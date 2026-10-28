@@ -10,9 +10,12 @@
     "test": "vitest run",
     "eval": "tsx src/evaluation/challenge-run.ts",
     "eval:legacy": "tsx src/evaluation/evaluate.ts",
-    "ai:check": "NODE_ENV=development tsx scripts/check-ai.ts"
+    "ai:check": "NODE_ENV=development tsx scripts/check-ai.ts",
+    "test:e2e": "playwright test",
+    "migrate:local": "tsx scripts/migrate-auth.ts"
   },
   "dependencies": {
+    "better-auth": "^1.7.14",
     "lucide-react": "^1.62.0",
     "next": "16.4.3",
     "pg": "^8.23.1",
@@ -21,6 +24,7 @@
     "tldts": "^7.4.19"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",

@@ -1,0 +1,24 @@
+# Implementation status — 5.0
+
+This is an incomplete development snapshot, not a commercial SaaS release. Public production authentication is deliberately disabled. Local accounts do not verify email, reset passwords or implement production abuse protections; use synthetic data and unique test passwords only.
+
+## Available locally
+
+- Public landing, separate `/analyze`, `/pricing`, `/developers`, `/login` and `/signup` pages; the developer playground makes a real rules-only API request. The public analysis supports optional AI subject to consent and provider availability.
+- With the explicitly configured loopback-only development account mode: Better Auth signup, login, logout and session-protected dashboard; idempotent personal workspace, default project and 10 experimental credits; create additional projects scoped to the signed-in user.
+- `/dashboard/analyses`, `api-keys`, `playground`, `usage`, `billing` and `settings` show honest unavailable states. `/admin` grants no administrative access and only explains that admin is unavailable.
+- In the local signed-in workspace, an analysis reserves one test credit, settles one on successful rules or AI analysis, and releases it on AI fallback; settlement and metadata-only usage are recorded transactionally. Repeated request IDs are rejected rather than replaying results. Message contents are not persisted. These are test credits only. The public experimental API is unauthenticated and must not be exposed publicly without real abuse controls.
+
+## Last verification
+
+On 2026-10-28: actual browser signup, project creation, logout, login and protected dashboard; Playwright tested local rules analysis, credit deduction, usage, duplicate request rejection, 20 concurrent HTTP requests, user project isolation, logout, rules-only developer API, and 375/390/768/1024/1440 pixel horizontal overflow on six public pages. Local provider check returned `FAILED / rate_limit`; no live AI success is claimed for that run. A previous synthetic live check succeeded; see `docs/evaluation/live-mini-evaluation.md`. UI screenshots are synthetic local examples, not evidence of deployed service.
+
+## Local account setup
+
+Use a dedicated disposable local PostgreSQL on `127.0.0.1:55443`, database `overto`, and a unique local database password. Add `OVERTO_AUTH_LOCAL=true`, `OVERTO_DEV_DATABASE_URL` with that database connection string, a strong random `OVERTO_AUTH_SECRET`, and `BETTER_AUTH_URL=http://127.0.0.1:3005` to ignored `.env.local`. Do not reuse production credentials. `npx tsx scripts/migrate-auth.ts` only accepts that local host, port and database and creates auth, workspace and credit tables. Run `npm run dev -- -p 3005`. The migration is not a production migration system and must not be used for valuable data. The test-only local setup already exists on the current machine; do not recreate its volume without a backup.
+
+Playwright against the running, configured local server: `PLAYWRIGHT_CHROMIUM_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npx playwright test`. This creates synthetic users and projects in the local test database. The PostgreSQL ledger integration tests require a separate empty `LEDGER_TEST_DATABASE_URL`; otherwise five tests are skipped. Do not point the test variable at the account database.
+
+## Known limitations
+
+No verified email, password recovery, authenticated production configuration, team memberships, project rename/archive, API keys, Stripe, admin RBAC, OCR, distributed rate limit, public HTTPS, GHCR or full browser accessibility audit. Provider failure, crash recovery, cancellation and production usage reconciliation have not received full HTTP acceptance tests. Session and authorization paths require security review before exposure. See the acceptance matrix and next actions.

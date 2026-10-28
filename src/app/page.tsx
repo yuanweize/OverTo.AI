@@ -1,174 +1,24 @@
-'use client';
-
-import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, Check, FileSearch, ShieldCheck, Braces, MessageSquareText } from 'lucide-react';
 import { Header } from '@/components/Header';
-import { ScenarioSelector } from '@/components/ScenarioSelector';
-import { AnalysisForm } from '@/components/AnalysisForm';
-import { AnalysisResultsView } from '@/components/AnalysisResultsView';
-import { VerificationWorkflow } from '@/components/VerificationWorkflow';
-import { BarometerInsights } from '@/components/BarometerInsights';
-import { HowItWorks } from '@/components/HowItWorks';
-import { EmergencyChecklist } from '@/components/EmergencyChecklist';
 import { Footer } from '@/components/Footer';
-import { sanitizeInput } from '@/lib/sanitizer';
-import { DemoScenario, AnalysisResult } from '@/types/analyzer';
-import { AlertCircle, ShieldCheck, Eye, Route } from 'lucide-react';
 
 export default function Home() {
-  const inputVersion = useRef(0);
-  const [inputText, setInputText] = useState<string>('');
-  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [reviewed, setReviewed] = useState(false);
-  const [aiConsent, setAiConsent] = useState(false);
-  const previewOpen = preview !== null;
-  useEffect(() => { if (previewOpen) document.getElementById('preview-title')?.focus(); }, [previewOpen]);
-  useEffect(() => { if (analysisResult) document.getElementById('result-title')?.focus(); }, [analysisResult]);
-
-  const preparePreview = () => {
-    if (!inputText.trim()) return;
-    setPreview(sanitizeInput(inputText).sanitizedText);
-    setReviewed(false);
-    setAiConsent(false);
-    setAnalysisResult(null);
-    setErrorMessage(null);
-  };
-
-  const handleSelectScenario = (scenario: DemoScenario) => {
-    inputVersion.current++;
-    setPreview(null);
-    setSelectedScenarioId(scenario.id);
-    setInputText(scenario.sampleText);
-    setAnalysisResult(null);
-    setErrorMessage(null);
-    document.getElementById('message-input')?.focus();
-  };
-
-  const handleAnalyze = async () => {
-    if (!preview?.trim() || !reviewed) return;
-    const safePreview = sanitizeInput(preview).sanitizedText;
-    if (safePreview !== preview) {
-      setPreview(safePreview);
-      setReviewed(false);
-      setAiConsent(false);
-      setErrorMessage('V upraveném textu byly nalezeny další údaje. Zkontrolujte novou podobu před odesláním.');
-      return;
-    }
-    const version = inputVersion.current;
-    setIsLoading(true);
-    setErrorMessage(null);
-    setAnalysisResult(null);
-
-    try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: safePreview,
-          enableLlm: aiConsent,
-          aiConsent,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || 'Analýza selhala. Zkuste to prosím znovu.');
-      }
-
-      const data: AnalysisResult = await response.json();
-      if (version === inputVersion.current) setAnalysisResult(data);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Došlo k neočekávané chybě.';
-      if (version === inputVersion.current) setErrorMessage(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <Header />
-
-      <a href="#message-input" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-teal-900">Přejít k zadání zprávy</a>
-      <main className="flex-1">
-        <section id="top" className="bg-[#eef5f3] pt-10 pb-7 sm:pt-14 sm:pb-10">
-          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-            <div className="max-w-2xl">
-              <p className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-800"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Pomocník pro podezřelé zprávy</p>
-              <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl">Nejste si jistí zprávou? Zastavte se a ověřte ji.</h1>
-              <p className="mt-4 max-w-xl text-base leading-7 text-slate-700 sm:text-lg">Vložte zprávu a zjistěte, na co si dát pozor a jak bezpečně pokračovat.</p>
-            </div>
-            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-slate-700">
-              <span className="inline-flex items-center gap-2"><Eye className="h-4 w-4 text-teal-700" aria-hidden="true" /> Text před odesláním zkontrolujete</span>
-              <span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-teal-700" aria-hidden="true" /> Praktický postup ověření</span>
-            </div>
-          </div>
-        </section>
-
-        {/* INTERAKTIVNÍ PRACOVNÍ PLOCHA (Scénáře + Formulář + Výsledky) */}
-        <section className="py-8 sm:py-10">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-            <AnalysisForm
-              text={inputText}
-              onChangeText={(newText) => {
-                inputVersion.current++;
-                setInputText(newText);
-                setPreview(null);
-                setReviewed(false);
-                setAiConsent(false);
-                setAnalysisResult(null);
-                setSelectedScenarioId(null);
-                setErrorMessage(null);
-              }}
-              onAnalyze={preparePreview}
-              isLoading={isLoading}
-            />
-            <ScenarioSelector selectedId={selectedScenarioId} onSelectScenario={handleSelectScenario} />
-
-            {preview !== null && (
-              <section aria-labelledby="preview-title" className="rounded-2xl border border-teal-200 bg-white p-5 shadow-sm sm:p-7">
-                <h2 id="preview-title" tabIndex={-1} className="text-xl font-bold text-slate-900">Zkontrolujte, co odešlete</h2>
-                <p id="preview-help" className="mt-2 text-sm leading-relaxed text-slate-700">Prohlížeč se pokusil skrýt některé citlivé údaje a odstranit cestu a parametry odkazů. Může něco přehlédnout, například jména nebo adresy. Odstraňte je ručně. Text níže a názvy hostitelů odešleme našemu serveru.</p>
-                <label htmlFor="preview-text" className="mt-4 block text-sm font-semibold text-slate-900">Text k odeslání (můžete jej upravit)</label>
-                <textarea id="preview-text" aria-describedby="preview-help" rows={6} maxLength={10000} value={preview} onChange={e => { inputVersion.current++; setPreview(e.target.value); setReviewed(false); setAiConsent(false); setAnalysisResult(null); }} className="mt-2 w-full rounded-lg border border-slate-400 bg-white p-4 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700" />
-                <label className="mt-3 flex min-h-11 items-start gap-3 text-sm text-slate-800"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-700" /><span>Zkontroloval/a jsem text a odstranil/a údaje, které nechci odeslat.</span></label>
-                <label className="mt-3 flex min-h-12 items-center gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-950"><input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} className="h-4 w-4 accent-teal-700" /><span>Použít AI — upravený text se odešle poskytovateli modelu.</span></label>
-                <button type="button" onClick={handleAnalyze} disabled={!reviewed || !preview.trim() || isLoading} className="mt-5 min-h-12 w-full rounded-lg bg-teal-800 px-6 py-3 font-bold text-white hover:bg-teal-900 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:w-auto">{isLoading ? 'Probíhá analýza…' : aiConsent ? 'Odeslat a analyzovat s AI' : 'Odeslat a analyzovat pravidly'}</button>
-                <p role="status" className="mt-2 text-sm text-slate-600">{isLoading ? 'Vyčkejte prosím na výsledek.' : ''}</p>
-              </section>
-            )}
-
-            {/* Chybové hlášení */}
-            {errorMessage && (
-              <div role="alert" className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            {/* Zobrazení výsledků analýzy */}
-            {analysisResult && (
-              <div key={analysisResult.metadata.analyzedAt}><AnalysisResultsView result={analysisResult} /><VerificationWorkflow categories={analysisResult.detectedCategories} /></div>
-            )}
-          </div>
-        </section>
-
-        {/* ČESKÝ BAROMETR OBAV Z AI 2026 DATA */}
-        <BarometerInsights />
-
-        {/* JAK TO FUNGUJE & ARCHITEKTURA */}
-        <HowItWorks />
-
-        {/* SOS PRVNÍ POMOC */}
-        <EmergencyChecklist />
-      </main>
-
-      <Footer />
-    </div>
-  );
+  return <div className="min-h-screen bg-[#f6f8f7]"><Header />
+    <main id="main">
+      <section className="mx-auto grid max-w-6xl gap-12 px-5 pb-16 pt-16 lg:grid-cols-[1.05fr_.95fr] lg:items-center lg:pb-24 lg:pt-24">
+        <div><p className="inline-flex items-center gap-2 text-sm font-semibold text-teal-800"><ShieldCheck size={17} aria-hidden="true"/> Prostor pro klidnější rozhodnutí</p>
+          <h1 className="mt-5 max-w-xl text-4xl font-bold leading-[1.08] tracking-tight text-slate-950 sm:text-6xl">Než odpovíte, ověřte si zprávu.</h1>
+          <p className="mt-6 max-w-xl text-lg leading-8 text-slate-700">Podezřelá SMS, e-mail nebo žádost o platbu? OvěřTo.AI pomáhá najít varovné signály a navrhnout bezpečný další krok.</p>
+          <div className="mt-8 flex flex-wrap gap-3"><Link href="/analyze" className="inline-flex min-h-12 items-center gap-2 rounded-lg bg-teal-800 px-6 font-semibold text-white hover:bg-teal-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800">Vyzkoušet analýzu <ArrowRight size={18} aria-hidden="true"/></Link><Link href="/developers" className="inline-flex min-h-12 items-center rounded-lg border border-slate-300 bg-white px-6 font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-800">Pro vývojáře</Link></div>
+          <p className="mt-5 text-sm leading-6 text-slate-600">Bez registrace · Text před odesláním zkontrolujete · AI je volitelná</p><Link href="/analyze#sos-pomoc" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-rose-800 underline underline-offset-4">Už jste poslali peníze nebo sdíleli údaje?</Link></div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_18px_60px_rgba(15,40,36,.08)] sm:p-7" aria-label="Ukázka postupu ověření">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4"><span className="flex items-center gap-2 font-semibold text-slate-900"><FileSearch className="text-teal-700" size={20}/> Přehled zprávy</span><span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">Ilustrační ukázka</span></div>
+          <div className="mt-6 rounded-xl bg-slate-50 p-5"><p className="text-xs font-semibold text-slate-600">PŘÍKLAD ZPRÁVY</p><p className="mt-2 leading-7 text-slate-800">„Ahoj, mám nové číslo. <mark className="rounded bg-amber-100 px-1 text-slate-900">Pošli mi ihned peníze.</mark>“</p></div>
+          <div className="mt-5 flex gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-900"><MessageSquareText size={18}/></span><div><h2 className="font-semibold text-slate-900">Žádost o platbu pod tlakem</h2><p className="mt-1 text-sm leading-6 text-slate-600">Zavolejte odesílateli na číslo, které už znáte. Ukázka není výsledkem živé analýzy.</p></div></div>
+        </div>
+      </section>
+      <section className="border-y border-slate-200 bg-white"><div className="mx-auto grid max-w-6xl gap-8 px-5 py-12 md:grid-cols-3">{[["Srozumitelné signály","Uvidíte části zprávy, které mohou vyžadovat pozornost."],["Nezávislé ověření","Dostanete postup, jak si žádost ověřit vlastní cestou."],["Kontrola nad textem","Před odesláním můžete upravit údaje, které nechcete sdílet."]].map(([a,b])=><div key={a}><Check className="mb-3 text-teal-700" size={20} aria-hidden="true"/><h2 className="font-semibold text-slate-950">{a}</h2><p className="mt-2 text-sm leading-6 text-slate-600">{b}</p></div>)}</div></section>
+      <section className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-2"><div><p className="text-sm font-semibold text-teal-800">Pro jednotlivce i vývojáře</p><h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">Pomoc při rozhodování, ne příslib jistoty.</h2><p className="mt-4 max-w-xl leading-7 text-slate-700">Pravidla a volitelná AI pomáhají popsat možné rizikové znaky. Systém nedokáže ověřit totožnost odesílatele ani zaručit, že je zpráva bezpečná.</p><Link href="/analyze" className="mt-5 inline-flex min-h-11 items-center gap-2 font-semibold text-teal-800 underline underline-offset-4">Otevřít pracovní plochu <ArrowRight size={16}/></Link></div><div className="rounded-xl bg-slate-900 p-7 text-white"><Braces size={25} className="text-teal-300"/><h2 className="mt-4 text-xl font-semibold">Experimentální API</h2><p className="mt-3 leading-7 text-slate-300">Strukturované signály, citované úryvky a doporučení pro nezávislé ověření. Správa klíčů a komerční použití se připravují.</p><Link href="/developers" className="mt-5 inline-flex min-h-11 items-center font-semibold text-teal-200 underline underline-offset-4">Prozkoumat API</Link></div></section>
+    </main><Footer /></div>;
 }

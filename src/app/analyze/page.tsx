@@ -1,2 +1,2 @@
-import Home from '../page';
-export default function AnalyzePage() { return <Home />; }
+import { AnalysisWorkspace } from '@/components/AnalysisWorkspace';
+export default function AnalyzePage() { return <AnalysisWorkspace />; }

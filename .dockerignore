@@ -4,6 +4,8 @@ node_modules
 .env*
 !.env.example
 coverage
+test-results
+playwright-report
 docs/research
 docs/audit
 submission

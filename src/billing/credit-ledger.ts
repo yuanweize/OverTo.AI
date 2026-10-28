@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg';
 
 type Category = 'PROMOTIONAL' | 'SUBSCRIPTION' | 'PURCHASED';
 type Reservation = { id: string; amount: number; status: 'RESERVED' | 'CONSUMED' | 'RELEASED' | 'EXPIRED'; settled_amount: number | null };
+type LocalUsage = { projectId: string; mode: 'RULES' | 'AI'; providerStatus: string; model: string | null; durationMs: number };
 
 /** Internal experimental ledger. Callers must authorize account access before invoking it. */
 export class CreditLedger {
@@ -49,23 +50,23 @@ export class CreditLedger {
     return { granted, consumed, reserved, available: granted - consumed - reserved };
   }
 
-  async reserve(accountId: string, key: string, amount: number, ttlSeconds: number): Promise<Reservation> {
+  async reserve(accountId: string, key: string, amount: number, ttlSeconds: number): Promise<Reservation & { created: boolean }> {
     requireKey(key); requireAmount(amount);
     if (!Number.isInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > 3600) throw new Error('INVALID_TTL');
     return this.locked(accountId, async client => {
       const previous = await client.query<Reservation & { ttl_seconds: number }>('SELECT id, amount, status, settled_amount, ttl_seconds FROM credit_reservations WHERE account_id = $1 AND idempotency_key = $2', [accountId, key]);
       if (previous.rowCount) {
         if (previous.rows[0].amount !== amount || previous.rows[0].ttl_seconds !== ttlSeconds) throw new Error('IDEMPOTENCY_CONFLICT');
-        return previous.rows[0];
+        return { ...previous.rows[0], created: false };
       }
       if ((await this.balanceInTransaction(client, accountId)).available < amount) throw new Error('INSUFFICIENT_CREDITS');
       const result = await client.query<Reservation>(`INSERT INTO credit_reservations (account_id, idempotency_key, amount, ttl_seconds, expires_at)
         VALUES ($1, $2, $3, $4::integer, now() + $4::integer * interval '1 second') RETURNING id, amount, status, settled_amount`, [accountId, key, amount, ttlSeconds]);
-      return result.rows[0];
+      return { ...result.rows[0], created: true };
     });
   }
 
-  async settle(accountId: string, key: string, actualAmount: number): Promise<Reservation> {
+  async settle(accountId: string, key: string, actualAmount: number, usage?: LocalUsage): Promise<Reservation> {
     requireKey(key);
     if (!Number.isSafeInteger(actualAmount) || actualAmount < 0) throw new Error('INVALID_AMOUNT');
     return this.locked(accountId, async client => {
@@ -79,6 +80,8 @@ export class CreditLedger {
       if (reservation.status !== 'RESERVED') throw new Error('RESERVATION_EXPIRED');
       if (actualAmount > reservation.amount) throw new Error('EXCEEDS_RESERVATION');
       if (actualAmount > 0) await client.query('INSERT INTO credit_transactions (account_id, reservation_id, amount) VALUES ($1,$2,$3)', [accountId, reservation.id, actualAmount]);
+      if (usage) await client.query(`INSERT INTO local_usage_events (account_id, reservation_id, project_id, mode, provider_status, model, duration_ms, credits)
+        SELECT $1,$2,p.id,$4,$5,$6,$7,$8 FROM local_projects p WHERE p.id=$3 AND p.workspace_id=$1`, [accountId, reservation.id, usage.projectId, usage.mode, usage.providerStatus, usage.model, usage.durationMs, actualAmount]).then(result => { if (result.rowCount !== 1) throw new Error('PROJECT_NOT_FOUND'); });
       const updated = await client.query<Reservation>("UPDATE credit_reservations SET status = $1, settled_amount = $2 WHERE id = $3 RETURNING id, amount, status, settled_amount", [actualAmount ? 'CONSUMED' : 'RELEASED', actualAmount, reservation.id]);
       return updated.rows[0];
     });

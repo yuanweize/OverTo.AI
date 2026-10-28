@@ -7,17 +7,18 @@ Czech-language experimental assistant for examining suspicious messages and guid
 - **Implemented:** local attempted redaction and editable review, rules and offline URL checks, opt-in OpenLux-compatible structured-output integration with validation and fallback, and a branching verification guide.
 - **Experimental:** AI integration has mock tests and limited real model smoke tests. It is disabled by default; individual provider availability varies. No independently reviewed or representative accuracy study has been completed.
 - **Not yet available:** public demo, independent AI evaluation, OCR, distributed rate limiting and production deployment. Do not expose the AI endpoint publicly without enforcing real quotas and spending limits.
-- **Ledger prototype:** a separate PostgreSQL credit ledger has integration tests for concurrency and retries. It is not connected to analyses, accounts, subscriptions or payments; do not use it for billing yet. See [ledger status](docs/saas/ledger.md).
+- **Local account experiment:** on an explicitly configured development server only, users can sign up, sign in, create a personal workspace and projects, and receive a one-time test credit grant. Email verification, password reset, production accounts and billing are not available. Do not use real credentials. See [development status](docs/development/IMPLEMENTATION-STATUS.md).
+- **Local metering experiment:** signed-in local analyses reserve and settle test credits and record metadata-only usage. This is not production billing; subscriptions, payments, reconciliation and robust failure recovery remain incomplete. See [ledger status](docs/saas/ledger.md).
 
 ## Product preview
 
-![Desktop analysis workspace](assets/screenshots/home-desktop.png)
+![Desktop home page](assets/screenshots/saas-home-desktop.png)
 
 The workspace supports redaction review, optional AI, grounded excerpts and contextual verification. The experimental action graph links observed signals or model-proposed actions to matching text; it does not prove identity, intent, or fraud.
 
 ## API and deployment
 
-`POST /api/v1/analyses` returns an ephemeral versioned result and evidence graph. See [API documentation](docs/api/v1.md). Results are not stored, and retrieval, user accounts and admin controls are not yet implemented.
+`POST /api/v1/analyses` returns an ephemeral versioned result and evidence graph. See [API documentation](docs/api/v1.md). Results are not stored. Retrieval, commercial accounts, API keys and admin controls are not yet implemented.
 
 A self-hosted rules-only container can be started using `docker compose up --build` and accessed at `http://127.0.0.1:3006`. The image was tested on arm64; public deployment, rate limits, model billing controls and other architectures have not been validated. Cloudflare Workers and OCR are planned, not deployed.
 
