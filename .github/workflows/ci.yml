@@ -34,3 +34,52 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+  local-journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: overto
+          POSTGRES_PASSWORD: local-ci-password
+          POSTGRES_DB: overto
+        ports:
+          - 55443:5432
+        options: >-
+          --health-cmd "pg_isready -U overto -d overto"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mailpit:
+        image: axllent/mailpit@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      OVERTO_AUTH_LOCAL: 'true'
+      OVERTO_LOCAL_VERIFY_EMAIL: 'true'
+      OVERTO_DEV_DATABASE_URL: postgresql://overto:local-ci-password@127.0.0.1:55443/overto
+      OVERTO_AUTH_SECRET: local-ci-only-secret-not-for-any-other-use-123456789
+      BETTER_AUTH_URL: http://127.0.0.1:3005
+      AI_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run migrate:local
+      - name: Start local server and run browser journeys
+        run: |
+          npm run dev -- -p 3005 > /tmp/overto-ci-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3005/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3005/ >/dev/null
+          npm run test:e2e

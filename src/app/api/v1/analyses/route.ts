@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const match = /^Bearer (ovt_test_[A-Za-z0-9_-]{43})$/.exec(authorization);
     if (!pool || !match) return NextResponse.json({ schemaVersion: '1.0', error: { code: 'INVALID_KEY', message: 'Neplatný klíč.' } }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
     const hash = createHash('sha256').update(match[1]).digest('hex');
-    const lookup = await pool.query<{ workspace_id: string; project_id: string }>("UPDATE local_api_keys SET last_used_at=now() WHERE key_hash=$1 AND revoked_at IS NULL AND expires_at > now() RETURNING workspace_id, project_id", [hash]);
+    const lookup = await pool.query<{ workspace_id: string; project_id: string }>(`UPDATE local_api_keys k SET last_used_at=now() FROM local_workspaces w JOIN "user" u ON u.id=w.user_id JOIN local_projects p ON p.workspace_id=w.id WHERE k.project_id=p.id AND p.archived_at IS NULL AND k.workspace_id=w.id AND u."emailVerified"=true AND k.key_hash=$1 AND k.revoked_at IS NULL AND k.expires_at > now() RETURNING k.workspace_id, k.project_id`, [hash]);
     if (!lookup.rowCount) return NextResponse.json({ schemaVersion: '1.0', error: { code: 'INVALID_KEY', message: 'Neplatný nebo zrušený klíč.' } }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
     response = await runLocalAnalysis(request, lookup.rows[0].workspace_id, lookup.rows[0].project_id);
     metered = true;

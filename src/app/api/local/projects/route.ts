@@ -6,7 +6,7 @@ import type { NextRequest } from 'next/server';
 export async function POST(request: NextRequest) {
   if (!auth || !pool || request.headers.get('origin') !== process.env.BETTER_AUTH_URL) return Response.json({ error: 'Nedostupné.' }, { status: 403 });
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) return Response.json({ error: 'Přihlaste se.' }, { status: 401 });
+  if (!session || !session.user.emailVerified) return Response.json({ error: 'Přihlaste se.' }, { status: 401 });
   const reader = request.body?.getReader(); if (!reader) return Response.json({ error: 'Chybí údaje.' }, { status: 400 });
   const parts: Uint8Array[] = []; let bytes = 0;
   while (true) { const chunk = await reader.read(); if (chunk.done) break; bytes += chunk.value.byteLength; if (bytes > 1024) { await reader.cancel(); return Response.json({ error: 'Příliš velký požadavek.' }, { status: 413 }); } parts.push(chunk.value); }
