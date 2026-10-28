@@ -15,7 +15,7 @@ describe('v1 analysis API', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
   it('preserves consent and input validation errors', async () => {
-    const req = new NextRequest('http://localhost/api/v1/analyses', { method: 'POST', body: JSON.stringify({ text: 'test', enableLlm: true }) });
+    const req = new NextRequest('http://localhost/api/v1/analyses', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'test', enableLlm: true }) });
     expect((await POST(req)).status).toBe(400);
   });
 });

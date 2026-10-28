@@ -1,5 +1,6 @@
 /** Server-only semantic provider. User content is untrusted; outputs never authorize actions. */
 import { networkInterfaces } from 'node:os';
+import { providerLimiter } from './process-limiter';
 import type { ScamCategory, Severity } from '@/types/analyzer';
 
 const categories: ScamCategory[] = ['IMPERSONATION', 'URGENCY_PRESSURE', 'PAYMENT_DEMAND', 'CREDENTIAL_THEFT', 'OTP_THEFT', 'REMOTE_ACCESS', 'SUSPICIOUS_URL', 'FAMILY_EMERGENCY', 'PACKAGE_DELIVERY', 'INVESTMENT_FRAUD'];
@@ -104,6 +105,8 @@ export async function runLlmAnalysisIfConfigured(sanitizedText: string): Promise
       url.pathname === '/v1' && !url.search && !url.hash && addresses.includes(url.hostname);
   } catch { return { status: 'BLOCKED', reason: 'deployment_gate' }; }
   if (baseUrl !== 'https://api.openlux.ai/v1' && !localGateway) return { status: 'BLOCKED', reason: 'deployment_gate' };
+  const permit = providerLimiter.acquire();
+  if ('retryAfter' in permit) return { status: 'FAILED', reason: 'rate_limit' };
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), 45000);
   try {
@@ -127,5 +130,5 @@ export async function runLlmAnalysisIfConfigured(sanitizedText: string): Promise
     return { status: 'SUCCESS', analysis: validated.analysis, rejectedEvidence: validated.rejectedEvidence, model };
   } catch {
     return { status: 'FAILED', reason: abort.signal.aborted ? 'timeout' : 'provider' };
-  } finally { clearTimeout(timer); }
+  } finally { clearTimeout(timer); permit.release(); }
 }

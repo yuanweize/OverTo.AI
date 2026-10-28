@@ -5,30 +5,25 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeSuspiciousMessage } from '@/lib/decision-engine';
+import { analysisLimiter } from '@/lib/process-limiter';
+import { readRequestBody } from '@/lib/read-request-body';
 
 
 export async function POST(request: NextRequest) {
+  const permit = analysisLimiter.acquire();
+  if ('retryAfter' in permit) return NextResponse.json({ error: 'Server je dočasně vytížen. Zkuste to prosím později.' }, { status: 429, headers: { 'Retry-After': String(permit.retryAfter), 'Cache-Control': 'no-store' } });
   try {
+    if (request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') return NextResponse.json({ error: 'Použijte Content-Type: application/json.' }, { status: 415, headers: { 'Cache-Control': 'no-store' } });
     // Bound the body while reading, including requests without Content-Length.
-    const reader = request.body?.getReader();
-    if (!reader) return NextResponse.json({ error: 'Chybí tělo požadavku.' }, { status: 400 });
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 40000) {
-        await reader.cancel();
-        return NextResponse.json({ error: 'Požadavek je příliš velký.' }, { status: 413 });
-      }
-      chunks.push(value);
+    let bytes: Uint8Array;
+    try { bytes = await readRequestBody(request, 40000); }
+    catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      const status = code === 'BODY_TOO_LARGE' ? 413 : code === 'BODY_TIMEOUT' ? 408 : 400;
+      return NextResponse.json({ error: status === 413 ? 'Požadavek je příliš velký.' : status === 408 ? 'Čas na odeslání požadavku vypršel.' : 'Chybí tělo požadavku.' }, { status, headers: { 'Cache-Control': 'no-store' } });
     }
     let body: { text?: unknown; enableLlm?: unknown; aiConsent?: unknown };
     try {
-      const bytes = new Uint8Array(size);
-      let offset = 0;
-      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
       body = JSON.parse(new TextDecoder().decode(bytes));
     } catch {
       return NextResponse.json({ error: 'Neplatný JSON.' }, { status: 400 });
@@ -72,5 +67,5 @@ export async function POST(request: NextRequest) {
       { error: 'Při analýze zprávy došlo k neočekávané chybě. Zkuste to prosím znovu.' },
       { status: 500 }
     );
-  }
+  } finally { permit.release(); }
 }

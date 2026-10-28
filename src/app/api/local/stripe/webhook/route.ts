@@ -4,6 +4,7 @@ import { pool } from '@/auth/server';
 import { stripeTestConfig } from '@/billing/stripe-test';
 import { CreditLedger } from '@/billing/credit-ledger';
 import { verifyTestEvent } from '@/billing/stripe-signature';
+import { readRequestBody } from '@/lib/read-request-body';
 
 const id = (value: string | { id: string } | null | undefined) => typeof value === 'string' ? value : value?.id;
 
@@ -13,10 +14,13 @@ export async function POST(request: NextRequest) {
   if (!config || !pool) return NextResponse.json({ error: 'Stripe test mode unavailable' }, { status: 503 });
   const signature = request.headers.get('stripe-signature');
   if (!signature) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
-  const reader = request.body?.getReader(); if (!reader) return NextResponse.json({ error: 'Missing body' }, { status: 400 });
-  const chunks: Uint8Array[] = []; let size = 0;
-  while (true) { const part = await reader.read(); if (part.done) break; size += part.value.byteLength; if (size > 262144) { await reader.cancel(); return NextResponse.json({ error: 'Body too large' }, { status: 413 }); } chunks.push(part.value); }
-  const event = verifyTestEvent(config.stripe, Buffer.concat(chunks), signature, config.webhookSecret);
+  let body: Uint8Array;
+  try { body = await readRequestBody(request, 262144); }
+  catch (error) {
+    const code = error instanceof Error ? error.message : '';
+    return NextResponse.json({ error: code === 'BODY_TOO_LARGE' ? 'Body too large' : code === 'BODY_TIMEOUT' ? 'Body timeout' : 'Missing body' }, { status: code === 'BODY_TOO_LARGE' ? 413 : code === 'BODY_TIMEOUT' ? 408 : 400 });
+  }
+  const event = verifyTestEvent(config.stripe, Buffer.from(body), signature, config.webhookSecret);
   if (!event) return NextResponse.json({ error: 'Invalid signature or live event' }, { status: 400 });
   if (event.type !== 'invoice.paid' && !event.type.startsWith('customer.subscription.')) return NextResponse.json({ received: true });
   try {

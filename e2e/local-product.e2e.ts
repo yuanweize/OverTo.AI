@@ -197,3 +197,17 @@ test('public pages fit common viewport widths', async ({ page }) => {
     }
   }
 });
+
+test('system dark theme keeps the main surfaces readable on mobile', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const path of ['/', '/analyze', '/developers', '/pricing']) {
+    await page.goto(path);
+    await expect(page.locator('h1')).toBeVisible();
+    await expect(page.locator('header')).toHaveCSS('background-color', 'rgb(25, 40, 42)');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), path).toBe(false);
+  }
+  await page.goto('/analyze');
+  await expect(page.locator('#top')).toHaveCSS('background-color', 'rgb(16, 26, 28)');
+  await expect(page.locator('#message-input')).toHaveCSS('background-color', 'rgb(16, 26, 28)');
+});

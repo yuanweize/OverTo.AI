@@ -53,9 +53,18 @@ paths:
         '400': { description: Invalid input or missing AI consent. }
         '401': { description: Invalid, expired or revoked local test key. }
         '402': { description: Insufficient local test credits. }
+        '408': { description: Request body was not received before the deadline. }
         '409': { description: Local request identifier already used. }
         '413': { description: Request too large. }
+        '415': { description: Content-Type must be application/json. }
+        '429':
+          description: Per-process circuit breaker is full. This is not distributed rate limiting.
+          headers:
+            Retry-After:
+              description: Seconds before retrying.
+              schema: { type: integer, minimum: 1 }
         '500': { description: Internal processing error. }
+        '503': { description: Local service unavailable. }
   /api/v1/health:
     get:
       summary: Basic service health

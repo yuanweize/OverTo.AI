@@ -3,9 +3,13 @@ import { POST as analyze } from '@/app/api/analyze/route';
 import { buildActionGraph } from '@/fraud-engine/action-graph';
 import type { AnalysisResult } from '@/types/analyzer';
 import { createHash } from 'node:crypto';
+import { apiEntryLimiter } from '@/lib/process-limiter';
 
 /** Non-persistent v1 wrapper around the existing, bounded and consent-gated endpoint. */
 export async function POST(request: NextRequest) {
+  const permit = apiEntryLimiter.acquire();
+  if ('retryAfter' in permit) return NextResponse.json({ schemaVersion: '1.0', error: { code: 'RATE_LIMITED', message: 'Server je dočasně vytížen.' } }, { status: 429, headers: { 'Retry-After': String(permit.retryAfter), 'Cache-Control': 'no-store' } });
+  try {
   const authorization = request.headers.get('authorization');
   let response: Response;
   let metered = false;
@@ -22,7 +26,10 @@ export async function POST(request: NextRequest) {
   } else response = await analyze(request);
   if (!response.ok) {
     const body = await response.json();
-    return NextResponse.json({ schemaVersion: '1.0', error: { code: 'ANALYSIS_REQUEST_FAILED', message: body.error } }, { status: response.status, headers: { 'Cache-Control': 'no-store' } });
+    const headers: Record<string, string> = { 'Cache-Control': 'no-store' };
+    const retryAfter = response.headers.get('retry-after');
+    if (retryAfter) headers['Retry-After'] = retryAfter;
+    return NextResponse.json({ schemaVersion: '1.0', error: { code: response.status === 429 ? 'RATE_LIMITED' : 'ANALYSIS_REQUEST_FAILED', message: body.error } }, { status: response.status, headers });
   }
   const payload = await response.json();
   const result: AnalysisResult = metered ? payload.result : payload;
@@ -37,4 +44,5 @@ export async function POST(request: NextRequest) {
     metadata: { engineVersion: '0.1.0', rulesetVersion: 'development', decisionPolicyVersion: '1' , processingTimeMs: result.metadata.processingTimeMs, analyzedAt: result.metadata.analyzedAt, ...(metered ? { testCreditsCharged: payload.creditsCharged } : {}) },
     result,
   }, { headers: { 'Cache-Control': 'no-store' } });
+  } finally { permit.release(); }
 }
