@@ -75,6 +75,8 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   try {
     const unverified = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${apiKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
     expect(unverified.status()).toBe(401);
+    const profileChange = await a.request.post('/api/auth/update-user', { headers: { Origin: 'http://127.0.0.1:3005' }, data: { name: 'Unauthorized' } });
+    expect(profileChange.status()).toBe(401);
     await a.goto('/dashboard'); await expect(a).toHaveURL(/\/login/);
   } finally { await setSyntheticUserVerified(aEmail, true); }
   await a.goto('/dashboard/playground'); await a.getByLabel(/Testovací API klíč/).fill(apiKey); await a.getByRole('button', { name: 'Odeslat test' }).click();
