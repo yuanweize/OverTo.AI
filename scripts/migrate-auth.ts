@@ -17,6 +17,7 @@ async function main() {
     const existing = await pool.query("SELECT to_regclass('public.credit_accounts') AS name");
     if (!existing.rows[0].name) await pool.query(await readFile('migrations/001_credit_ledger.sql', 'utf8'));
     await pool.query(await readFile('migrations/003_local_usage.sql', 'utf8'));
+    await pool.query(await readFile('migrations/004_local_api_keys.sql', 'utf8'));
     console.log('Local authentication and workspace tables ready.');
   } finally { await pool.end(); }
 }

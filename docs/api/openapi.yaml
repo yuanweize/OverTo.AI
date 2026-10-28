@@ -7,6 +7,17 @@ paths:
   /api/v1/analyses:
     post:
       summary: Analyze a user-reviewed message
+      parameters:
+        - in: header
+          name: Authorization
+          required: false
+          description: Optional local-development test bearer key; production key authentication is not available.
+          schema: { type: string }
+        - in: header
+          name: Idempotency-Key
+          required: false
+          description: UUID required when using a local test key. Replays return 409.
+          schema: { type: string, format: uuid }
       requestBody:
         required: true
         content:
@@ -40,6 +51,9 @@ paths:
                   metadata: { type: object }
                   result: { type: object }
         '400': { description: Invalid input or missing AI consent. }
+        '401': { description: Invalid, expired or revoked local test key. }
+        '402': { description: Insufficient local test credits. }
+        '409': { description: Local request identifier already used. }
         '413': { description: Request too large. }
         '500': { description: Internal processing error. }
   /api/v1/health:

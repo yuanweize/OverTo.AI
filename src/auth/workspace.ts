@@ -18,6 +18,7 @@ export async function personalWorkspace(userId: string) {
   await ledger.grant(workspaceId, 'local-trial-v1', 10, 'PROMOTIONAL');
   const balance = await ledger.balance(workspaceId);
   const projects = await pool.query<{ id: string; name: string }>('SELECT id,name FROM local_projects WHERE workspace_id=$1 ORDER BY created_at', [workspaceId]);
-  const usage = await pool.query<{ mode: string; provider_status: string; credits: number; created_at: Date }>('SELECT mode,provider_status,credits,created_at FROM local_usage_events WHERE account_id=$1 ORDER BY created_at DESC LIMIT 50', [workspaceId]);
-  return { workspaceId, balance, projects: projects.rows, usage: usage.rows };
+  const usage = await pool.query<{ mode: string; provider_status: string; credits: number; created_at: Date; project_name: string }>('SELECT u.mode,u.provider_status,u.credits,u.created_at,p.name AS project_name FROM local_usage_events u JOIN local_projects p ON p.id=u.project_id WHERE u.account_id=$1 ORDER BY u.created_at DESC LIMIT 50', [workspaceId]);
+  const keys = await pool.query<{ id: string; name: string; key_prefix: string; expires_at: Date; revoked_at: Date | null }>('SELECT id,name,key_prefix,expires_at,revoked_at FROM local_api_keys WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 100', [workspaceId]);
+  return { workspaceId, balance, projects: projects.rows, usage: usage.rows, keys: keys.rows };
 }

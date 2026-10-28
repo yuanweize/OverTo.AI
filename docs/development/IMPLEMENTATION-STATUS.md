@@ -6,12 +6,12 @@ This is an incomplete development snapshot, not a commercial SaaS release. Publi
 
 - Public landing, separate `/analyze`, `/pricing`, `/developers`, `/login` and `/signup` pages; the developer playground makes a real rules-only API request. The public analysis supports optional AI subject to consent and provider availability.
 - With the explicitly configured loopback-only development account mode: Better Auth signup, login, logout and session-protected dashboard; idempotent personal workspace, default project and 10 experimental credits; create additional projects scoped to the signed-in user.
-- `/dashboard/analyses`, `api-keys`, `playground`, `usage`, `billing` and `settings` show honest unavailable states. `/admin` grants no administrative access and only explains that admin is unavailable.
+- The local workspace can create project-scoped test API keys, reveal them once, call the API and revoke them. Hashes rather than full keys are stored. The local Playground sends real rules requests with a test key. `/dashboard/analyses`, `billing` and `settings` show unavailable states. `/admin` grants no administrative access and only explains that admin is unavailable.
 - In the local signed-in workspace, an analysis reserves one test credit, settles one on successful rules or AI analysis, and releases it on AI fallback; settlement and metadata-only usage are recorded transactionally. Repeated request IDs are rejected rather than replaying results. Message contents are not persisted. These are test credits only. The public experimental API is unauthenticated and must not be exposed publicly without real abuse controls.
 
 ## Last verification
 
-On 2026-10-28: actual browser signup, project creation, logout, login and protected dashboard; Playwright tested local rules analysis, credit deduction, usage, duplicate request rejection, 20 concurrent HTTP requests, user project isolation, logout, rules-only developer API, and 375/390/768/1024/1440 pixel horizontal overflow on six public pages. Local provider check returned `FAILED / rate_limit`; no live AI success is claimed for that run. A previous synthetic live check succeeded; see `docs/evaluation/live-mini-evaluation.md`. UI screenshots are synthetic local examples, not evidence of deployed service.
+On 2026-10-28: actual browser signup, project creation, logout, login and protected dashboard; Playwright tested local rules analysis, credit deduction, usage, duplicate request rejection, 20 concurrent HTTP requests, user project isolation, local API key creation, API access and revocation, logout, rules-only developer API, and 375/390/768/1024/1440 pixel horizontal overflow on six public pages. Local provider check returned `FAILED / rate_limit`; no live AI success is claimed for that run. A previous synthetic live check succeeded; see `docs/evaluation/live-mini-evaluation.md`. UI screenshots are synthetic local examples, not evidence of deployed service.
 
 ## Local account setup
 
@@ -21,4 +21,4 @@ Playwright against the running, configured local server: `PLAYWRIGHT_CHROMIUM_EX
 
 ## Known limitations
 
-No verified email, password recovery, authenticated production configuration, team memberships, project rename/archive, API keys, Stripe, admin RBAC, OCR, distributed rate limit, public HTTPS, GHCR or full browser accessibility audit. Provider failure, crash recovery, cancellation and production usage reconciliation have not received full HTTP acceptance tests. Session and authorization paths require security review before exposure. See the acceptance matrix and next actions.
+No verified email, password recovery, authenticated production configuration, team memberships, project rename/archive, production API keys, Stripe, admin RBAC, OCR, distributed rate limit, public HTTPS, GHCR or full browser accessibility audit. The local API key feature lacks custom scope, rotation, usage caps and an expiry test. Provider failure, crash recovery, cancellation and production usage reconciliation have not received full HTTP acceptance tests. Session and authorization paths require security review before exposure. See the acceptance matrix and next actions.
