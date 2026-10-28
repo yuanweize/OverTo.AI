@@ -1,0 +1,9 @@
+# Credit ledger prototype
+
+Status: implemented as an isolated PostgreSQL module and tested against PostgreSQL 17; not integrated into the application, deployed, or approved for financial use. It does not implement accounts, plans, subscriptions, billing, payments, webhooks, refunds, usage events, reconciliation, category-based spending or grant expiry. No analysis is charged.
+
+The prototype uses a row lock on the credit account inside each transaction. Grants and reservations have account-scoped idempotency keys, settlement records at most one consumption per reservation, and active reservations reduce available balance. Expired reservations are recovered lazily when that account is accessed; there is no background recovery job. Clients must authorize access to the account before invoking the module. Direct database writers that bypass the module could violate its invariants; database permissions and production hardening remain to be designed. Do not run the migration against an existing production database.
+
+The integration test creates tables in a dedicated empty database specified by `LEDGER_TEST_DATABASE_URL`; it must never point to a database containing valuable data. Tests skip if the variable is absent. CI supplies a fresh disposable PostgreSQL service. The test covers concurrent reservations, replay conflicts, settlement, release, lazy expiry and account separation at the ledger interface; it is not a test of user authorization or production-scale concurrency.
+
+Before billing use, complete and independently review authentication, workspace authorization, a persisted usage-to-ledger transaction policy, scheduled expiry and reconciliation, grant expiry/ordering, refunds, provider failure semantics, Stripe signature verification and replay handling, full audit logging, backup/restore, monitoring and load tests. Pricing and credit values have not been approved.

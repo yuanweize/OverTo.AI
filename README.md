@@ -7,6 +7,7 @@ Czech-language experimental assistant for examining suspicious messages and guid
 - **Implemented:** local attempted redaction and editable review, rules and offline URL checks, opt-in OpenLux-compatible structured-output integration with validation and fallback, and a branching verification guide.
 - **Experimental:** AI integration has mock tests and limited real model smoke tests. It is disabled by default; individual provider availability varies. No independently reviewed or representative accuracy study has been completed.
 - **Not yet available:** public demo, independent AI evaluation, OCR, distributed rate limiting and production deployment. Do not expose the AI endpoint publicly without enforcing real quotas and spending limits.
+- **Ledger prototype:** a separate PostgreSQL credit ledger has integration tests for concurrency and retries. It is not connected to analyses, accounts, subscriptions or payments; do not use it for billing yet. See [ledger status](docs/saas/ledger.md).
 
 ## Product preview
 

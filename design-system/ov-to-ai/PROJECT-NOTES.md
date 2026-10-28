@@ -1,0 +1,3 @@
+# Project design decisions
+
+The generated MASTER.md is a discovery artifact, not an established product specification. Its conversion-rate claim is unverified and must not be used as a business claim. The generated purple/pink palette and animation recommendations were not adopted automatically: they are generic to AI products and do not reflect the existing interface. Continue the existing trust-focused Czech analysis design until a deliberate visual system is reviewed in the browser. Prioritize readable text, keyboard focus, explicit consent and accurate model availability. No new UI was shipped in this ledger iteration.
