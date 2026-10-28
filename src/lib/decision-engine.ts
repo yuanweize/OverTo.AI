@@ -9,6 +9,7 @@ import { sanitizeInput } from './sanitizer';
 import { analyzeUrls } from './url-analyzer';
 import { evaluateDeterministicRules } from './rules-engine';
 import { runLlmAnalysisIfConfigured, type ProviderResult } from './llm-adapter';
+import { decideRisk } from '@/fraud-engine/decision-policy';
 
 export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boolean = false): Promise<AnalysisResult> {
   const startTime = Date.now();
@@ -81,14 +82,13 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
   let headlineCzech = '';
   let summaryCzech = '';
 
-  const hasCritical = combinedEvidences.some(e => e.severity === 'CRITICAL');
-  const hasHigh = combinedEvidences.some(e => e.severity === 'HIGH');
+  const policyDecision = decideRisk(combinedEvidences, urlResult.hasUrl);
 
-  if (hasCritical || finalRiskScore >= 50) {
+  if (policyDecision === 'HIGH_RISK') {
     riskLevel = 'HIGH_RISK';
     headlineCzech = 'Vysoké riziko podvodu a manipulace';
     summaryCzech = 'Zpráva obsahuje možné rizikové signály. Před jakoukoli platbou nebo sdílením údajů situaci nezávisle ověřte; samotný výsledek podvod nedokazuje.';
-  } else if (hasHigh || finalRiskScore >= 20 || urlResult.hasUrl) {
+  } else if (policyDecision === 'VERIFICATION_RECOMMENDED') {
     riskLevel = 'VERIFICATION_RECOMMENDED';
     headlineCzech = 'Doporučeno zvýšené prověření';
     summaryCzech = 'Ve zprávě byly nalezeny podezřelé prvky nebo neověřený odkaz. Nejedná se nutně o prokázaný podvod, ale před jakoukoliv akcí důrazně doporučujeme provést nezávislé ověření.';
@@ -133,7 +133,8 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
     semanticAnalysis: aiResult.analysis,
     metadata: {
       aiStatus: aiResult.status,
-      aiProvider: aiResult.status === 'SUCCESS' ? 'OpenAI' : null,
+      aiReason: aiResult.reason,
+      aiProvider: aiResult.status === 'SUCCESS' ? 'AI' : null,
       aiModel: aiResult.model,
       rejectedAiEvidence: aiResult.rejectedEvidence,
       analyzedAt: new Date().toISOString(),

@@ -23,10 +23,9 @@ export const metadata: Metadata = {
     'ochrana seniorů před podvody',
   ],
   authors: [{ name: 'HKTSE s.r.o. & Weize Yuan' }],
-  metadataBase: new URL('https://overto.ai'),
-  openGraph: {
+    openGraph: {
     title: 'OvěřTo.AI — Bezpečný asistent pro ověření podezřelých zpráv',
-    description: 'Nejste si jisti obdrženou SMS či e-mailem? Ověřte si fakta bezpečně, bez prozrazení osobních údajů a s konkrétním návodem na nezávislé prověření.',
+    description: 'Nejste si jisti obdrženou SMS či e-mailem? Prohlédněte si možné varovné znaky a kroky k nezávislému ověření.',
     locale: 'cs_CZ',
     type: 'website',
   },

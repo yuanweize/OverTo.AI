@@ -1,4 +1,5 @@
 /** Server-only semantic provider. User content is untrusted; outputs never authorize actions. */
+import { networkInterfaces } from 'node:os';
 import type { ScamCategory, Severity } from '@/types/analyzer';
 
 const categories: ScamCategory[] = ['IMPERSONATION', 'URGENCY_PRESSURE', 'PAYMENT_DEMAND', 'CREDENTIAL_THEFT', 'OTP_THEFT', 'REMOTE_ACCESS', 'SUSPICIOUS_URL', 'FAMILY_EMERGENCY', 'PACKAGE_DELIVERY', 'INVESTMENT_FRAUD'];
@@ -46,23 +47,32 @@ export function validateSemanticOutput(value: unknown, input: string): { analysi
       !Array.isArray(value.requestedActions) || value.requestedActions.length > 8 ||
       !Array.isArray(value.riskSignals) || value.riskSignals.length > 8) return null;
   const normalized = input.normalize('NFC');
-  const grounded = (v: string) => normalized.includes(v.normalize('NFC'));
+  const groundedQuote = (value: string): string | null => {
+    let quote = value.normalize('NFC').trim();
+    // Some models wrap exact excerpts in typographic quotation marks.
+    // Remove only a matching outer pair; the content must still match verbatim.
+    const pairs: Record<string, string> = { '„': '“', '“': '”', '«': '»', '‘': '’', '"': '"', "'": "'" };
+    if (quote.length > 2 && pairs[quote[0]] === quote[quote.length - 1]) quote = quote.slice(1, -1);
+    return quote && normalized.includes(quote) ? quote : null;
+  };
   let rejectedEvidence = 0;
   const requestedActions: SemanticAnalysis['requestedActions'] = [];
   for (const action of value.requestedActions) {
     if (!object(action) || !hasOnlyKeys(action, ['type', 'description', 'evidenceText']) || !actionTypes.includes(action.type as ActionType) || !short(action.description) || !short(action.evidenceText, 400)) return null;
-    if (!grounded(action.evidenceText)) { rejectedEvidence++; continue; }
+    const quote = groundedQuote(action.evidenceText);
+    if (!quote) { rejectedEvidence++; continue; }
     const type = action.type as ActionType;
-    requestedActions.push({ type, description: actionDescriptions[type], evidenceText: action.evidenceText });
+    requestedActions.push({ type, description: actionDescriptions[type], evidenceText: quote });
   }
   const riskSignals: SemanticAnalysis['riskSignals'] = [];
   for (const signal of value.riskSignals) {
     if (!object(signal) || !hasOnlyKeys(signal, ['category', 'severity', 'evidenceText', 'explanation']) || !categories.includes(signal.category as ScamCategory) || !severities.includes(signal.severity as Severity) || !short(signal.evidenceText, 400) || !short(signal.explanation)) return null;
-    if (!grounded(signal.evidenceText)) { rejectedEvidence++; continue; }
+    const quote = groundedQuote(signal.evidenceText);
+    if (!quote) { rejectedEvidence++; continue; }
     const category = signal.category as ScamCategory;
-    riskSignals.push({ category, severity: signal.severity as Severity, evidenceText: signal.evidenceText, explanation: signalDescriptions[category] });
+    riskSignals.push({ category, severity: signal.severity as Severity, evidenceText: quote, explanation: signalDescriptions[category] });
   }
-  const claimedIdentity = typeof value.claimedIdentity === 'string' && grounded(value.claimedIdentity) ? value.claimedIdentity : null;
+  const claimedIdentity = typeof value.claimedIdentity === 'string' ? groundedQuote(value.claimedIdentity) : null;
   // Free-form model instructions are not used as safety advice or displayed as fact.
   return { analysis: { claimedIdentity, requestedActions, riskSignals, contextualSummary: 'Model navrhl výše uvedené možné signály na základě citovaných částí zprávy.', missingInformation: ['Totožnost odesílatele a pravost žádosti nebyly ověřeny.'], uncertainty: ['Model se může mýlit; citace sama o sobě nepotvrzuje výklad.'] }, rejectedEvidence };
 }
@@ -80,12 +90,24 @@ const schema = {
 export async function runLlmAnalysisIfConfigured(sanitizedText: string): Promise<ProviderResult> {
   if (!process.env.OPENAI_API_KEY || process.env.AI_ENABLED !== 'true') return { status: 'UNAVAILABLE', reason: 'not_configured' };
   // This flag is an operator assertion, not an implementation of distributed rate limiting.
-  if (process.env.AI_EXTERNAL_RATE_LIMIT_CONFIRMED !== 'true') return { status: 'BLOCKED', reason: 'deployment_gate' };
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini-2024-07-18';
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), 12000);
+  const localDevelopment = process.env.NODE_ENV === 'development' && process.env.AI_LOCAL_ONLY === 'true';
+  if (!localDevelopment && process.env.AI_EXTERNAL_RATE_LIMIT_CONFIRMED !== 'true') return { status: 'BLOCKED', reason: 'deployment_gate' };
+  const model = process.env.OPENAI_MODEL || 'gpt-6.1-sol';
+  const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openlux.ai/v1').replace(/\/$/, '');
+  // HTTP is only permitted in explicitly local development, and only for an
+  // IP actually assigned to this machine. Never forward keys to arbitrary LAN hosts.
+  let localGateway = false;
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const url = new URL(baseUrl);
+    const addresses = Object.values(networkInterfaces()).flatMap(entries => entries ?? []).map(entry => entry.address);
+    localGateway = localDevelopment && url.protocol === 'http:' && !url.username && !url.password &&
+      url.pathname === '/v1' && !url.search && !url.hash && addresses.includes(url.hostname);
+  } catch { return { status: 'BLOCKED', reason: 'deployment_gate' }; }
+  if (baseUrl !== 'https://api.openlux.ai/v1' && !localGateway) return { status: 'BLOCKED', reason: 'deployment_gate' };
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 45000);
+  try {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST', signal: abort.signal,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({ model, store: false, max_completion_tokens: 900, temperature: 0,

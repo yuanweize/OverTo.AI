@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+.env*
+!.env.example
+coverage
+docs/research
+docs/audit
+submission
+*.pem
+*.key
+.DS_Store

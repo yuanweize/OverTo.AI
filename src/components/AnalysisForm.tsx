@@ -1,121 +1,36 @@
 import React, { useState } from 'react';
-import { Search, Clipboard, Trash2, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Clipboard, Trash2, Lock, ArrowRight, Loader2 } from 'lucide-react';
 
-interface AnalysisFormProps {
-  text: string;
-  onChangeText: (text: string) => void;
-  onAnalyze: () => void;
-  isLoading: boolean;
-}
+interface AnalysisFormProps { text: string; onChangeText: (text: string) => void; onAnalyze: () => void; isLoading: boolean; }
 
-export const AnalysisForm: React.FC<AnalysisFormProps> = ({
-  text,
-  onChangeText,
-  onAnalyze,
-  isLoading,
-}) => {
-  const [copiedTip, setCopiedTip] = useState(false);
-
+export const AnalysisForm: React.FC<AnalysisFormProps> = ({ text, onChangeText, onAnalyze, isLoading }) => {
+  const [pasteStatus, setPasteStatus] = useState('');
   const handlePaste = async () => {
     try {
       const clipText = await navigator.clipboard.readText();
-      if (clipText) {
-        onChangeText(clipText);
-        setCopiedTip(true);
-        setTimeout(() => setCopiedTip(false), 2000);
-      }
-    } catch {
-      // Fallback pokud není povolen přístup k clipboardu
-    }
+      if (clipText) { onChangeText(clipText); setPasteStatus('Text byl vložen.'); }
+      else setPasteStatus('Schránka je prázdná.');
+    } catch { setPasteStatus('Vložení není dostupné. Použijte Ctrl+V nebo dlouhé stisknutí.'); }
   };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      if (text.trim().length > 0 && !isLoading) {
-        onAnalyze();
-      }
-    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && text.trim() && !isLoading) { e.preventDefault(); onAnalyze(); }
   };
-
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-lg shadow-slate-200/40 p-5 sm:p-7">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <label htmlFor="message-input" className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-          <span>Vložte text podezřelé zprávy nebo odkaz</span>
-        </label>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handlePaste}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-            title="Vložit obsah ze schránky"
-          >
-            <Clipboard className="w-3.5 h-3.5 text-slate-600" />
-            <span>{copiedTip ? 'Vloženo!' : 'Vložit ze schránky'}</span>
-          </button>
-          {text.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onChangeText('')}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
-              title="Vymazat text"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Smazat</span>
-            </button>
-          )}
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_38px_rgba(15,45,55,0.07)]">
+      <div className="p-5 sm:p-7">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+          <div><label htmlFor="message-input" className="block text-lg font-bold text-slate-900">Vložte podezřelou zprávu</label><p id="message-help" className="mt-1 text-sm leading-6 text-slate-600">SMS, e-mail nebo odkaz. Před odesláním text zkontrolujete.</p></div>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={handlePaste} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Clipboard className="h-4 w-4" aria-hidden="true" />Vložit</button>
+            {text.length > 0 && <button type="button" onClick={() => onChangeText('')} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-600 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"><Trash2 className="h-4 w-4" aria-hidden="true" />Smazat</button>}
+          </div>
         </div>
+        <textarea id="message-input" rows={6} maxLength={10000} value={text} onChange={e => onChangeText(e.target.value)} onKeyDown={handleKeyDown} aria-describedby="message-help" placeholder="Například: Přišla vám zpráva o nedoručeném balíčku…" className="block w-full resize-y rounded-xl border border-slate-300 bg-slate-50/70 p-4 text-base leading-7 text-slate-900 placeholder:text-slate-500 focus:border-teal-700 focus:bg-white focus:outline-2 focus:outline-offset-2 focus:outline-teal-700" />
+        <div className="mt-2 flex flex-wrap justify-between gap-2 text-sm text-slate-600"><span role="status">{pasteStatus}</span><span>{text.length} / 10 000 znaků</span></div>
       </div>
-
-      <div className="relative">
-        <textarea
-          id="message-input"
-          rows={5}
-          maxLength={10000}
-          value={text}
-          onChange={(e) => onChangeText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Zkopírujte sem podezřelou SMS, e-mail, zprávu z WhatsAppu nebo webovou adresu (např. 'Ceska posta: Vas balicek nebyl dorucen...')."
-          className="w-full text-base sm:text-lg p-4 sm:p-5 rounded-2xl border border-slate-200 focus:border-indigo-600 focus:ring-4 focus:ring-indigo-100 transition-all outline-none resize-y text-slate-900 placeholder:text-slate-400 font-sans"
-        />
-        <div className="absolute right-3 bottom-3 text-xs text-slate-400 bg-white/90 px-2 py-0.5 rounded-md pointer-events-none">
-          {text.length} / 10 000 znaků
-        </div>
-      </div>
-
-      {/* Ochrana soukromí & spouštěcí tlačítko */}
-      <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="flex items-start sm:items-center gap-2.5 text-xs text-slate-600 bg-slate-50 border border-slate-200/60 px-3.5 py-2.5 rounded-xl">
-          <Lock className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5 sm:mt-0" />
-          <span>
-            <strong>Před odesláním uvidíte upravený text.</strong> Maskování nemusí rozpoznat všechny citlivé údaje.
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={onAnalyze}
-          disabled={isLoading || text.trim().length === 0}
-          className={`inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-bold text-base transition-all shadow-md shrink-0 ${
-            isLoading || text.trim().length === 0
-              ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 hover:shadow-indigo-300 active:scale-[0.98]'
-          }`}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Provádím analýzu rizik...</span>
-            </>
-          ) : (
-            <>
-              <Search className="w-5 h-5" />
-              <span>Pokračovat ke kontrole textu</span>
-              <ArrowRight className="w-4 h-4 opacity-70" />
-            </>
-          )}
-        </button>
+      <div className="flex flex-col gap-4 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+        <p className="flex max-w-sm items-start gap-2 text-sm leading-5 text-slate-600"><Lock className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" /><span>Citlivé údaje před odesláním zkontrolujete a můžete upravit.</span></p>
+        <button type="button" onClick={onAnalyze} disabled={isLoading || !text.trim()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-teal-800 px-5 py-3 text-base font-bold text-white hover:bg-teal-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">{isLoading ? <><Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />Probíhá analýza…</> : <>Pokračovat ke kontrole textu<ArrowRight className="h-4 w-4" aria-hidden="true" /></>}</button>
       </div>
     </div>
   );

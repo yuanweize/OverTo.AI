@@ -1,10 +1,11 @@
 # Rules-only failure review
 
-Generated from the synthetic challenge run at 2026-10-28T13:22:56.156Z. These are hypotheses from case design, not independently verified incidents.
+Generated from the synthetic challenge run at 2026-10-28T18:07:54.113Z. These are hypotheses from case design, not independently verified incidents.
 
 - **bank-1** (label MALICIOUS; banking; decision INSUFFICIENT_EVIDENCE): Supposed bank identity, urgent transfer and secrecy.
 - **bank-2** (label MALICIOUS; banking; decision INSUFFICIENT_EVIDENCE): Requests an authentication code under a protective pretext.
 - **parcel-1** (label MALICIOUS; delivery; decision VERIFICATION_RECOMMENDED): Payment card request linked to alleged delivery problem.
+- **parcel-2** (label MALICIOUS; delivery; decision VERIFICATION_RECOMMENDED): Misleading URL userinfo and payment credentials request.
 - **family-1** (label MALICIOUS; family; decision INSUFFICIENT_EVIDENCE): Family impersonation scenario combining new contact and urgent payment.
 - **family-2** (label MALICIOUS; family; decision INSUFFICIENT_EVIDENCE): Changed contact, distress, payment demand and secrecy.
 - **market-1** (label MALICIOUS; marketplace; decision INSUFFICIENT_EVIDENCE): Asks seller for payment card secrets to receive funds.

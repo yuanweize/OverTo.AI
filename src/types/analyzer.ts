@@ -65,7 +65,8 @@ export interface AnalysisResult {
     analyzedAt: string;
     engine: 'HYBRID_RULES_AND_LLM' | 'DETERMINISTIC_RULES';
     aiStatus: AiStatus;
-    aiProvider: 'OpenAI' | null;
+    aiProvider: 'AI' | null;
+    aiReason?: 'not_configured' | 'deployment_gate' | 'timeout' | 'rate_limit' | 'provider' | 'invalid_response';
     aiModel?: string;
     rejectedAiEvidence?: number;
     processingTimeMs: number;

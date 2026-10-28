@@ -19,11 +19,22 @@ describe('AI output validation', () => {
     expect(output.analysis.riskSignals[0].explanation).not.toContain('123');
     expect(validateSemanticOutput({ ...data, riskSignals: [{ ...data.riskSignals[0], severity: 'SAFE' }] }, input)).toBeNull();
   });
+  it('accepts paired Czech quotation marks only around a verbatim excerpt', () => {
+    const data = semantic();
+    data.riskSignals[0].evidenceText = '„mám nové číslo“';
+    data.requestedActions[0].evidenceText = '„Pošli mi ihned peníze“';
+    const result = validateSemanticOutput(data, input)!;
+    expect(result.rejectedEvidence).toBe(0);
+    expect(result.analysis.riskSignals[0].evidenceText).toBe('mám nové číslo');
+    data.riskSignals[0].evidenceText = '„neexistující citace“';
+    expect(validateSemanticOutput(data, input)?.rejectedEvidence).toBe(1);
+  });
   it('sends a bounded strict-schema request and grounds returned signals', async () => {
     const fetchMock = vi.fn().mockResolvedValue(reply(semantic())); vi.stubGlobal('fetch', fetchMock);
     const result = await runLlmAnalysisIfConfigured(input);
     expect(result.status).toBe('SUCCESS');
     expect(result.analysis?.riskSignals[0].evidenceText).toBe('mám nové číslo');
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.openlux.ai/v1/chat/completions');
     const request = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(request.response_format.json_schema.strict).toBe(true);
     expect(request.max_completion_tokens).toBe(900);
@@ -41,6 +52,33 @@ describe('AI output validation', () => {
   });
   it('fails closed when external controls are not asserted', async () => {
     vi.stubEnv('AI_EXTERNAL_RATE_LIMIT_CONFIRMED', 'false');
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+    expect((await runLlmAnalysisIfConfigured(input)).status).toBe('BLOCKED');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('allows explicitly local development but never bypasses production controls', async () => {
+    vi.stubEnv('AI_EXTERNAL_RATE_LIMIT_CONFIRMED', 'false');
+    vi.stubEnv('AI_LOCAL_ONLY', 'true');
+    vi.stubEnv('NODE_ENV', 'development');
+    const fetchMock = vi.fn().mockResolvedValue(reply(semantic())); vi.stubGlobal('fetch', fetchMock);
+    expect((await runLlmAnalysisIfConfigured(input)).status).toBe('SUCCESS');
+    vi.stubEnv('NODE_ENV', 'production');
+    expect((await runLlmAnalysisIfConfigured(input)).status).toBe('BLOCKED');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('accepts a loopback gateway only in local development', async () => {
+    vi.stubEnv('OPENAI_BASE_URL', 'http://127.0.0.1:57871/v1');
+    vi.stubEnv('AI_LOCAL_ONLY', 'true');
+    vi.stubEnv('NODE_ENV', 'development');
+    const fetchMock = vi.fn().mockResolvedValue(reply(semantic())); vi.stubGlobal('fetch', fetchMock);
+    expect((await runLlmAnalysisIfConfigured(input)).status).toBe('SUCCESS');
+    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:57871/v1/chat/completions');
+    vi.stubEnv('NODE_ENV', 'production');
+    expect((await runLlmAnalysisIfConfigured(input)).status).toBe('BLOCKED');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('rejects an unexpected provider address without sending the key', async () => {
+    vi.stubEnv('OPENAI_BASE_URL', 'https://example.com/v1');
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
     expect((await runLlmAnalysisIfConfigured(input)).status).toBe('BLOCKED');
     expect(fetchMock).not.toHaveBeenCalled();

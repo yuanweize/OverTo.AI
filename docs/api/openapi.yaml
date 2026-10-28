@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: OvěřTo.AI Analysis API
+  version: '1.0'
+  description: Experimental, non-persistent analysis. Not a guarantee of fraud detection.
+paths:
+  /api/v1/analyses:
+    post:
+      summary: Analyze a user-reviewed message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 10000 }
+                enableLlm: { type: boolean, default: false }
+                aiConsent: { type: boolean, description: Required to be true when enableLlm is true. }
+      responses:
+        '200':
+          description: Ephemeral analysis with a versioned response and evidence graph.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, analysisId, status, decision, signals, evidence, actionGraph, recommendedActions, uncertainty, engine, metadata, result]
+                properties:
+                  schemaVersion: { const: '1.0' }
+                  analysisId: { type: string, format: uuid }
+                  status: { const: COMPLETED }
+                  decision: { enum: [HIGH_RISK, VERIFICATION_RECOMMENDED, INSUFFICIENT_EVIDENCE] }
+                  signals: { type: array, items: { type: object } }
+                  evidence: { type: array, items: { type: object } }
+                  actionGraph: { type: object, description: UTF-16 spans refer to result.sanitizedText. }
+                  recommendedActions: { type: array, items: { type: object } }
+                  uncertainty: { type: string }
+                  engine: { type: object }
+                  metadata: { type: object }
+                  result: { type: object }
+        '400': { description: Invalid input or missing AI consent. }
+        '413': { description: Request too large. }
+        '500': { description: Internal processing error. }
+  /api/v1/health:
+    get:
+      summary: Basic service health
+      responses:
+        '200': { description: Service process responded. }
+  /api/v1/capabilities:
+    get:
+      summary: Available feature types
+      responses:
+        '200': { description: Capabilities, excluding model connectivity. }

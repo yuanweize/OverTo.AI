@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "eval": "tsx src/evaluation/challenge-run.ts",
-    "eval:legacy": "tsx src/evaluation/evaluate.ts"
+    "eval:legacy": "tsx src/evaluation/evaluate.ts",
+    "ai:check": "NODE_ENV=development tsx scripts/check-ai.ts"
   },
   "dependencies": {
     "lucide-react": "^1.62.0",
