@@ -1,0 +1,3 @@
+# Limitations
+
+This is an experimental prototype. It can miss scams, misclassify ordinary messages and misunderstand quotations or negation. It does not establish identity or website safety. Client redaction is incomplete and URL hosts may contain identifying information. An exact AI quote is not proof of a correct interpretation. The model integration has not been live-tested; no independent evaluation, real-user benefit study, security audit or legal privacy assessment is complete. No public deployment or demonstrated rate-limited AI service exists. See [evaluation](docs/evaluation/ai-evaluation.md).

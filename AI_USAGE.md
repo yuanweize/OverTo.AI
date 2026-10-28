@@ -1,0 +1,5 @@
+# AI usage
+
+AI assisted development. The optional runtime integration sends user-reviewed, best-effort sanitized text to OpenAI Chat Completions with strict JSON Schema, a fixed output-token cap, a 12-second timeout and `store: false`. The adapter validates returned structure and checks that evidence appears in NFC-normalized input; quotation match does not establish semantic correctness. Free-form model safety actions are not used. Rules remain part of the final decision and an unavailable model falls back to rules with an explicit status.
+
+Set `OPENAI_API_KEY`, `OPENAI_MODEL`, `AI_ENABLED=true`, and `AI_EXTERNAL_RATE_LIMIT_CONFIRMED=true` on the server only. The latter is an operator assertion, not an actual rate limiter: configure and test a distributed edge quota and a provider spending limit before enabling public use. User consent is also required. The configured default model is `gpt-4o-mini-2024-07-18`; availability and cost must be checked against the account. No live inference has been verified in this environment. Mock tests do not measure model quality or prompt-injection immunity.

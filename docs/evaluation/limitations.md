@@ -1,0 +1,3 @@
+# Evaluation limitations
+
+The old 100-case set is self-authored and overlaps the implemented rules. The newer synthetic challenge set was created during this development effort and is not independently labeled, blinded or representative. Labels encode scenario hypotheses rather than confirmed actual incidents. Small per-category counts give unstable estimates. Prompt-injection examples do not prove general resistance. No human outcome study, safety-action review, or independent field evaluation has been performed. Default evaluation makes no provider calls. No comparative AI benefit can be claimed until real inference is measured and independently reviewed.

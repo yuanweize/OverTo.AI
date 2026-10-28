@@ -1,0 +1,90 @@
+/**
+ * OvěřTo.AI - Curated Realistic Czech Demo Scenarios
+ * Demonstruje reálné incidenty mapované v ČR v roce 2026,
+ * včetně legitimních a nejednoznačných případů.
+ */
+
+import { DemoScenario } from '@/types/analyzer';
+
+export const DEMO_SCENARIOS: DemoScenario[] = [
+  {
+    id: 'ceska-posta-phishing',
+    title: 'Falešná SMS České pošty (Nedoručený balík)',
+    subtitle: 'Typický podvod s doplatkem 49 Kč a falešnou doménou',
+    category: 'PACKAGE_DELIVERY',
+    expectedRiskLevel: 'HIGH_RISK',
+    sourceType: 'SMS',
+    sampleText: 'Ceska posta: Vas balicek CP9842145CZ nemohl byt dorucen z duvodu neplatne adresy. Prosim aktualizujte udaje a uhradte poplatek 49 Kc do 24 hodin na https://ceskaposta.cz-sledovani.xyz/track jinak bude zasilka vracena odesilateli.',
+    explanation: 'Útočník vyvolává časový tlak (do 24 hodin) a požaduje malý poplatek 49 Kč. Odkaz vede na podvrženou doménu .xyz napodobující Českou poštu s cílem vylákat údaje platební karty.',
+  },
+  {
+    id: 'falesny-banker-zachranny-ucet',
+    title: 'Falešný bankéř (Nouzový převod na bezpečný účet)',
+    subtitle: 'Reverzní vishingový scénář zaměřený na úspory',
+    category: 'PAYMENT_DEMAND',
+    expectedRiskLevel: 'HIGH_RISK',
+    sourceType: 'SMS',
+    sampleText: 'UPOZORNENI CSOB: Vas bankovni ucet byl napaden podezrelou transakci z ciziho zarizeni. Z bezpecnostnich duvodu okamzite prevedte veskere financni prostredky na nas docasny rezervni ucet 290123456/0300. Pote si nainstalujte aplikaci AnyDesk pro overeni zabezpeceni bankovnictvi.',
+    explanation: 'Klasický sofistikovaný podvod falešného bankéře. Vyžaduje převod peněz na cizí účet („záchranný“) a instalaci AnyDesku pro převzetí kontroly nad zařízením.',
+  },
+  {
+    id: 'whatsapp-ahoj-mami',
+    title: 'WhatsApp zpráva: „Ahoj mami, ztratil jsem mobil“',
+    subtitle: 'Emocionální manipulace rodinnou nouzí',
+    category: 'FAMILY_EMERGENCY',
+    expectedRiskLevel: 'HIGH_RISK',
+    sourceType: 'WHATSAPP',
+    sampleText: 'Ahoj mami, starý telefon mi včera spadl do vody a tohle je moje nové dočasné číslo. Ulož si ho. Mám velký problém, nemůžu se dostat do internetového bankovnictví a musím dnes do 14:00 zaplatit nájem 14 500 Kč, jinak mě vyhodí. Můžeš to prosím poslat za mě na účet 19-8765430217/0100? Zítra ti to vrátím, slibuju!',
+    explanation: 'Sociální inženýrství zneužívající strach rodičů o děti. Útočník předstírá ztrátu telefonu a žádá o urgentní převod peněz na účet „bílého koně“.',
+  },
+  {
+    id: 'falesna-investice-cez',
+    title: 'Falešná AI investiční platforma ČEZ',
+    subtitle: 'Podvod s garancí nereálného zisku zneužívající energetiku',
+    category: 'INVESTMENT_FRAUD',
+    expectedRiskLevel: 'HIGH_RISK',
+    sourceType: 'EMAIL',
+    sampleText: 'Vážený občane, Skupina ČEZ ve spolupráci s vládou ČR spouští revoluční automatický investiční robot řízený umělou inteligencí. Garantovaný měsíční výnos činí 45 % při počátečním vkladu pouze 6 000 Kč. Zaregistrujte se ještě dnes a získejte pasivní příjem na https://cez-investice-ai.com/registrace.',
+    explanation: 'Zneužití důvěryhodné značky ČEZ s příslibem astronomického nereálného zisku (45 % měsíčně). ČEZ žádné takové investiční platformy neprovozuje.',
+  },
+  {
+    id: 'vinted-falesny-kuryr',
+    title: 'Podvod na Vinted / Bazoši (Falešná Zásilkovna)',
+    subtitle: 'Snaha vylákat údaje platební karty pod záminkou příjmu peněz',
+    category: 'PAYMENT_DEMAND',
+    expectedRiskLevel: 'HIGH_RISK',
+    sourceType: 'WHATSAPP',
+    sampleText: 'Dobrý den, koupila jsem váš kabát přes Vinted a peníze jsem již odeslala kurýrní službou Zásilkovna. Kurýr si balík vyzvedne u vás doma. Zde je odkaz pro přijetí platby na vaši platební kartu: https://zasilkovna-platba.fun/order9821. Stačí zadat číslo karty a CVV kód.',
+    explanation: 'Typický inzertní podvod. K přijetí platby NIKDY není potřeba zadávat číslo karty ani CVV kód, stačí pouze číslo bankovního účtu.',
+  },
+  {
+    id: 'legitimni-zasilkovna',
+    title: 'Legitimní výdejní SMS Zásilkovny',
+    subtitle: 'Běžná notifikace o uložení zásilky bez odkazu na platbu',
+    category: 'BENIGN',
+    expectedRiskLevel: 'VERIFICATION_RECOMMENDED',
+    sourceType: 'SMS',
+    sampleText: 'Zasilkovna: Zasilka Z987654321 od Alza.cz je pripravena k vyzvednuti na pobocce Vinohradska 45, Praha 2. Heslo pro vydej: 849201. Ulozeno do 3. 11. 2026. Dobirka: 0 Kc.',
+    explanation: 'Ukázka běžné a bezpečné zprávy. Obsahuje pouze heslo pro fyzický výdej a dobírku 0 Kč. Neobsahuje žádný klikací odkaz ani požadavek na platbu.',
+  },
+  {
+    id: 'legitimni-banka-info',
+    title: 'Legitimní informační e-mail od banky',
+    subtitle: 'Oznámení o vystavení výpisu z účtu bez žádosti o heslo',
+    category: 'BENIGN',
+    expectedRiskLevel: 'VERIFICATION_RECOMMENDED',
+    sourceType: 'EMAIL',
+    sampleText: 'Vážený kliente, v internetovém bankovnictví George je pro Vás připraven nový měsíční výpis z účtu za období 09/2026. Do bankovnictví se přihlaste obvyklým způsobem přes aplikaci George nebo na stránkách csas.cz. Vaše Česká spořitelna.',
+    explanation: 'Legitimní bankovní e-mail nenutí uživatele klikat na neznámé odkazy ani nevyžaduje zadání hesla v e-mailu. Pouze informuje a odkazuje na oficiální web.',
+  },
+  {
+    id: 'nejednoznacna-zprava',
+    title: 'Nejednoznačná zpráva s minimem kontextu',
+    subtitle: 'Ukázka, kdy systém poctivě přiznává nedostatek informací',
+    category: 'AMBIGUOUS',
+    expectedRiskLevel: 'INSUFFICIENT_EVIDENCE',
+    sourceType: 'SMS',
+    sampleText: 'Ahoj, posilam ty podklady ze vcerajska, podivej se na to az budes mit chvilku. Petr.',
+    explanation: 'Zpráva neobsahuje zjevné znaky podvodu ani odkaz, ale odesílatel nemusí být známý. Systém poctivě informuje, že nelze jednoznačně potvrdit ani vyvrátit riziko.',
+  },
+];
