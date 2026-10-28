@@ -12,7 +12,8 @@
     "eval:legacy": "tsx src/evaluation/evaluate.ts",
     "ai:check": "NODE_ENV=development tsx scripts/check-ai.ts",
     "test:e2e": "playwright test",
-    "migrate:local": "tsx scripts/migrate-auth.ts"
+    "migrate:local": "tsx scripts/migrate-auth.ts",
+    "stripe:check": "tsx scripts/check-stripe-test.ts"
   },
   "dependencies": {
     "better-auth": "^1.7.14",
@@ -22,6 +23,7 @@
     "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "stripe": "^23.0.1",
     "tldts": "^7.4.19"
   },
   "devDependencies": {

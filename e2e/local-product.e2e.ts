@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { loadEnvConfig } from '@next/env';
 import { Pool } from 'pg';
+import { createHash } from 'node:crypto';
 
 loadEnvConfig(process.cwd(), true);
 async function setSyntheticUserVerified(email: string, verified: boolean) {
@@ -13,6 +14,17 @@ async function setSyntheticUserVerified(email: string, verified: boolean) {
   const pool = new Pool({ connectionString: address });
   try { const result = await pool.query('UPDATE "user" SET "emailVerified"=$1 WHERE email=$2', [verified, email]); if (result.rowCount !== 1) throw new Error('Test user missing'); }
   finally { await pool.end(); }
+}
+async function expireSyntheticKey(email: string, key: string) {
+  if (!/^a-\d+-\d+@example\.com$/.test(email) || !/^ovt_test_[A-Za-z0-9_-]{43}$/.test(key)) throw new Error('Refusing non-test key');
+  const address = process.env.OVERTO_DEV_DATABASE_URL; if (!address) throw new Error('Local test database missing');
+  const url = new URL(address); if (url.hostname !== '127.0.0.1' || url.port !== '55443' || url.pathname !== '/overto') throw new Error('Refusing non-local database');
+  const pool = new Pool({ connectionString: address });
+  try {
+    const hash = createHash('sha256').update(key).digest('hex');
+    const result = await pool.query('UPDATE local_api_keys k SET expires_at=now()-interval \'1 second\' FROM local_workspaces w JOIN "user" u ON u.id=w.user_id WHERE k.workspace_id=w.id AND u.email=$1 AND k.key_hash=$2', [email, hash]);
+    if (result.rowCount !== 1) throw new Error('Test key missing');
+  } finally { await pool.end(); }
 }
 
 async function localMailLink(email: string, subject: string): Promise<string> {
@@ -123,6 +135,9 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   if (process.env.OVERTO_CAPTURE_UI === 'true') await a.screenshot({ path: 'assets/screenshots/saas-projects.png', fullPage: true });
   const restoredRequest = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${projectKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
   expect(restoredRequest.status()).toBe(402);
+  await expireSyntheticKey(aEmail, projectKey);
+  const expired = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${projectKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
+  expect(expired.status()).toBe(401);
   await a.getByRole('button', { name: 'Odhlásit se' }).click(); await expect(a).toHaveURL(/\/login/); await a.goto('/dashboard'); await expect(a).toHaveURL(/\/login/);
   await one.close(); await two.close();
 });
@@ -143,6 +158,10 @@ test('web analysis records usage against the selected project', async ({ page })
   await page.getByRole('button', { name: 'Pokračovat ke kontrole textu' }).click(); await page.getByLabel(/Zkontroloval.a jsem text/).check();
   await page.getByRole('button', { name: 'Odeslat a analyzovat pravidly' }).click(); await expect(page.getByText('Odečteno testovacích kreditů: 1')).toBeVisible();
   await page.goto('/dashboard/usage'); await expect(page.getByText(/Pravidla · NOT_REQUESTED · 1.*Vybraný projekt/)).toBeVisible();
+  await page.goto('/dashboard/billing'); await expect(page.getByRole('button', { name: 'Otevřít testovací platbu' })).toBeDisabled();
+  if (process.env.OVERTO_CAPTURE_UI === 'true') await page.screenshot({ path: 'assets/screenshots/saas-billing-test.png', fullPage: true });
+  const disabledCheckout = await page.request.post('/api/local/stripe/checkout', { headers: { Origin: 'http://127.0.0.1:3005', 'Idempotency-Key': crypto.randomUUID() } }); expect(disabledCheckout.status()).toBe(503);
+  const disabledWebhook = await page.request.post('/api/local/stripe/webhook', { data: '{}' }); expect(disabledWebhook.status()).toBe(503);
   await page.goto('/dashboard/settings'); await page.getByLabel('Jméno').fill('Nové jméno'); await page.getByRole('button', { name: 'Uložit profil' }).click();
   await expect(page.getByRole('status')).toContainText('Profil je uložen.'); await page.goto('/dashboard'); await expect(page.getByRole('heading', { name: 'Vítejte, Nové jméno.' })).toBeVisible();
 });

@@ -19,6 +19,7 @@ async function main() {
     await pool.query(await readFile('migrations/003_local_usage.sql', 'utf8'));
     await pool.query(await readFile('migrations/004_local_api_keys.sql', 'utf8'));
     await pool.query(await readFile('migrations/005_local_project_archive.sql', 'utf8'));
+    await pool.query(await readFile('migrations/006_stripe_test.sql', 'utf8'));
     console.log('Local authentication and workspace tables ready.');
   } finally { await pool.end(); }
 }

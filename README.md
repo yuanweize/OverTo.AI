@@ -9,6 +9,7 @@ Czech-language experimental assistant for examining suspicious messages and guid
 - **Not yet available:** public demo, independent AI evaluation, OCR, distributed rate limiting and production deployment. Do not expose the AI endpoint publicly without enforcing real quotas and spending limits.
 - **Local account experiment:** on an explicitly configured development server only, users can sign up, verify email and reset passwords through a local capture mailbox, create projects and test API keys, and receive a one-time test credit grant. Test mail is not delivered to real addresses. Production accounts and billing are not available. Do not use real credentials. See [development status](docs/development/IMPLEMENTATION-STATUS.md).
 - **Local metering experiment:** signed-in local analyses reserve and settle test credits and record metadata-only usage. This is not production billing; subscriptions, payments, reconciliation and robust failure recovery remain incomplete. See [ledger status](docs/saas/ledger.md).
+- **Stripe:** an experimental local Test Mode checkout and signed webhook path is implemented and tested with simulated Stripe events. A real Stripe test-mode checkout and webhook have not yet been verified; no production billing is available. Keep `STRIPE_TEST_ENABLED=false` until the local end-to-end test is complete.
 
 ## Product preview
 
