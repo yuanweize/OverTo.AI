@@ -12,7 +12,7 @@ import { sanitizeInput } from '@/lib/sanitizer';
 import { DemoScenario, AnalysisResult } from '@/types/analyzer';
 import { AlertCircle, ShieldCheck, Eye, Route } from 'lucide-react';
 
-export function AnalysisWorkspace({ accountMode = false }: { accountMode?: boolean }) {
+export function AnalysisWorkspace({ accountMode = false, projects = [], defaultProjectId = '' }: { accountMode?: boolean; projects?: { id: string; name: string }[]; defaultProjectId?: string }) {
   const inputVersion = useRef(0);
   const [inputText, setInputText] = useState<string>('');
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
@@ -23,6 +23,7 @@ export function AnalysisWorkspace({ accountMode = false }: { accountMode?: boole
   const [reviewed, setReviewed] = useState(false);
   const [aiConsent, setAiConsent] = useState(false);
   const [creditsCharged, setCreditsCharged] = useState<number | null>(null);
+  const [projectId, setProjectId] = useState(defaultProjectId);
   const Main = accountMode ? 'div' : 'main';
   const previewOpen = preview !== null;
   useEffect(() => { if (previewOpen) document.getElementById('preview-title')?.focus(); }, [previewOpen]);
@@ -68,7 +69,7 @@ export function AnalysisWorkspace({ accountMode = false }: { accountMode?: boole
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(accountMode ? { 'Idempotency-Key': crypto.randomUUID() } : {}),
+          ...(accountMode ? { 'Idempotency-Key': crypto.randomUUID(), 'X-Project-Id': projectId } : {}),
         },
         body: JSON.stringify({
           text: safePreview,
@@ -118,6 +119,7 @@ export function AnalysisWorkspace({ accountMode = false }: { accountMode?: boole
         {/* INTERAKTIVNÍ PRACOVNÍ PLOCHA (Scénáře + Formulář + Výsledky) */}
         <section className="py-8 sm:py-10">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            {accountMode && <label className="block rounded-xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-900">Projekt pro analýzu<select value={projectId} disabled={isLoading} onChange={event => { inputVersion.current++; setProjectId(event.target.value); setAnalysisResult(null); setCreditsCharged(null); }} className="mt-2 block min-h-11 w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 text-base disabled:opacity-60">{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select><span className="mt-2 block font-normal text-slate-600">Spotřeba se zaznamená k vybranému aktivnímu projektu.</span></label>}
             <AnalysisForm
               text={inputText}
               onChangeText={(newText) => {

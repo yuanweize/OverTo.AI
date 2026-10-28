@@ -24,5 +24,19 @@ export const auth = pool ? betterAuth({
       await mail.sendMail({ from: 'OvěřTo local <no-reply@example.test>', to: user.email, subject: 'Ověření e-mailu — místní test', text: `Místní test. Pro ověření e-mailu otevřete: ${url}` });
     },
   },
+  databaseHooks: {
+    user: {
+      create: { before: async (user) => {
+        const name = user.name.trim();
+        return name.length > 0 && name.length <= 100 ? { data: { ...user, name } } : false;
+      } },
+      update: { before: async (user) => {
+        if (user.name === undefined) return;
+        if (typeof user.name !== 'string') return false;
+        const name = user.name.trim();
+        return name.length > 0 && name.length <= 100 ? { data: { ...user, name } } : false;
+      } },
+    },
+  },
   session: { expiresIn: 60 * 60 * 24, updateAge: 60 * 60 },
 }) : null;

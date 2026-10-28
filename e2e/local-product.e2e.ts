@@ -115,6 +115,8 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   expect(crossProject.status()).toBe(404);
   const crossEdit = await b.request.patch(`/api/local/projects/${privateProjectId}`, { headers: { Origin: 'http://127.0.0.1:3005' }, data: { name: 'Unauthorized' } });
   expect(crossEdit.status()).toBe(404);
+  const crossAnalysis = await b.request.post('/api/local/analyses', { headers: { Origin: 'http://127.0.0.1:3005', 'X-Project-Id': privateProjectId!, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
+  expect(crossAnalysis.status()).toBe(404);
   await renamedRow.getByRole('button', { name: 'Obnovit' }).click(); await expect(renamedRow.getByText('Aktivní projekt')).toBeVisible();
   if (process.env.OVERTO_CAPTURE_UI === 'true') await a.screenshot({ path: 'assets/screenshots/saas-projects.png', fullPage: true });
   const restoredRequest = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${projectKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
@@ -126,6 +128,21 @@ test('local registration, workspace, project, logout and isolation', async ({ br
 test('developer playground sends real rules request', async ({ page }) => {
   await page.goto('/developers'); await page.getByRole('button', { name: 'Odeslat test' }).click();
   await expect(page.getByRole('status')).toContainText('HTTP 200'); await expect(page.locator('pre').last()).toContainText('schemaVersion');
+});
+
+test('web analysis records usage against the selected project', async ({ page }) => {
+  const email = `select-${Date.now()}-${Math.floor(Math.random() * 1000000)}@example.com`;
+  await verifiedSignup(page, 'Project Test', email, 'project-test-password-42');
+  await page.goto('/dashboard/projects'); await page.getByLabel('Název nového projektu').fill('Vybraný projekt'); await page.getByRole('button', { name: 'Vytvořit projekt' }).click();
+  await expect(page.getByText('Vybraný projekt')).toBeVisible();
+  await page.goto('/dashboard/analyze'); await page.getByLabel('Projekt pro analýzu').selectOption({ label: 'Vybraný projekt' });
+  await page.getByLabel('Vložte podezřelou zprávu').fill('Ahoj mami, mám nové číslo. Pošli mi ihned peníze.');
+  if (process.env.OVERTO_CAPTURE_UI === 'true') await page.screenshot({ path: 'assets/screenshots/saas-project-analysis.png', fullPage: true });
+  await page.getByRole('button', { name: 'Pokračovat ke kontrole textu' }).click(); await page.getByLabel(/Zkontroloval.a jsem text/).check();
+  await page.getByRole('button', { name: 'Odeslat a analyzovat pravidly' }).click(); await expect(page.getByText('Odečteno testovacích kreditů: 1')).toBeVisible();
+  await page.goto('/dashboard/usage'); await expect(page.getByText(/Pravidla · NOT_REQUESTED · 1.*Vybraný projekt/)).toBeVisible();
+  await page.goto('/dashboard/settings'); await page.getByLabel('Jméno').fill('Nové jméno'); await page.getByRole('button', { name: 'Uložit profil' }).click();
+  await expect(page.getByRole('status')).toContainText('Profil je uložen.'); await page.goto('/dashboard'); await expect(page.getByRole('heading', { name: 'Vítejte, Nové jméno.' })).toBeVisible();
 });
 
 test('password reset invalidates existing session and old password', async ({ browser }) => {
