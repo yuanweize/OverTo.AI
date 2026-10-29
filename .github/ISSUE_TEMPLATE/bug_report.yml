@@ -1,0 +1,39 @@
+name: Bug report
+description: Report a reproducible problem without including private messages, API keys or account data.
+title: "Bug: "
+body:
+  - type: markdown
+    attributes:
+      value: "Use a synthetic example. Do not paste real suspicious messages, credentials, tokens or private logs. For security vulnerabilities, follow SECURITY.md instead of opening a public issue."
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: Commit SHA or release tag
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Analysis and evidence
+        - API and authentication
+        - AI Studio
+        - Billing test mode
+        - UI and accessibility
+        - Documentation and deployment
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include expected and actual results with synthetic data.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, OS, deployment mode and relevant non-secret configuration.

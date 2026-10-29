@@ -1,0 +1,11 @@
+# Model service configuration
+
+The root-only `/admin/ai-studio/providers` page controls provider name, registered API base URL, model enablement, default model, allowed model identifiers, request timeout (1–45 seconds) and maximum completion tokens (100–2000). Settings persist in PostgreSQL with optimistic concurrency, repeated transaction-level root/email verification and audit events. Public requests cannot select arbitrary models or endpoints.
+
+The API key remains in the server environment and is never returned by the configuration API. Set `OPENAI_BASE_URL` for the current OpenAI-compatible endpoint; add optional alternative URLs to `AI_ALLOWED_BASE_URLS` before selecting one in the admin UI. The adapter accepts only exact registered HTTPS URLs or a registered HTTP address assigned to this machine in local development. URLs with embedded credentials, queries, fragments or unexpected paths are rejected. The UI reports whether a credential exists; this is not a connectivity result. Enabling a database configuration cannot override `AI_ENABLED=false` or the production deployment guard. The same server API key is used for the selected endpoint; register only endpoints that should receive it.
+
+Web/API analyses, Prompt Lab tests and evaluation requests read these settings. Each in-flight request uses the configuration captured at admission; disabling blocks subsequent calls, not requests already underway. Prompt Lab is the real diagnostic path and records provider failures without pretending configuration implies health. No automatic retry or paid-model fallback is performed. Analysis can return its explicit rules fallback.
+
+The **Check connection** action makes one explicit, root-only `GET /models` request to the saved endpoint. It sends no user message and does not request a completion. A shared PostgreSQL limiter allows two checks per root per minute. Redirects are rejected, response bodies are not read or stored, and only HTTP status plus duration is returned. A successful response does **not** establish that the selected model, structured-output format, pricing or fraud analysis works.
+
+Prices are unknown unless separately verified; no spending protection is claimed by limiting output tokens. Multiple provider priority routing, price management and production budgets remain unfinished.

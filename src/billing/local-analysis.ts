@@ -3,10 +3,11 @@ import { pool } from '@/auth/server';
 import { CreditLedger } from '@/billing/credit-ledger';
 import { POST as analyze } from '@/app/api/analyze/route';
 import type { AnalysisResult } from '@/types/analyzer';
+import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
 import { readRequestBody } from '@/lib/read-request-body';
 
 /** Local-only metered analysis; the caller must authorize this workspace and project. */
-export async function runLocalAnalysis(request: NextRequest, workspaceId: string, projectId: string) {
+export async function runLocalAnalysis(request: NextRequest, workspaceId: string, projectId: string, scopes?: string[]) {
   const fail = (message: string, status: number) => NextResponse.json({ error: message }, { status, headers: { 'Cache-Control': 'no-store' } });
   if (!pool) return fail('Nedostupné.', 503);
   if (request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') return fail('Použijte Content-Type: application/json.', 415);
@@ -21,6 +22,14 @@ export async function runLocalAnalysis(request: NextRequest, workspaceId: string
   let body: { text?: unknown; enableLlm?: unknown; aiConsent?: unknown };
   try { body = JSON.parse(raw); } catch { return fail('Neplatný JSON.', 400); }
   if (!body || typeof body.text !== 'string' || !body.text.trim() || body.text.length > 10000 || typeof body.enableLlm !== 'boolean' || (body.enableLlm && body.aiConsent !== true)) return fail('Zkontrolujte text a souhlas s AI.', 400);
+  if(scopes && !scopes.includes(body.enableLlm?'analysis:ai':'analysis:rules')) return fail('KEY_SCOPE_DENIED',403);
+  try {
+    const admission = await new SharedRateLimiter(pool).consume([
+      { bucket: `workspace:${workspaceId}`, limit: 60, windowSeconds: 60 },
+      { bucket: `project:${projectId}`, limit: 40, windowSeconds: 60 },
+    ]);
+    if (!admission.allowed) return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': String(admission.retryAfter) } });
+  } catch { return fail('RATE_LIMIT_UNAVAILABLE', 503); }
   const ledger = new CreditLedger(pool);
   let reservation;
   try { reservation = await ledger.reserve(workspaceId, key, 1, 120); }
@@ -29,7 +38,7 @@ export async function runLocalAnalysis(request: NextRequest, workspaceId: string
   const mode = body.enableLlm ? 'AI' : 'RULES';
   const started = Date.now();
   try {
-    const internal = new NextRequest(new URL('/api/analyze', request.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: raw });
+    const internal = new NextRequest(new URL('/api/analyze', request.url), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': request.headers.get('accept-language') || 'cs' }, body: raw });
     const resultResponse = await analyze(internal);
     if (resultResponse.status === 429) {
       await ledger.settle(workspaceId, key, 0, { projectId, mode, providerStatus: 'FAILED', model: null, durationMs: Math.max(0, Date.now() - started) });

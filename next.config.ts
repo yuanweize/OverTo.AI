@@ -1,9 +1,9 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from 'next-intl/plugin';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  cacheComponents: true,
-  partialPrefetching: true,
+  devIndicators: false,
   turbopack: {
     rules: {
       "*.css": {
@@ -14,4 +14,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default createNextIntlPlugin()(nextConfig);

@@ -23,6 +23,7 @@ jobs:
           --health-retries 5
     env:
       LEDGER_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/overto_test
+      SITE_CONFIG_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/overto_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,6 +33,7 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run lint
+      - run: npm run docs:check
       - run: npm test
       - run: npm run build
   local-journeys:
@@ -83,3 +85,4 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3005/ >/dev/null
           npm run test:e2e
+          OVERTO_ADMIN_E2E=true npx playwright test e2e/admin-settings.e2e.ts --workers=1

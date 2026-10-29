@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalysisWorkspace } from '../AnalysisWorkspace';
 import { VerificationWorkflow } from '../VerificationWorkflow';
+import { NextIntlClientProvider } from 'next-intl';
+import messages from '@/i18n/messages/cs.json';
 
 // React's act environment is required when exercising the real client interactions.
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -24,7 +26,7 @@ describe('review and verification flow', () => {
   it('does not transmit until reviewed and sends redacted URL with explicit AI consent', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: 'test' }) });
     vi.stubGlobal('fetch', fetchMock);
-    await act(async () => { root.render(<AnalysisWorkspace />); });
+    await act(async () => { root.render(<NextIntlClientProvider locale="cs" messages={messages}><AnalysisWorkspace /></NextIntlClientProvider>); });
     const scenario = [...container.querySelectorAll('button')].find(b => b.textContent?.includes('Falešná SMS České pošty'));
     expect(scenario).toBeDefined();
     await act(async () => { scenario!.click(); });
@@ -48,7 +50,7 @@ describe('review and verification flow', () => {
   });
 
   it('changes guidance according to action already taken', async () => {
-    await act(async () => { root.render(<VerificationWorkflow categories={['FAMILY_EMERGENCY']} />); });
+    await act(async () => { root.render(<NextIntlClientProvider locale="cs" messages={messages}><VerificationWorkflow categories={['FAMILY_EMERGENCY']} /></NextIntlClientProvider>); });
     const none = container.querySelector<HTMLInputElement>('input[value=none]')!;
     await act(async () => { none.click(); });
     expect(container.textContent).toContain('Zavolejte příbuznému');

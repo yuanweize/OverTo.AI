@@ -27,6 +27,7 @@ paths:
               required: [text]
               properties:
                 text: { type: string, minLength: 1, maxLength: 10000 }
+                locale: { type: string, enum: [cs, en], description: Overrides Accept-Language. Unsupported browser languages fall back to Czech. }
                 enableLlm: { type: boolean, default: false }
                 aiConsent: { type: boolean, description: Required to be true when enableLlm is true. }
       responses:
@@ -44,7 +45,7 @@ paths:
                   decision: { enum: [HIGH_RISK, VERIFICATION_RECOMMENDED, INSUFFICIENT_EVIDENCE] }
                   signals: { type: array, items: { type: object } }
                   evidence: { type: array, items: { type: object } }
-                  actionGraph: { type: object, description: UTF-16 spans refer to result.sanitizedText. }
+                  actionGraph: { type: object, description: Graph v2 UTF-16 spans refer to result.sanitizedText; repeated quotes expose multiple spans and ambiguous=true. }
                   recommendedActions: { type: array, items: { type: object } }
                   uncertainty: { type: string }
                   engine: { type: object }
@@ -58,7 +59,7 @@ paths:
         '413': { description: Request too large. }
         '415': { description: Content-Type must be application/json. }
         '429':
-          description: Per-process circuit breaker is full. This is not distributed rate limiting.
+          description: A process circuit breaker or shared local-account key/project/workspace rate limit was reached. Anonymous requests still have only process-local protection.
           headers:
             Retry-After:
               description: Seconds before retrying.

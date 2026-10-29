@@ -4,7 +4,6 @@ import { personalWorkspace } from '@/auth/workspace';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-export const instant = false;
 export default async function DashboardAnalyzePage() {
   if (!auth) redirect('/login');
   const session = await auth.api.getSession({ headers: await headers() });

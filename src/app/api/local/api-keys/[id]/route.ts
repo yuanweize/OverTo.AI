@@ -1,3 +1,4 @@
+import {ApiKeyRepository} from '@/server/api-keys/repository';
 import type { NextRequest } from 'next/server';
 import { auth, pool } from '@/auth/server';
 import { personalWorkspace } from '@/auth/workspace';
@@ -8,4 +9,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const result = await pool.query('UPDATE local_api_keys SET revoked_at=COALESCE(revoked_at,now()) WHERE id=$1 AND workspace_id=$2 RETURNING id', [id, workspaceId]);
   if (!result.rowCount) return Response.json({ error: 'Klíč nebyl nalezen.' }, { status: 404 });
   return Response.json({ revoked: true }, { headers: { 'Cache-Control': 'no-store' } });
+}
+
+export async function POST(request:NextRequest,{params}:{params:Promise<{id:string}>}) {
+  if(!auth||!pool||request.headers.get('origin')!==process.env.BETTER_AUTH_URL)return Response.json({error:'UNAVAILABLE'},{status:403});
+  const session=await auth.api.getSession({headers:request.headers});if(!session?.user.emailVerified)return Response.json({error:'UNAUTHORIZED'},{status:401});
+  const {workspaceId}=await personalWorkspace(session.user.id),{id}=await params;
+  try{return Response.json(await new ApiKeyRepository(pool).rotate(workspaceId,id),{status:201,headers:{'Cache-Control':'no-store'}});}catch{return Response.json({error:'KEY_NOT_FOUND'},{status:404,headers:{'Cache-Control':'no-store'}});}
 }

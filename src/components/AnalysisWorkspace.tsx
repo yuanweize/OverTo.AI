@@ -1,4 +1,5 @@
 'use client';
+import { useTranslations, useLocale } from 'next-intl';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Header } from '@/components/Header';
@@ -13,6 +14,8 @@ import { DemoScenario, AnalysisResult } from '@/types/analyzer';
 import { AlertCircle, ShieldCheck, Eye, Route } from 'lucide-react';
 
 export function AnalysisWorkspace({ accountMode = false, projects = [], defaultProjectId = '' }: { accountMode?: boolean; projects?: { id: string; name: string }[]; defaultProjectId?: string }) {
+  const t = useTranslations('Analysis');
+  const locale = useLocale();
   const inputVersion = useRef(0);
   const [inputText, setInputText] = useState<string>('');
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
@@ -56,7 +59,7 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
       setPreview(safePreview);
       setReviewed(false);
       setAiConsent(false);
-      setErrorMessage('V upraveném textu byly nalezeny další údaje. Zkontrolujte novou podobu před odesláním.');
+      setErrorMessage(t('reviewAgain'));
       return;
     }
     const version = inputVersion.current;
@@ -73,6 +76,7 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
         },
         body: JSON.stringify({
           text: safePreview,
+          locale,
           enableLlm: aiConsent,
           aiConsent,
         }),
@@ -80,7 +84,7 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || 'Analýza selhala. Zkuste to prosím znovu.');
+        throw new Error(errorData?.error || t('failed'));
       }
 
       const data = await response.json();
@@ -89,7 +93,7 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
         if (accountMode) setCreditsCharged(data.creditsCharged);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Došlo k neočekávané chybě.';
+      const msg = err instanceof Error ? err.message : t('unexpected');
       if (version === inputVersion.current) setErrorMessage(msg);
     } finally {
       setIsLoading(false);
@@ -100,26 +104,27 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
     <div className="min-h-screen flex flex-col bg-slate-50">
       {!accountMode && <Header />}
 
-      <a href="#message-input" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-teal-900">Přejít k zadání zprávy</a>
-      <Main className="flex-1">
+      <a href="#message-input" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-teal-900">{t('skip')}</a>
+      <Main id={accountMode ? undefined : "main"} className="flex-1">
         <section id="top" className="bg-[#eef5f3] pt-10 pb-7 sm:pt-14 sm:pb-10">
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
-              <p className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-800"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> Pomocník pro podezřelé zprávy</p>
-              <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl">Nejste si jistí zprávou? Zastavte se a ověřte ji.</h1>
-              <p className="mt-4 max-w-xl text-base leading-7 text-slate-700 sm:text-lg">Vložte zprávu a zjistěte, na co si dát pozor a jak bezpečně pokračovat.</p>
+              <p className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-800"><ShieldCheck className="h-4 w-4" aria-hidden="true" /> {t('eyebrow')}</p>
+              <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl">{t('title')}</h1>
+              <p className="mt-4 max-w-xl text-base leading-7 text-slate-700 sm:text-lg">{t('intro')}</p>
             </div>
             <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-slate-700">
-              <span className="inline-flex items-center gap-2"><Eye className="h-4 w-4 text-teal-700" aria-hidden="true" /> Text před odesláním zkontrolujete</span>
-              <span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-teal-700" aria-hidden="true" /> Praktický postup ověření</span>
+              <span className="inline-flex items-center gap-2"><Eye className="h-4 w-4 text-teal-700" aria-hidden="true" /> {t('reviewFirst')}</span>
+              <span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-teal-700" aria-hidden="true" /> {t('guidance')}</span>
             </div>
           </div>
         </section>
 
         {/* INTERAKTIVNÍ PRACOVNÍ PLOCHA (Scénáře + Formulář + Výsledky) */}
         <section className="py-8 sm:py-10">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-            {accountMode && <label className="block rounded-xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-900">Projekt pro analýzu<select value={projectId} disabled={isLoading} onChange={event => { inputVersion.current++; setProjectId(event.target.value); setAnalysisResult(null); setCreditsCharged(null); }} className="mt-2 block min-h-11 w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 text-base disabled:opacity-60">{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select><span className="mt-2 block font-normal text-slate-600">Spotřeba se zaznamená k vybranému aktivnímu projektu.</span></label>}
+          <div className={`${analysisResult ? 'max-w-6xl' : 'max-w-4xl'} mx-auto px-4 sm:px-6 lg:px-8 space-y-6`}>
+            {accountMode && <label className="block rounded-xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-900">{t('project')}<select value={projectId} disabled={isLoading} onChange={event => { inputVersion.current++; setProjectId(event.target.value); setAnalysisResult(null); setCreditsCharged(null); }} className="mt-2 block min-h-11 w-full max-w-md rounded-lg border border-slate-300 bg-white px-3 text-base disabled:opacity-60">{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select><span className="mt-2 block font-normal text-slate-600">{t('projectHelp')}</span></label>}
+            <details className="workspace-stage" open={preview === null && !analysisResult}><summary className="workspace-stage-heading">{t('inputStage')}</summary>
             <AnalysisForm
               text={inputText}
               onChangeText={(newText) => {
@@ -136,20 +141,21 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
               isLoading={isLoading}
             />
             <ScenarioSelector selectedId={selectedScenarioId} onSelectScenario={handleSelectScenario} />
+            </details>
 
             {preview !== null && (
-              <section aria-labelledby="preview-title" className="rounded-2xl border border-teal-200 bg-white p-5 shadow-sm sm:p-7">
-                <h2 id="preview-title" tabIndex={-1} className="text-xl font-bold text-slate-900">Zkontrolujte, co odešlete</h2>
-                <p id="preview-help" className="mt-2 text-sm leading-relaxed text-slate-700">Prohlížeč se pokusil skrýt některé citlivé údaje a odstranit cestu a parametry odkazů. Může něco přehlédnout, například jména nebo adresy. Odstraňte je ručně. Text níže a názvy hostitelů odešleme našemu serveru.</p>
-                <label htmlFor="preview-text" className="mt-4 block text-sm font-semibold text-slate-900">Text k odeslání (můžete jej upravit)</label>
+              <details open={!analysisResult} className="workspace-stage"><summary className="workspace-stage-heading">{t('reviewStage')}</summary><section aria-labelledby="preview-title" className="rounded-2xl border border-teal-200 bg-white p-5 shadow-sm sm:p-7">
+                <h2 id="preview-title" tabIndex={-1} className="text-xl font-bold text-slate-900">{t('previewTitle')}</h2>
+                <p id="preview-help" className="mt-2 text-sm leading-relaxed text-slate-700">{t('previewHelp')}</p>
+                <label htmlFor="preview-text" className="mt-4 block text-sm font-semibold text-slate-900">{t('previewLabel')}</label>
                 <textarea id="preview-text" aria-describedby="preview-help" rows={6} maxLength={10000} value={preview} onChange={e => { inputVersion.current++; setPreview(e.target.value); setReviewed(false); setAiConsent(false); setAnalysisResult(null); }} className="mt-2 w-full rounded-lg border border-slate-400 bg-white p-4 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700" />
-                <label className="mt-3 flex min-h-11 items-start gap-3 text-sm text-slate-800"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-700" /><span>Zkontroloval/a jsem text a odstranil/a údaje, které nechci odeslat.</span></label>
-                <label className="mt-3 flex min-h-12 items-center gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-950"><input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} aria-describedby="ai-privacy" className="h-4 w-4 accent-teal-700" /><span>Chci použít AI a souhlasím s předáním upraveného textu službě OpenLux a jejímu poskytovateli modelu. Bez zaškrtnutí použijeme pouze pravidla.</span></label>
-                <p id="ai-privacy" className="mt-3 text-sm leading-6 text-slate-700">V AI režimu mohou OpenLux a jeho poskytovatel modelu obdržet vše, co v textu zůstane, včetně hostitelů odkazů. Uchování a zpracování se řídí podmínkami OpenLux a jeho poskytovatelů; provozovatel hostingu může vést technické záznamy. Aplikace zprávy neukládá do databáze. AI nemusí být na tomto serveru dostupná; v takovém případě dostanete výsledek pravidel.</p>
-                {accountMode && <p className="mt-3 text-sm font-semibold text-slate-700">Místní test: úspěšná analýza stojí 1 testovací kredit. Pokud požadovaná AI selže, zobrazíme pravidlový výsledek bez odečtu.</p>}
-                <button type="button" onClick={handleAnalyze} disabled={!reviewed || !preview.trim() || isLoading} className="mt-5 min-h-12 w-full rounded-lg bg-teal-800 px-6 py-3 font-bold text-white hover:bg-teal-900 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:w-auto">{isLoading ? 'Probíhá analýza…' : aiConsent ? 'Odeslat a analyzovat s AI' : 'Odeslat a analyzovat pravidly'}</button>
-                <p role="status" className="mt-2 text-sm text-slate-600">{isLoading ? 'Vyčkejte prosím na výsledek.' : ''}</p>
-              </section>
+                <label className="mt-3 flex min-h-11 items-start gap-3 text-sm text-slate-800"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-700" /><span>{t('reviewConsent')}</span></label>
+                <label className="mt-3 flex min-h-12 items-center gap-3 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-medium text-teal-950"><input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} aria-describedby="ai-privacy" className="h-4 w-4 accent-teal-700" /><span>{t('aiConsent')}</span></label>
+                <p id="ai-privacy" className="mt-3 text-sm leading-6 text-slate-700">{t('aiPrivacy')}</p>
+                {accountMode && <p className="mt-3 text-sm font-semibold text-slate-700">{t('creditsNote')}</p>}
+                <button type="button" onClick={handleAnalyze} disabled={!reviewed || !preview.trim() || isLoading} className="mt-5 min-h-12 w-full rounded-lg bg-teal-800 px-6 py-3 font-bold text-white hover:bg-teal-900 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:w-auto">{isLoading ? t('busy') : aiConsent ? t('sendAi') : t('sendRules')}</button>
+                <p role="status" className="mt-2 text-sm text-slate-600">{isLoading ? t('wait') : ''}</p>
+              </section></details>
             )}
 
             {/* Chybové hlášení */}
@@ -162,7 +168,7 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
 
             {/* Zobrazení výsledků analýzy */}
             {analysisResult && (
-              <div key={analysisResult.metadata.analyzedAt}>{accountMode && <p role="status" className="mb-4 rounded-lg border border-teal-200 bg-white p-4 text-sm font-semibold">Odečteno testovacích kreditů: {creditsCharged}</p>}<AnalysisResultsView result={analysisResult} /><VerificationWorkflow categories={analysisResult.detectedCategories} /></div>
+              <div key={analysisResult.metadata.analyzedAt}>{accountMode && <p role="status" className="mb-4 rounded-lg border border-teal-200 bg-white p-4 text-sm font-semibold">{t('charged')} {creditsCharged}</p>}<AnalysisResultsView result={analysisResult} /><VerificationWorkflow categories={analysisResult.detectedCategories} /></div>
             )}
           </div>
         </section>

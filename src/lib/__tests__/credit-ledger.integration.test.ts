@@ -7,14 +7,23 @@ import { CreditLedger } from '@/billing/credit-ledger';
 // Requires a dedicated disposable PostgreSQL database. No existing database is modified.
 const connectionString = process.env.LEDGER_TEST_DATABASE_URL;
 describe.skipIf(!connectionString)('PostgreSQL credit ledger', () => {
-  const pool = new Pool({ connectionString, max: 24 });
+  const schema = `ledger_test_${randomUUID().replaceAll('-', '')}`;
+  const control = new Pool({ connectionString });
+  const pool = new Pool({ connectionString, max: 24, options: `-c search_path=${schema}` });
   const ledger = new CreditLedger(pool);
   const account = randomUUID();
   beforeAll(async () => {
+    const url = new URL(connectionString!);
+    if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.pathname !== '/overto_test') throw new Error('Requires a disposable local overto_test database');
+    await control.query(`CREATE SCHEMA ${schema}`);
     await pool.query(await readFile('migrations/001_credit_ledger.sql', 'utf8'));
     await pool.query('INSERT INTO credit_accounts (id) VALUES ($1)', [account]);
   });
-  afterAll(async () => { await pool.end(); });
+  afterAll(async () => {
+    await pool.end();
+    await control.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    await control.end();
+  });
 
   it('grants once and rejects altered replays', async () => {
     await Promise.all(Array.from({ length: 5 }, () => ledger.grant(account, 'trial', 10, 'PROMOTIONAL')));

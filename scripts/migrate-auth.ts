@@ -20,6 +20,15 @@ async function main() {
     await pool.query(await readFile('migrations/004_local_api_keys.sql', 'utf8'));
     await pool.query(await readFile('migrations/005_local_project_archive.sql', 'utf8'));
     await pool.query(await readFile('migrations/006_stripe_test.sql', 'utf8'));
+    await pool.query(await readFile('migrations/007_platform_settings.sql', 'utf8'));
+    await pool.query(await readFile('migrations/008_ai_traces.sql', 'utf8'));
+    await pool.query(await readFile('migrations/009_shared_rate_limits.sql', 'utf8'));
+    await pool.query(await readFile('migrations/010_ai_prompts.sql', 'utf8'));
+    await pool.query(await readFile('migrations/011_prompt_test_metrics.sql', 'utf8'));
+    await pool.query(await readFile('migrations/012_ai_evaluations.sql', 'utf8'));
+    await pool.query(await readFile('migrations/013_ai_provider_settings.sql', 'utf8'));
+    await pool.query(await readFile('migrations/014_key_permissions.sql', 'utf8'));
+    await pool.query(await readFile('migrations/015_provider_identity.sql', 'utf8'));
     console.log('Local authentication and workspace tables ready.');
   } finally { await pool.end(); }
 }

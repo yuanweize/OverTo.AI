@@ -1,22 +1,25 @@
-# Acceptance matrix
+# Acceptance matrix — 2026-10-30 local build
 
-Statuses reflect the current local development build, not a production release. Screenshots show synthetic content.
+Statuses distinguish working local experiments from a production SaaS release. Screenshots contain synthetic content. See [implementation status](IMPLEMENTATION-STATUS.md) for setup and test counts.
 
-| Feature | Route | Backend / DB | Verification | Visual | Status |
-| --- | --- | --- | --- | --- | --- |
-| Landing | `/` | none | viewport smoke | `assets/screenshots/saas-home-desktop.png`, `saas-home-mobile.png` | implemented locally |
-| Analysis | `/analyze` | `/api/analyze`, existing fraud engine | existing privacy tests; live AI latest rate-limited | prior result screenshot | partial |
-| Pricing | `/pricing` | none, no paid plans | viewport smoke | `assets/screenshots/saas-pricing.png` | partial |
-| Developer API | `/developers` | `/api/v1/analyses` | browser real rules request | `assets/screenshots/saas-developers.png` | partial |
-| Login / signup | `/login`, `/signup`, `/verify-email`, `/forgot-password`, `/reset-password` | Better Auth, local PostgreSQL and Mailpit capture | Playwright verifies email, password reset, session revocation, token replay and unverified denial | `assets/screenshots/saas-verify-email.png`, `saas-password-recovery.png` | local test only |
-| Dashboard / projects | `/dashboard`, `/dashboard/projects` | local auth, workspace, credit tables | browser create, rename, archive, restore, archived-key denial and two-user project isolation | `assets/screenshots/saas-projects.png` | local test only |
-| Usage | `/dashboard/usage` | local usage events | Playwright verifies one completed rules request | not reviewed fully | local test only |
-| Project selection / profile | `/dashboard/analyze`, `/dashboard/settings` | server-checked project ownership and Better Auth | Playwright selected-project usage, cross-user denial and profile update | `assets/screenshots/saas-project-analysis.png` | local test only |
-| API keys | `/dashboard/api-keys`, `/dashboard/playground` | local key hashes, project ownership, metered `/api/v1/analyses` | Playwright create, call, revoke, expiry and cross-user project rejection | not reviewed fully | local test only |
-| Billing | `/dashboard/billing` | experimental local Stripe Test Mode | disabled-state browser check; provider simulated | `assets/screenshots/saas-billing-test.png` | incomplete, disabled by default |
-| Admin | `/admin` | no RBAC or business data | informational state only | not reviewed fully | not implemented |
-| Credits + analysis | `/dashboard/analyze` | local session, ledger, metadata-only usage | Playwright rules analysis, duplicate ID and 20 concurrent HTTP requests; provider-failure HTTP test outstanding | not reviewed fully | local test only |
-| Stripe | local checkout, portal and webhook routes | test-only customer and subscription state, idempotent test-credit grants | simulated signatures, checkout and webhook with isolated PostgreSQL; real Stripe end-to-end outstanding | billing screenshot above | incomplete, disabled by default |
-| Deployment | none | existing rules-only Docker | previous Docker smoke; no current SaaS container verification | none | incomplete |
+| Area | Routes / module | Current evidence | Status |
+| --- | --- | --- | --- |
+| Public website | `/`, `/analyze`, `/pricing`, `/developers`, `/docs`, `/features`, `/how-it-works`, `/security`, `/privacy`, `/terms` | Three screenshot rounds at desktop/tablet/mobile, revised hero and new bilingual `/docs`; analysis and API rules requests exercised | Local, partially reviewed |
+| Language and theme | Czech/English, Light/Dark/System | Browser override and fallback tests; English and Czech dark/light captures | Local, partial accessibility audit |
+| Rules and evidence | `/api/analyze`, `/api/v1/analyses`, action graph | Schema, span grounding, ambiguity and request tests; no URL fetch | Local, no representative accuracy claim |
+| AI adapter | OpenAI-compatible endpoint in server config | Synthetic live connectivity success before a later provider rate limit; mocked malformed/429/failure tests | Local only, production blocked |
+| Provider / model admin | `/admin/ai-studio/providers`, `/admin/ai-studio/models`, explicit `/models` diagnostic | Root-only audited settings, endpoint allowlist, model registry save/restore in browser; diagnostic mock tests | Local, no price or model-capability guarantee |
+| Prompt Lab | `/admin/ai-studio/prompts` | Immutable versions and activation gate integration tests; browser creation and untested-activation denial | Partial: live activation not accepted |
+| Evaluations | `/admin/ai-studio/evaluations`, `/admin/ai-studio/datasets` | Authored rules dataset saved in earlier browser run; later repeated run intentionally hit shared limit | Partial, no accuracy certification |
+| Traces | `/admin/ai-studio`, metadata repository | Isolated PostgreSQL test, 24-hour summaries, no message text | Local |
+| Auth and account | `/signup`, `/login`, `/verify-email`, `/forgot-password`, `/reset-password`, `/dashboard` | Mailpit browser journey, unverified denial, reset session revocation, logout | Local only; production disabled |
+| Projects and keys | `/dashboard/projects`, `/dashboard/api-keys`, `/dashboard/playground` | Cross-account isolation, archived-key rejection, scope denial, rotation, expiry and daily quota concurrency; actual used/limit shown before and after rotation in browser | Local only |
+| Credits and usage | `/dashboard/analyze`, `/dashboard/usage` | Concurrent reservations, duplicate rejection, project-scoped usage; compact actual-data summary and structured Playground response inspected in browser | Local test credits |
+| Billing | `/dashboard/billing`, Stripe test routes | Actual sandbox checkout, signed webhook, one credit grant, portal and cancellation; replay and bad signature checks | Experimental; renewal/refunds/reconciliation pending |
+| Site administration | `/admin` | Verified ROOT, audited configuration, version conflicts, browser save/restore | Local only |
+| Docker and deployment | Dockerfile, Compose | Rules-only container was previously smoked on arm64 | SaaS self-hosting incomplete |
+| Public release | GitHub `competition-2026.10.29` | Public `main` and competition release remain unchanged; 7.0 is published as a preview branch only | No 7.0 release |
 
-Public Git commit for this iteration is recorded by Git history, not asserted in this file. Release gates A–G are not passed.
+## Release gates
+
+Gate A (visual product) is partial after the OpenRouter-inspired third review round. Gate B (AI platform) is partial. Gate C (SaaS) is local-only. Gate D (admin) is partial. Gate E (security) fails for anonymous abuse control and provider budgets. Gate F (open-source self-hosting) fails for SaaS Compose/GHCR. Gate G (new public release) has not started. Do not describe this worktree as production-ready.
