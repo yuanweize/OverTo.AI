@@ -48,5 +48,7 @@ The live public reference and its access limits are recorded in [reference revie
 | API keys desktop, Czech light | [Keys](../../assets/screenshots/v7-api-keys-cs-1440.png) | Current and revoked key show the same quota lineage; only prefixes are visible. |
 | Playground desktop, Czech light | [Playground](../../assets/screenshots/v7-playground-cs-1440.png) | Decision, signal count, engine and credits precede expandable JSON. The input was cleared before capture. |
 | Docs, English, 1024px | [Documentation](../../assets/screenshots/v7-docs-en-1024.png) | Navigation, code examples and content measure are readable. |
+| AI Studio, English desktop light | [Light](../../assets/screenshots/v7-ai-studio-en-light.png) | Compact live metrics and bordered trace rows replace the earlier card stack. The obsolete feature disclaimer was corrected. |
+| AI Studio, English desktop dark | [Dark](../../assets/screenshots/v7-ai-studio-en-dark.png) | Status labels remain readable in dark mode; only synthetic administrator identity and operational metadata are shown. |
 
-The dashboard and key screens still need a 390px dark inspection after the latest design pass. The admin and billing surfaces also need a second visual iteration. This round is a real improvement, not final visual acceptance for every route.
+The dashboard and key screens still need a 390px dark inspection after the latest design pass. Billing and the remaining admin surfaces need another visual iteration. This round is a real improvement, not final visual acceptance for every route.

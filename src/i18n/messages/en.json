@@ -294,7 +294,7 @@
     "rejected": "Rejected quotations",
     "reason": "Failure reason",
     "cost": "Estimated cost (USD)",
-    "scope": "This view shows local operational metadata. Prompt version management, model activation and evaluation runs in the interface are not yet implemented. A successful past request does not establish current provider health."
+    "scope": "This view shows local operational metadata. Prompt Lab, the model registry and synthetic evaluations are available in this console. A successful past request does not establish current provider health or a spending limit."
   },
   "Auth": {
     "account": "Your account",

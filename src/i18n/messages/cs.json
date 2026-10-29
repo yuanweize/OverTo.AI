@@ -295,7 +295,7 @@
     "rejected": "Odmítnuté citace",
     "reason": "Důvod selhání",
     "cost": "Odhad ceny (USD)",
-    "scope": "Tato část zobrazuje metadata místního provozu. Správa verzí promptů, aktivace modelů a běh evaluací v rozhraní dosud nejsou implementovány. Úspěšný požadavek neznamená, že je poskytovatel právě dostupný."
+    "scope": "Tato část zobrazuje metadata místního provozu. V konzoli jsou dostupné verze promptů, registr modelů a syntetické evaluace. Dříve úspěšný požadavek nedokládá současnou dostupnost poskytovatele ani limit výdajů."
   },
   "Auth": {
     "account": "OvěřTo.AI účet",

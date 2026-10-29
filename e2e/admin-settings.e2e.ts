@@ -26,6 +26,16 @@ test('root can save branding, reject a stale edit and restore the prior version'
     await pool.query("INSERT INTO platform_admins(user_id,role) VALUES ($1,'ROOT')", [id]);
     const login = await page.request.post('/api/auth/sign-in/email', { headers: { Origin: origin }, data: { email, password } });
     expect(login.status()).toBe(200);
+    if (process.env.OVERTO_ADMIN_VISUAL_ONLY === 'true') {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto('/admin/ai-studio');
+      await expect(page.getByRole('heading', { name: 'AI Studio', exact: true })).toBeVisible();
+      await page.emulateMedia({ colorScheme: 'light' });
+      await page.screenshot({ path: 'assets/screenshots/v7-ai-studio-en-light.png', fullPage: true });
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.screenshot({ path: 'assets/screenshots/v7-ai-studio-en-dark.png', fullPage: true });
+      return;
+    }
     original = await (await page.request.get('/api/site')).json();
     await page.goto('/admin');
     await page.getByLabel('Site name', { exact: true }).fill('Evidence test site');

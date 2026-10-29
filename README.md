@@ -95,7 +95,7 @@ The local AI Studio shows trace metadata and 24-hour operational counts. Message
 | English documentation, desktop | [View](assets/screenshots/v7-docs-en-1024.png) |
 | AI Studio models, synthetic administrator | [View](assets/screenshots/v7-model-registry.png) |
 | Administrator settings, synthetic test branding | [View](assets/screenshots/v6-admin-settings.png) |
-| AI trace view, synthetic test branding | [View](assets/screenshots/v6-ai-traces.png) |
+| AI Studio traces, light and dark | [Light](assets/screenshots/v7-ai-studio-en-light.png) · [Dark](assets/screenshots/v7-ai-studio-en-dark.png) |
 
 Theme and language choices persist. Public pages, authentication forms and account screens have Czech and English catalogs. Backend error responses and email templates still need localization. See the [three-round visual review](docs/design/FINAL-VISUAL-REVIEW.md), [public reference review](docs/design/OPENROUTER-REFERENCE-REVIEW.md) and [branding policy](BRANDING.md). Screenshots show local operation, not a hosted production SaaS.
 
