@@ -51,15 +51,24 @@ async function verifiedSignup(page: Page, name: string, email: string, password:
   await expect(page.getByRole('heading', { name: `Vítejte, ${name}.` })).toBeVisible();
 }
 
+async function captureDarkMobile(page: Page, path: string) {
+  const desktop = page.viewportSize();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path, fullPage: true });
+  await page.emulateMedia({ colorScheme: 'light' });
+  if (desktop) await page.setViewportSize(desktop);
+}
+
 test('local registration, workspace, project, logout and isolation', async ({ browser }) => {
-  const one = await browser.newContext({ locale: 'cs-CZ' }); const two = await browser.newContext({ locale: 'cs-CZ' });
+  const one = await browser.newContext({ locale: 'cs-CZ', viewport: { width: 1440, height: 900 } }); const two = await browser.newContext({ locale: 'cs-CZ' });
   const a = await one.newPage(); const b = await two.newPage();
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const password = 'unique-local-test-password-42';
   const aEmail = `a-${suffix}@example.com`;
   await verifiedSignup(a, 'Test A', aEmail, password);
   await expect(a.getByRole('heading', { name: 'Testovací kredity' })).toBeVisible(); await expect(a.getByText('10', { exact: true })).toBeVisible();
-  if (process.env.OVERTO_CAPTURE_UI === 'true') await a.screenshot({ path: 'assets/screenshots/v7-dashboard-cs-1440.png', fullPage: true });
+  if (process.env.OVERTO_CAPTURE_UI === 'true') { await a.screenshot({ path: 'assets/screenshots/v7-dashboard-cs-1440.png', fullPage: true }); await captureDarkMobile(a, 'assets/screenshots/v7-dashboard-cs-dark-390.png'); }
   await a.goto('/dashboard/analyze');
   await a.getByLabel('Vložte podezřelou zprávu').fill('Ahoj mami, mám nové číslo. Pošli mi ihned peníze.');
   await a.getByRole('button', { name: 'Pokračovat ke kontrole textu' }).click();
@@ -113,7 +122,7 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   await expect(a.getByLabel('Nový API klíč')).toHaveCount(0);
   const activeKeyRow = a.locator('li').filter({ hasText: apiKey.slice(0, 15) });
   await expect(activeKeyRow.getByLabel('Dnes využito 3 z 1000 požadavků')).toBeVisible();
-  if (process.env.OVERTO_CAPTURE_UI === 'true') await a.screenshot({ path: 'assets/screenshots/v7-api-keys-cs-1440.png', fullPage: true });
+  if (process.env.OVERTO_CAPTURE_UI === 'true') { await a.screenshot({ path: 'assets/screenshots/v7-api-keys-cs-1440.png', fullPage: true }); await captureDarkMobile(a, 'assets/screenshots/v7-api-keys-cs-dark-390.png'); }
   await activeKeyRow.getByRole('button', { name: 'Zrušit klíč' }).click();
   await expect(activeKeyRow).toContainText('Zrušen');
   const revoked = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${apiKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });

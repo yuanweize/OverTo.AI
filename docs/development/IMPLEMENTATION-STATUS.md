@@ -18,7 +18,7 @@ Updated 2026-10-30. This worktree is **not a production SaaS release**. Public `
 | Unit and isolated PostgreSQL integration tests | 129 passed, 0 failed, 0 skipped across 29 files after the explicit provider-health check |
 | TypeScript | `npx tsc --noEmit` passed after the documentation, home, dashboard and Studio changes |
 | ESLint | `npm run lint` passed after those changes |
-| Documentation links | Public candidate tree: 38 Markdown files, 126 local targets, 6 anchors, 20 remote URLs checked; 0 failures |
+| Documentation links | Public candidate tree: 38 Markdown files; local links, anchors and remote HTTP URLs checked; 0 failures |
 | Browser | Standard suite: 10 passed, 1 skipped (privileged test intentionally disabled). Separate privileged suite: 1 passed, 0 skipped. Covers registration, projects, key usage/rotation/scope denial, credits, logout, isolation, public page viewports, model save/restore and rules evaluation. |
 | Production build | `npm run build` passed after the documentation, home, dashboard and Studio changes. |
 

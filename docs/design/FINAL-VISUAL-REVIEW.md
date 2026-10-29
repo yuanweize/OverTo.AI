@@ -45,10 +45,12 @@ The live public reference and its access limits are recorded in [reference revie
 | Home mobile, Czech dark | [Home mobile](../../assets/screenshots/v7-home-cs-dark-390.png) | One-column hero and annotation fit without horizontal overflow; the full-page capture is tall. |
 | Analysis mobile, English dark | [Analysis](../../assets/screenshots/v7-analyze-en-dark-390.png) | Disabled review action now uses a neutral surface and legible text. |
 | Dashboard desktop, Czech light | [Dashboard](../../assets/screenshots/v7-dashboard-cs-1440.png) | Credits, projects and plan form one scannable strip; all values come from the test account. |
+| Dashboard mobile, Czech dark | [Dashboard mobile](../../assets/screenshots/v7-dashboard-cs-dark-390.png) | Metrics stack cleanly; the primary analysis action stays visible below them. |
 | API keys desktop, Czech light | [Keys](../../assets/screenshots/v7-api-keys-cs-1440.png) | Current and revoked key show the same quota lineage; only prefixes are visible. |
+| API keys mobile, Czech dark | [Keys mobile](../../assets/screenshots/v7-api-keys-cs-dark-390.png) | First capture exposed squeezed key details and a low-contrast disabled button. The layout and disabled state were corrected, then recaptured after a clean dev restart. Key prefixes only are visible. |
 | Playground desktop, Czech light | [Playground](../../assets/screenshots/v7-playground-cs-1440.png) | Decision, signal count, engine and credits precede expandable JSON. The input was cleared before capture. |
 | Docs, English, 1024px | [Documentation](../../assets/screenshots/v7-docs-en-1024.png) | Navigation, code examples and content measure are readable. |
 | AI Studio, English desktop light | [Light](../../assets/screenshots/v7-ai-studio-en-light.png) | Compact live metrics and bordered trace rows replace the earlier card stack. The obsolete feature disclaimer was corrected. |
 | AI Studio, English desktop dark | [Dark](../../assets/screenshots/v7-ai-studio-en-dark.png) | Status labels remain readable in dark mode; only synthetic administrator identity and operational metadata are shown. |
 
-The dashboard and key screens still need a 390px dark inspection after the latest design pass. Billing and the remaining admin surfaces need another visual iteration. This round is a real improvement, not final visual acceptance for every route.
+Billing and the remaining admin surfaces need another visual iteration. Keyboard-only and assistive technology acceptance is still incomplete. This round is a real improvement, not final visual acceptance for every route.
