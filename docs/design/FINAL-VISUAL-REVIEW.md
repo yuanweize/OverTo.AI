@@ -50,7 +50,9 @@ The live public reference and its access limits are recorded in [reference revie
 | API keys mobile, Czech dark | [Keys mobile](../../assets/screenshots/v7-api-keys-cs-dark-390.png) | First capture exposed squeezed key details and a low-contrast disabled button. The layout and disabled state were corrected, then recaptured after a clean dev restart. Key prefixes only are visible. |
 | Playground desktop, Czech light | [Playground](../../assets/screenshots/v7-playground-cs-1440.png) | Decision, signal count, engine and credits precede expandable JSON. The input was cleared before capture. |
 | Docs, English, 1024px | [Documentation](../../assets/screenshots/v7-docs-en-1024.png) | Navigation, code examples and content measure are readable. |
+| Billing, Czech desktop light | [Billing](../../assets/screenshots/v7-billing-cs-1440.png) | Disabled test-payment state is explicit; no live amount or entitlement is invented. |
+| Billing, Czech mobile dark | [Billing mobile](../../assets/screenshots/v7-billing-cs-dark-390.png) | Single-column copy and buttons fit 390px. Disabled actions received a semantic high-contrast treatment. |
 | AI Studio, English desktop light | [Light](../../assets/screenshots/v7-ai-studio-en-light.png) | Compact live metrics and bordered trace rows replace the earlier card stack. The obsolete feature disclaimer was corrected. |
 | AI Studio, English desktop dark | [Dark](../../assets/screenshots/v7-ai-studio-en-dark.png) | Status labels remain readable in dark mode; only synthetic administrator identity and operational metadata are shown. |
 
-Billing and the remaining admin surfaces need another visual iteration. Keyboard-only and assistive technology acceptance is still incomplete. This round is a real improvement, not final visual acceptance for every route.
+An active billing subscription and the remaining admin surfaces need another visual iteration. Keyboard-only and assistive technology acceptance is still incomplete. This round is a real improvement, not final visual acceptance for every route.

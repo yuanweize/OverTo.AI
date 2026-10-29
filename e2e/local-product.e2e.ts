@@ -55,7 +55,9 @@ async function captureDarkMobile(page: Page, path: string) {
   const desktop = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({ path, fullPage: true });
+  const height = await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); return document.documentElement.scrollHeight; });
+  await page.setViewportSize({ width: 390, height: Math.min(height, 5000) });
+  await page.screenshot({ path, animations: 'disabled' });
   await page.emulateMedia({ colorScheme: 'light' });
   if (desktop) await page.setViewportSize(desktop);
 }
@@ -69,6 +71,12 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   await verifiedSignup(a, 'Test A', aEmail, password);
   await expect(a.getByRole('heading', { name: 'Testovací kredity' })).toBeVisible(); await expect(a.getByText('10', { exact: true })).toBeVisible();
   if (process.env.OVERTO_CAPTURE_UI === 'true') { await a.screenshot({ path: 'assets/screenshots/v7-dashboard-cs-1440.png', fullPage: true }); await captureDarkMobile(a, 'assets/screenshots/v7-dashboard-cs-dark-390.png'); }
+  if (process.env.OVERTO_CAPTURE_UI === 'true') {
+    await a.goto('/dashboard/billing');
+    await expect(a.getByRole('heading', { name: 'Fakturace', exact: true })).toBeVisible();
+    await a.screenshot({ path: 'assets/screenshots/v7-billing-cs-1440.png', fullPage: true });
+    await captureDarkMobile(a, 'assets/screenshots/v7-billing-cs-dark-390.png');
+  }
   await a.goto('/dashboard/analyze');
   await a.getByLabel('Vložte podezřelou zprávu').fill('Ahoj mami, mám nové číslo. Pošli mi ihned peníze.');
   await a.getByRole('button', { name: 'Pokračovat ke kontrole textu' }).click();

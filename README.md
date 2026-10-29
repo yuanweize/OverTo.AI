@@ -91,6 +91,7 @@ The local AI Studio shows trace metadata and 24-hour operational counts. Message
 | Czech dashboard, dark mobile | [View](assets/screenshots/v7-dashboard-cs-dark-390.png) |
 | Czech API keys and shared daily usage | [View](assets/screenshots/v7-api-keys-cs-1440.png) |
 | Czech API keys, dark mobile | [View](assets/screenshots/v7-api-keys-cs-dark-390.png) |
+| Czech billing, light desktop and dark mobile | [Desktop](assets/screenshots/v7-billing-cs-1440.png) · [Mobile](assets/screenshots/v7-billing-cs-dark-390.png) |
 | Czech API Playground with structured result | [View](assets/screenshots/v7-playground-cs-1440.png) |
 | English workspace, synthetic test account | [View](assets/screenshots/v7-workspace-mobile.png) |
 | Czech pricing, desktop | [View](assets/screenshots/v7-pricing-cs-1440.png) |
