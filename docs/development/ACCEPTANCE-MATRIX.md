@@ -5,7 +5,7 @@ Statuses distinguish working local experiments from a production SaaS release. S
 | Area | Routes / module | Current evidence | Status |
 | --- | --- | --- | --- |
 | Public website | `/`, `/analyze`, `/pricing`, `/developers`, `/docs`, `/features`, `/how-it-works`, `/security`, `/privacy`, `/terms` | Three screenshot rounds at desktop/tablet/mobile, revised hero and new bilingual `/docs`; analysis and API rules requests exercised | Local, partially reviewed |
-| Language and theme | Czech/English, Light/Dark/System | Browser override and fallback tests; English and Czech dark/light captures | Local, partial accessibility audit |
+| Language and theme | Czech/English, Light/Dark/System | Browser override and fallback tests; English and Czech dark/light captures; axe WCAG A/AA scans on eight public combinations, five signed-in routes and two admin routes | Local; manual keyboard/screen-reader audit remains |
 | Rules and evidence | `/api/analyze`, `/api/v1/analyses`, action graph | Schema, span grounding, ambiguity and request tests; no URL fetch | Local, no representative accuracy claim |
 | AI adapter | OpenAI-compatible endpoint in server config | Synthetic live connectivity success before a later provider rate limit; mocked malformed/429/failure tests | Local only, production blocked |
 | Provider / model admin | `/admin/ai-studio/providers`, `/admin/ai-studio/models`, explicit `/models` diagnostic | Root-only audited settings, endpoint allowlist, model registry save/restore in browser; diagnostic mock tests | Local, no price or model-capability guarantee |

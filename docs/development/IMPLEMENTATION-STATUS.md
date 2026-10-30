@@ -21,7 +21,7 @@ Updated 2026-10-30. This worktree is **not a production SaaS release**. Public `
 | TypeScript | `npx tsc --noEmit` passed after the documentation, home, dashboard and Studio changes |
 | ESLint | `npm run lint` passed after those changes |
 | Documentation links | Public candidate tree: 38 Markdown files; local links, anchors and remote HTTP URLs checked; 0 failures |
-| Browser | Current standard suite: 10 passed, 1 skipped (privileged test intentionally disabled). Separate privileged visual and full settings/Studio runs: 1 passed each, including all new operations routes, anonymous 404, wildcard-literal search and English/Czech plus mobile dark captures. The standard and full privileged runs were repeated after guest admission. |
+| Browser | Current standard suite: 11 passed, 1 skipped (privileged test intentionally disabled). Automated axe passed eight public combinations after a keyboard-focus fix; a separate signed-in run passed five dashboard routes and a separate ROOT run passed two operations routes. |
 | Production build | `npm run build` passed after the new operations pages; documentation and browser assertions changed afterward. |
 
 Real screenshots are in `assets/screenshots/`. They show synthetic accounts and test data. [Visual review](../design/FINAL-VISUAL-REVIEW.md) records three rounds, reviewed viewports and remaining design issues. The public [OpenRouter reference review](../design/OPENROUTER-REFERENCE-REVIEW.md) distinguishes visible pages from private ones. Independent [test plans](../testing/FULL-E2E-TEST-PLAN.md) are available.

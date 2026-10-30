@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { loadEnvConfig } from '@next/env';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
+import AxeBuilder from '@axe-core/playwright';
 loadEnvConfig(process.cwd(), true);
 
 // Run explicitly with one worker: this journey temporarily changes global site settings.
@@ -36,6 +37,10 @@ test('root can inspect operations, save branding and restore the prior version',
     await page.goto('/admin/operations');
     await expect(page.getByRole('heading', { name: 'Operations overview' })).toBeVisible();
     await expect(page.getByText('Analyses today')).toBeVisible();
+    if (process.env.OVERTO_A11Y_ADMIN === 'true') {
+      const scan = await new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']).analyze();
+      expect(scan.violations.map(v => ({ rule: v.id, targets: v.nodes.map(n => n.target) })), 'admin operations').toEqual([]);
+    }
     if (process.env.OVERTO_CAPTURE_UI === 'true' || process.env.OVERTO_ADMIN_VISUAL_ONLY === 'true') {
       await page.screenshot({ path: 'assets/screenshots/v7-admin-overview-en-1440.png', fullPage: true });
       await page.setViewportSize({ width: 390, height: 844 });
@@ -52,6 +57,10 @@ test('root can inspect operations, save branding and restore the prior version',
     await page.goto('/admin/users?q=admin-acceptance-');
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
     await expect(page.getByRole('main').getByText(email)).toBeVisible();
+    if (process.env.OVERTO_A11Y_ADMIN === 'true') {
+      const scan = await new AxeBuilder({ page }).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']).analyze();
+      expect(scan.violations.map(v => ({ rule: v.id, targets: v.nodes.map(n => n.target) })), 'admin users').toEqual([]);
+    }
     if (process.env.OVERTO_CAPTURE_UI === 'true' || process.env.OVERTO_ADMIN_VISUAL_ONLY === 'true') await page.screenshot({ path: 'assets/screenshots/v7-admin-users-en-1440.png', fullPage: true });
     await page.goto('/admin/users?q=no-such-synthetic-user');
     await expect(page.getByText('No accounts match this search.')).toBeVisible();

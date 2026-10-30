@@ -1,5 +1,9 @@
 # Visual review — local development build
 
+## Round 5 — automated accessibility and developer experience
+
+The `frontend-design`, `ui-ux-pro-max` and `codebase-design` skills were revisited before this pass. A real Chrome run used axe-core with WCAG 2/2.1/2.2 A and AA rules on eight public screen combinations: Czech and English, light and dark, 390–1440px. It found two horizontally scrollable code examples on `/developers` that keyboard users could not focus. Both examples now have a named, focusable region; the suite passed after the fix. A second Chrome run passed the same automated rules on five signed-in dashboard pages. The ROOT acceptance journey passed scans on the operations overview and user table. The [corrected Czech dark developer screenshot](../../assets/screenshots/v7-developers-cs-dark-1024-a11y.png) was reviewed after the fix. Automated axe results do not replace manual keyboard or screen-reader testing; those remain release gates.
+
 ## Round 4 — operations console
 
 The new ROOT-only operations pages were captured in Chrome after implementation. The first desktop capture used a 1280px test viewport despite its 1440 filename; the browser test was corrected to set 1440px before capture and rerun. The resulting [English overview](../../assets/screenshots/v7-admin-overview-en-1440.png), [Czech overview](../../assets/screenshots/v7-admin-overview-cs-1440.png), [English dark mobile overview](../../assets/screenshots/v7-admin-overview-en-dark-390.png) and [English users table](../../assets/screenshots/v7-admin-users-en-1440.png) were inspected. The metric strip becomes a two-column mobile grid, links and status text remain readable, and the desktop table aligns six fields. The screenshots show synthetic local accounts, not real adoption. Unauthorized requests to each new page returned 404 in the same browser run. The remaining visual gate is the broader keyboard, contrast and tablet audit across all routes.

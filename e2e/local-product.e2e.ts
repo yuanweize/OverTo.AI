@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { loadEnvConfig } from '@next/env';
 import { Pool } from 'pg';
@@ -181,6 +182,10 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   await expect(a.locator('html')).toHaveAttribute('lang','en');
   for (const [route,title] of [['projects','Projects'],['api-keys','API keys'],['usage','Usage'],['settings','Settings'],['billing','Billing']]) {
     await a.goto(`/dashboard/${route}`); await expect(a.getByRole('heading',{name:title,exact:true})).toBeVisible();
+    if (process.env.OVERTO_A11Y_ACCOUNT === 'true') {
+      const scan = await new AxeBuilder({ page: a }).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']).analyze();
+      expect(scan.violations.map(v => ({ rule: v.id, targets: v.nodes.map(n => n.target) })), `dashboard/${route}`).toEqual([]);
+    }
   }
   await a.goto('/dashboard/projects');
   await expect(a.getByRole('heading',{name:'Projects',exact:true})).toBeVisible();

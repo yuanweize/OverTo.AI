@@ -93,6 +93,7 @@ The local AI Studio shows trace metadata and 24-hour operational counts. Message
 | Czech API keys, dark mobile | [View](assets/screenshots/v7-api-keys-cs-dark-390.png) |
 | Czech billing, light desktop and dark mobile | [Desktop](assets/screenshots/v7-billing-cs-1440.png) · [Mobile](assets/screenshots/v7-billing-cs-dark-390.png) |
 | Czech API Playground with structured result | [View](assets/screenshots/v7-playground-cs-1440.png) |
+| Czech developer API guide, dark tablet | [View](assets/screenshots/v7-developers-cs-dark-1024-a11y.png) |
 | English workspace, synthetic test account | [View](assets/screenshots/v7-workspace-mobile.png) |
 | Czech pricing, desktop | [View](assets/screenshots/v7-pricing-cs-1440.png) |
 | English documentation, desktop | [View](assets/screenshots/v7-docs-en-1024.png) |
