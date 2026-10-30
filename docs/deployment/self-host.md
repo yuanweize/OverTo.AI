@@ -147,8 +147,8 @@ When deploying behind reverse proxies (Cloudflare, Nginx, Caddy, AWS ALB):
 Pre-built production multi-arch images (`linux/amd64`, `linux/arm64`) are published to GHCR:
 
 ```sh
-docker pull ghcr.io/yuanweize/overto-ai:v7.0.1
-docker pull ghcr.io/yuanweize/overto-ai:latest
+docker pull ghcr.io/yuanweize/overto.ai:7.0.1
+docker pull ghcr.io/yuanweize/overto.ai:latest
 ```
 
 To build and push manually using a GitHub Personal Access Token (classic):
@@ -160,6 +160,6 @@ To build and push manually using a GitHub Personal Access Token (classic):
 3. Build and push:
    ```sh
    docker buildx build --platform linux/amd64,linux/arm64 \
-     -t ghcr.io/yuanweize/overto-ai:v7.0.1 \
-     -t ghcr.io/yuanweize/overto-ai:latest --push .
+     -t ghcr.io/yuanweize/overto.ai:7.0.1 \
+     -t ghcr.io/yuanweize/overto.ai:latest --push .
    ```
