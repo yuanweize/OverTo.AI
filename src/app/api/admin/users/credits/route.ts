@@ -2,12 +2,13 @@ import { pool } from '@/auth/server';
 import { getPlatformAdmin } from '@/server/config/admin';
 import { CreditLedger } from '@/billing/credit-ledger';
 import { readRequestBody } from '@/lib/read-request-body';
+import { isAllowedOrigin } from '@/server/security/origin';
 import { randomUUID } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
   if (!pool) return Response.json({ error: 'UNAVAILABLE' }, { status: 503 });
-  if (request.headers.get('origin') !== process.env.BETTER_AUTH_URL) {
+  if (!isAllowedOrigin(request.headers.get('origin'))) {
     return Response.json({ error: 'INVALID_ORIGIN' }, { status: 403 });
   }
 

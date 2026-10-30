@@ -3,13 +3,14 @@ import { pool } from '@/auth/server';
 import { getPlatformAdmin } from '@/server/config/admin';
 import { readRequestBody } from '@/lib/read-request-body';
 import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
+import { isAllowedOrigin } from '@/server/security/origin';
 import { PromptRepository } from '@/ai/prompts/repository';
 import { runEvaluation,summarizeEvaluation, type EvaluationMode } from '@/ai/evaluations/runner';
 import { CHALLENGE_SET } from '@/evaluation/challenge-dataset';
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 export async function POST(request:Request) {
   if(!pool)return reply({error:'UNAVAILABLE'},503);
-  if(request.headers.get('origin')!==process.env.BETTER_AUTH_URL)return reply({error:'INVALID_ORIGIN'},403);
+  if(!isAllowedOrigin(request.headers.get('origin')))return reply({error:'INVALID_ORIGIN'},403);
   const user=await getPlatformAdmin(request.headers);if(!user)return reply({error:'FORBIDDEN'},403);
   let id:string|undefined;
   try {

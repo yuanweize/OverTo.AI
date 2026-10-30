@@ -7,10 +7,11 @@ import { runLlmAnalysisIfConfigured } from '@/lib/llm-adapter';
 import { sanitizeInput } from '@/lib/sanitizer';
 import { readRequestBody } from '@/lib/read-request-body';
 import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
+import { isAllowedOrigin } from '@/server/security/origin';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 export async function POST(request: Request) {
   if (!pool) return reply({error:'UNAVAILABLE'},503);
-  if (request.headers.get('origin')!==process.env.BETTER_AUTH_URL) return reply({error:'INVALID_ORIGIN'},403);
+  if (!isAllowedOrigin(request.headers.get('origin'))) return reply({error:'INVALID_ORIGIN'},403);
   const user=await getPlatformAdmin(request.headers);
   if (!user) return reply({error:'FORBIDDEN'},403);
   try {

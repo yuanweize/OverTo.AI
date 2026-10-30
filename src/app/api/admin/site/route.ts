@@ -2,10 +2,11 @@ import { pool } from '@/auth/server';
 import { getPlatformAdmin } from '@/server/config/admin';
 import { SiteRepository } from '@/server/config/site-repository';
 import { readRequestBody } from '@/lib/read-request-body';
+import { isAllowedOrigin } from '@/server/security/origin';
 export async function PUT(request: Request) {
   const fail = (error: string, status: number) => Response.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
   if (!pool) return fail('UNAVAILABLE', 503);
-  if (request.headers.get('origin') !== process.env.BETTER_AUTH_URL) return fail('INVALID_ORIGIN', 403);
+  if (!isAllowedOrigin(request.headers.get('origin'))) return fail('INVALID_ORIGIN', 403);
   const user = await getPlatformAdmin(request.headers);
   if (!user) return fail('FORBIDDEN', 403);
   try {

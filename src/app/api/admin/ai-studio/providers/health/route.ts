@@ -3,11 +3,12 @@ import { getPlatformAdmin } from '@/server/config/admin';
 import { ProviderRepository } from '@/ai/providers/repository';
 import { checkProviderHealth } from '@/ai/providers/health';
 import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
+import { isAllowedOrigin } from '@/server/security/origin';
 
 export async function POST(request: Request) {
   const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
   if (!pool) return reply({ error: 'UNAVAILABLE' }, 503);
-  if (request.headers.get('origin') !== process.env.BETTER_AUTH_URL) return reply({ error: 'INVALID_ORIGIN' }, 403);
+  if (!isAllowedOrigin(request.headers.get('origin'))) return reply({ error: 'INVALID_ORIGIN' }, 403);
   const admin = await getPlatformAdmin(request.headers);
   if (!admin) return reply({ error: 'FORBIDDEN' }, 403);
   try {
