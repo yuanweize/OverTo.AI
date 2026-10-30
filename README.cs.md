@@ -39,7 +39,7 @@ Projekt je poskytován pod [Apache-2.0](LICENSE); závislosti mají vlastní lic
 
 Domovská stránka, analýza včetně doporučení, přihlášení, obnova hesla, ceník a vývojářská stránka mají české a anglické texty. Jazyk se volí podle prohlížeče; ruční volba má přednost. Citace původních zpráv se nepřekládají. Témata Světlé / Tmavé / Systém se ukládají. Pracovní prostor a fakturace ještě nejsou kompletně přeloženy.
 
-Správce platformy může změnit název, lokální logo, barvu, popisy a oznámení. Uložení kontroluje oprávnění, verzi a vytváří auditní záznam. Prvního správce přiřazuje důvěryhodné místní CLI, nikoli veřejná registrace. [Postup správy](docs/administration/site-settings.md).
+Správce platformy může změnit název, lokální logo, barvu, popisy a oznámení. Uložení kontroluje oprávnění, verzi a vytváří auditní záznam. Prvního správce přiřazuje důvěryhodné místní CLI, nikoli veřejná registrace. [Přehled provozu](docs/administration/operations.md) nyní zobrazuje skutečné místní účty, testovací předplatná, audit a základní stav systému. Produkční správa účtů a plateb ještě není hotová. [Postup nastavení](docs/administration/site-settings.md).
 
 AI Studio zobrazuje metadata volání a jejich stav, dobu a tokeny. Chybějící cenu neoznačuje jako nulovou. Neuchovává celé zprávy; verze administračních instrukcí jsou uloženy jako konfigurace. Prompt Lab podporuje neměnné verze, syntetické testy a řízenou aktivaci. Evaluace spouští autorskou sadu pravidly a omezené AI testy se souhlasem. [Dokumentace záznamů](docs/administration/ai-traces.md).
 

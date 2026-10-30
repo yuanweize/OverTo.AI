@@ -1,5 +1,9 @@
 # Visual review — local development build
 
+## Round 4 — operations console
+
+The new ROOT-only operations pages were captured in Chrome after implementation. The first desktop capture used a 1280px test viewport despite its 1440 filename; the browser test was corrected to set 1440px before capture and rerun. The resulting [English overview](../../assets/screenshots/v7-admin-overview-en-1440.png), [Czech overview](../../assets/screenshots/v7-admin-overview-cs-1440.png), [English dark mobile overview](../../assets/screenshots/v7-admin-overview-en-dark-390.png) and [English users table](../../assets/screenshots/v7-admin-users-en-1440.png) were inspected. The metric strip becomes a two-column mobile grid, links and status text remain readable, and the desktop table aligns six fields. The screenshots show synthetic local accounts, not real adoption. Unauthorized requests to each new page returned 404 in the same browser run. The remaining visual gate is the broader keyboard, contrast and tablet audit across all routes.
+
 Screenshots were captured from the running app with synthetic content on 2026-10-29. They are visual evidence of the local build, not deployed-service evidence or a usability study.
 
 ## Direction

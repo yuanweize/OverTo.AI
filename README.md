@@ -79,7 +79,7 @@ A dedicated local PostgreSQL and loopback-only Mailpit support signup, email ver
 
 ## Administration and observability
 
-Verified platform administrators can edit public branding with validated settings, version-conflict detection and transactional audit history. First-root assignment is a trusted local CLI operation. [Site settings](docs/administration/site-settings.md) explains the supported fields and current deployment boundary.
+Verified platform administrators can edit public branding with validated settings, version-conflict detection and transactional audit history. First-root assignment is a trusted local CLI operation. The [operations console](docs/administration/operations.md) shows live local account, test billing, audit and basic system data behind the same ROOT check. It does not provide production account or billing actions. See [site settings](docs/administration/site-settings.md) for the supported branding fields.
 
 The local AI Studio shows trace metadata and 24-hour operational counts. Message contents are not stored; administrator-authored prompt versions **are** stored as configuration. Missing tokens and cost remain unknown. The [Prompt Lab](docs/administration/prompts.md) supports immutable drafts, real tests and audited activation/rollback. The [evaluation console](docs/administration/evaluations.md) runs the authored rules set and bounded AI smoke tests. [Model service settings](docs/administration/providers.md) control the registered endpoint, default and allowed models, timeout, output cap and an explicit metadata-only connection check. Dataset editing, multi-provider routing and production budgets remain unfinished. See [AI traces](docs/administration/ai-traces.md).
 
@@ -99,6 +99,8 @@ The local AI Studio shows trace metadata and 24-hour operational counts. Message
 | AI Studio models, synthetic administrator | [View](assets/screenshots/v7-model-registry.png) |
 | Administrator settings, synthetic test branding | [View](assets/screenshots/v6-admin-settings.png) |
 | AI Studio traces, light and dark | [Light](assets/screenshots/v7-ai-studio-en-light.png) · [Dark](assets/screenshots/v7-ai-studio-en-dark.png) |
+| Administrator overview, English light and dark mobile | [Desktop](assets/screenshots/v7-admin-overview-en-1440.png) · [Mobile](assets/screenshots/v7-admin-overview-en-dark-390.png) |
+| Administrator overview, Czech light | [View](assets/screenshots/v7-admin-overview-cs-1440.png) |
 
 Theme and language choices persist. Public pages, authentication forms and account screens have Czech and English catalogs. Backend error responses and email templates still need localization. See the [three-round visual review](docs/design/FINAL-VISUAL-REVIEW.md), [public reference review](docs/design/OPENROUTER-REFERENCE-REVIEW.md) and [branding policy](BRANDING.md). Screenshots show local operation, not a hosted production SaaS.
 

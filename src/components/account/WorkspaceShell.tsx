@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { ShieldCheck, SlidersHorizontal, Activity, LayoutDashboard, ScanText, History, Folder, KeyRound, Terminal, BarChart3, CreditCard, Settings, Menu, Cpu } from 'lucide-react';
+import { ShieldCheck, SlidersHorizontal, Activity, LayoutDashboard, ScanText, History, Folder, KeyRound, Terminal, BarChart3, CreditCard, Settings, Menu, Cpu, Users, ScrollText, Server } from 'lucide-react';
 import { Brand } from '@/components/branding/Brand';
 import { Preferences } from '@/components/layout/Preferences';
 import { LogoutButton } from './LogoutButton';
@@ -17,7 +17,7 @@ const navigation = [
   { key:'billing', href:'/dashboard/billing', icon:CreditCard },
   { key:'settings', href:'/dashboard/settings', icon:Settings },
 ] as const;
-const adminNavigation = [{ key:'site',href:'/admin',icon:SlidersHorizontal },{ key:'studio',href:'/admin/ai-studio',icon:Activity },{ key:'providers',href:'/admin/ai-studio/providers',icon:Settings },{ key:'models',href:'/admin/ai-studio/models',icon:Cpu },{ key:'prompts',href:'/admin/ai-studio/prompts',icon:ScanText },{ key:'evaluations',href:'/admin/ai-studio/evaluations',icon:BarChart3 },{ key:'datasets',href:'/admin/ai-studio/datasets',icon:Folder },{ key:'workspace',href:'/dashboard',icon:ShieldCheck }];
+const adminNavigation = [{ key:'operations',href:'/admin/operations',icon:LayoutDashboard },{ key:'users',href:'/admin/users',icon:Users },{ key:'billing',href:'/admin/billing',icon:CreditCard },{ key:'audit',href:'/admin/audit',icon:ScrollText },{ key:'system',href:'/admin/system',icon:Server },{ key:'site',href:'/admin',icon:SlidersHorizontal },{ key:'studio',href:'/admin/ai-studio',icon:Activity },{ key:'providers',href:'/admin/ai-studio/providers',icon:Settings },{ key:'models',href:'/admin/ai-studio/models',icon:Cpu },{ key:'prompts',href:'/admin/ai-studio/prompts',icon:ScanText },{ key:'evaluations',href:'/admin/ai-studio/evaluations',icon:BarChart3 },{ key:'datasets',href:'/admin/ai-studio/datasets',icon:Folder },{ key:'workspace',href:'/dashboard',icon:ShieldCheck }];
 export function WorkspaceShell({name,email,children,admin=false}: {name:string;email:string;children:React.ReactNode;admin?:boolean}) {
   const t = useTranslations(admin ? 'AdminNav' : 'Dashboard');
   const pathname = usePathname();

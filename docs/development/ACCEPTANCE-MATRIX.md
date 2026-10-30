@@ -17,6 +17,7 @@ Statuses distinguish working local experiments from a production SaaS release. S
 | Credits and usage | `/dashboard/analyze`, `/dashboard/usage` | Concurrent reservations, duplicate rejection, project-scoped usage; compact actual-data summary and structured Playground response inspected in browser | Local test credits |
 | Billing | `/dashboard/billing`, Stripe test routes | Actual sandbox checkout, signed webhook, one credit grant, portal and cancellation; replay and bad signature checks | Experimental; renewal/refunds/reconciliation pending |
 | Site administration | `/admin` | Verified ROOT, audited configuration, version conflicts, browser save/restore | Local only |
+| Operations console | `/admin/operations`, `/admin/users`, `/admin/billing`, `/admin/audit`, `/admin/system` | Live local SQL data, ROOT server guard, anonymous 404, literal user search, English light/Czech light/English dark mobile browser captures | Local read-only; no production user or billing actions |
 | Docker and deployment | Dockerfile, Compose | Rules-only container was previously smoked on arm64 | SaaS self-hosting incomplete |
 | Public release | GitHub `competition-2026.10.29` | Public `main` and competition release remain unchanged; 7.0 is published as a preview branch only | No 7.0 release |
 

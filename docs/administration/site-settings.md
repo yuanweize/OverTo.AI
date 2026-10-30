@@ -18,4 +18,4 @@ Every save checks verified platform-admin authorization, validates the full publ
 
 Theme and language preferences use HttpOnly SameSite cookies. Set `OVERTO_PUBLIC_URL` to the canonical public origin behind a proxy; the local environment uses `BETTER_AUTH_URL`. Forwarded host headers do not authorize preference writes.
 
-Not implemented here: production setup wizard, provider secrets, registration/maintenance controls, pricing, user administration, or organization roles. Do not expose the local account experiment as a production service.
+The separate [operations console](operations.md) now provides root-only, read-only user, test billing, audit and system views. Production setup, pricing administration, organization roles and account actions remain unfinished. Do not expose the local account experiment as a production service.

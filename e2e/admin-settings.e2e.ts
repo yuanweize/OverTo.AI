@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 loadEnvConfig(process.cwd(), true);
 
 // Run explicitly with one worker: this journey temporarily changes global site settings.
-test('root can save branding, reject a stale edit and restore the prior version', async ({ page }) => {
+test('root can inspect operations, save branding and restore the prior version', async ({ page, browser }) => {
   test.skip(process.env.OVERTO_ADMIN_E2E !== 'true', 'Explicit local administrator acceptance run only');
   test.setTimeout(150000);
   const connectionString = process.env.OVERTO_DEV_DATABASE_URL!;
@@ -16,6 +16,12 @@ test('root can save branding, reject a stale edit and restore the prior version'
   let original: { version: number; config: Record<string, unknown> } | undefined;
   const origin = 'http://127.0.0.1:3005';
   try {
+    const anonymous = await browser.newContext();
+    try {
+      for (const path of ['/admin/operations', '/admin/users', '/admin/billing', '/admin/audit', '/admin/system']) {
+        expect((await anonymous.request.get(`${origin}${path}`)).status(), `${path} must not expose operations`).toBe(404);
+      }
+    } finally { await anonymous.close(); }
     if ((await pool.query('SELECT 1 FROM platform_admins')).rowCount) { test.skip(true, 'An operator already owns root; no role changes allowed'); return; }
     const email = `admin-acceptance-${randomUUID()}@example.com`;
     const password = `test-${randomUUID()}`;
@@ -26,6 +32,38 @@ test('root can save branding, reject a stale edit and restore the prior version'
     await pool.query("INSERT INTO platform_admins(user_id,role) VALUES ($1,'ROOT')", [id]);
     const login = await page.request.post('/api/auth/sign-in/email', { headers: { Origin: origin }, data: { email, password } });
     expect(login.status()).toBe(200);
+    if (process.env.OVERTO_CAPTURE_UI === 'true' || process.env.OVERTO_ADMIN_VISUAL_ONLY === 'true') await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/admin/operations');
+    await expect(page.getByRole('heading', { name: 'Operations overview' })).toBeVisible();
+    await expect(page.getByText('Analyses today')).toBeVisible();
+    if (process.env.OVERTO_CAPTURE_UI === 'true' || process.env.OVERTO_ADMIN_VISUAL_ONLY === 'true') {
+      await page.screenshot({ path: 'assets/screenshots/v7-admin-overview-en-1440.png', fullPage: true });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.screenshot({ path: 'assets/screenshots/v7-admin-overview-en-dark-390.png', fullPage: true });
+      await page.emulateMedia({ colorScheme: 'light' });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.getByRole('combobox', { name: 'Language' }).selectOption('cs');
+      await expect(page.getByRole('heading', { name: 'Přehled provozu' })).toBeVisible();
+      await page.screenshot({ path: 'assets/screenshots/v7-admin-overview-cs-1440.png', fullPage: true });
+      await page.getByRole('combobox', { name: 'Jazyk' }).selectOption('en');
+      await expect(page.getByRole('heading', { name: 'Operations overview' })).toBeVisible();
+    }
+    await page.goto('/admin/users?q=admin-acceptance-');
+    await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+    await expect(page.getByRole('main').getByText(email)).toBeVisible();
+    if (process.env.OVERTO_CAPTURE_UI === 'true' || process.env.OVERTO_ADMIN_VISUAL_ONLY === 'true') await page.screenshot({ path: 'assets/screenshots/v7-admin-users-en-1440.png', fullPage: true });
+    await page.goto('/admin/users?q=no-such-synthetic-user');
+    await expect(page.getByText('No accounts match this search.')).toBeVisible();
+    await page.goto('/admin/users?q=%25');
+    await expect(page.getByText('No accounts match this search.')).toBeVisible();
+    await page.goto('/admin/billing');
+    await expect(page.getByRole('heading', { name: 'Billing activity' })).toBeVisible();
+    await page.goto('/admin/audit');
+    await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+    await page.goto('/admin/system');
+    await expect(page.getByRole('heading', { name: 'System status' })).toBeVisible();
+    await expect(page.getByText('Database connection')).toBeVisible();
     if (process.env.OVERTO_ADMIN_VISUAL_ONLY === 'true') {
       await page.setViewportSize({ width: 1440, height: 900 });
       await page.goto('/admin/ai-studio');
