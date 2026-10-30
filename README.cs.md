@@ -4,7 +4,7 @@
 
 Experimentální český pomocník pro posouzení podezřelých SMS, e-mailů a žádostí. Pomáhá najít možné varovné znaky a navrhuje nezávislé ověření. Neověřuje totožnost odesílatele, neotevírá odkazy a nezaručuje bezpečnost.
 
-[English README](README.md) · [Místní dokumentace](http://127.0.0.1:3005/docs) · [Dokumentace API](docs/api/v1.md) · [Soukromí](PRIVACY.md) · [Bezpečnost](SECURITY.md) · [Stav vývoje](docs/development/IMPLEMENTATION-STATUS.md)
+[English README](README.md) · [Dokumentace API](docs/api/v1.md) · [Průvodce vlastním provozem](docs/deployment/self-host.md) · [Soukromí](PRIVACY.md) · [Bezpečnost](SECURITY.md) · [Stav vývoje](docs/development/IMPLEMENTATION-STATUS.md)
 
 ## Spuštění
 

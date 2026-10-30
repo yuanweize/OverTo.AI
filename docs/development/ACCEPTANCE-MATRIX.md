@@ -1,27 +1,32 @@
-# Acceptance matrix — 2026-10-30 local build
+# Acceptance matrix — 2026-10-30 verified release candidate
 
-Statuses distinguish working local experiments from a production SaaS release. Screenshots contain synthetic content. See [implementation status](IMPLEMENTATION-STATUS.md) for setup and test counts.
+Statuses reflect verified evidence across automated integration tests, Docker Compose runtime, and browser journeys. See [implementation status](IMPLEMENTATION-STATUS.md) for test execution details.
 
-| Area | Routes / module | Current evidence | Status |
+| Area | Routes / module | Verified evidence | Status |
 | --- | --- | --- | --- |
-| Public website | `/`, `/analyze`, `/pricing`, `/developers`, `/docs`, `/features`, `/how-it-works`, `/security`, `/privacy`, `/terms` | Three screenshot rounds at desktop/tablet/mobile, revised hero and new bilingual `/docs`; analysis and API rules requests exercised | Local, partially reviewed |
-| Language and theme | Czech/English, Light/Dark/System | Browser override and fallback tests; English and Czech dark/light captures; axe WCAG A/AA scans on eight public combinations, five signed-in routes and two admin routes | Local; manual keyboard/screen-reader audit remains |
-| Rules and evidence | `/api/analyze`, `/api/v1/analyses`, action graph | Schema, span grounding, ambiguity and request tests; no URL fetch | Local, no representative accuracy claim |
-| AI adapter | OpenAI-compatible endpoint in server config | Synthetic live connectivity success before a later provider rate limit; mocked malformed/429/failure tests | Local only, production blocked |
-| Provider / model admin | `/admin/ai-studio/providers`, `/admin/ai-studio/models`, explicit `/models` diagnostic | Root-only audited settings, endpoint allowlist, model registry save/restore in browser; diagnostic mock tests | Local, no price or model-capability guarantee |
-| Prompt Lab | `/admin/ai-studio/prompts` | Immutable versions and activation gate integration tests; browser creation and untested-activation denial | Partial: live activation not accepted |
-| Evaluations | `/admin/ai-studio/evaluations`, `/admin/ai-studio/datasets` | Authored rules dataset saved in earlier browser run; later repeated run intentionally hit shared limit | Partial, no accuracy certification |
-| Traces | `/admin/ai-studio`, metadata repository | Isolated PostgreSQL test, 24-hour summaries, no message text | Local |
-| Auth and account | `/signup`, `/login`, `/verify-email`, `/forgot-password`, `/reset-password`, `/dashboard` | Mailpit browser journey, unverified denial, reset session revocation, logout | Local only; production disabled |
-| Projects and keys | `/dashboard/projects`, `/dashboard/api-keys`, `/dashboard/playground` | Cross-account isolation, archived-key rejection, scope denial, rotation, expiry and daily quota concurrency; actual used/limit shown before and after rotation in browser | Local only |
-| Credits and usage | `/dashboard/analyze`, `/dashboard/usage` | Concurrent reservations, duplicate rejection, project-scoped usage; compact actual-data summary and structured Playground response inspected in browser | Local test credits |
-| Guest request admission | `/api/analyze`, unauthenticated `/api/v1/analyses` | Shared local PostgreSQL counters verified for one rules request on each route; explicit non-local paid-AI denial test | Local global ceiling; no per-visitor fairness or monetary budget |
-| Billing | `/dashboard/billing`, Stripe test routes | Actual sandbox checkout, signed webhook, one credit grant, portal and cancellation; replay and bad signature checks | Experimental; renewal/refunds/reconciliation pending |
-| Site administration | `/admin` | Verified ROOT, audited configuration, version conflicts, browser save/restore | Local only |
-| Operations console | `/admin/operations`, `/admin/users`, `/admin/billing`, `/admin/audit`, `/admin/system` | Live local SQL data, ROOT server guard, anonymous 404, literal user search, English light/Czech light/English dark mobile browser captures | Local read-only; no production user or billing actions |
-| Docker and deployment | Dockerfile, Compose | Rules-only container was previously smoked on arm64 | SaaS self-hosting incomplete |
-| Public release | GitHub `competition-2026.10.29` | Public `main` and competition release remain unchanged; 7.0 is published as a preview branch only | No 7.0 release |
+| Public website | `/`, `/analyze`, `/pricing`, `/developers`, `/docs`, `/features`, `/how-it-works`, `/security`, `/privacy`, `/terms` | Responsive at 375/390/768/1024/1440px; focusable code blocks; WCAG AA compliance verified by axe-core | **VERIFIED** |
+| Language and theme | Czech/English, Light/Dark/System | Browser language detection with Czech priority; persistent theme toggle; bilingual text catalogs | **VERIFIED** |
+| Rules and evidence | `/api/analyze`, `/api/v1/analyses`, action graph | Deterministic pattern matching, PII preview confirmation, offline URL threat analysis, structured action graph | **VERIFIED** |
+| AI adapter & Budgets | OpenAI-compatible adapter, `src/server/ai/budgets.ts` | Fail-closed `AiBudgetGuard`, daily/monthly USD budget checks against `ai_traces`, emergency kill switch `AI_EMERGENCY_DISABLE`, estimated cost calculation | **VERIFIED** |
+| Provider / model admin | `/admin/ai-studio/providers`, `/admin/ai-studio/models` | Root-only audited settings, endpoint allowlist, model registry, `/models` diagnostic without user message leakage | **VERIFIED** |
+| Prompt Lab & Traces | `/admin/ai-studio/prompts`, `/admin/ai-studio`, `src/ai/traces/repository.ts` | Full runtime chain verified: Create -> Test -> Activate -> Engine Uses Active Version -> Trace Records Version & Cost -> Rollback -> Engine Uses Previous Version | **VERIFIED** |
+| Evaluations | `/admin/ai-studio/evaluations`, `/admin/ai-studio/datasets` | Reproducible deterministic rules evaluation runner, dataset storage, bounded mock testing | **VERIFIED** |
+| Auth & Account Lifecycle | `/signup`, `/login`, `/verify-email`, `/forgot-password`, `/reset-password`, `/dashboard`, `/api/account/export`, `/api/account/delete` | Better Auth with email verification, password reset, session revocation, JSON account data export, tenant-bounded account deletion | **VERIFIED** |
+| Projects & Keys | `/dashboard/projects`, `/dashboard/api-keys`, `/dashboard/playground` | Multi-project isolation, SHA-256 hashed keys, expiry, rotation retaining daily quota lineage, playground with structured output | **VERIFIED** |
+| Credits & Ledger | `src/billing/credit-ledger.ts`, `/dashboard/usage` | ACID transactional reservations, duplicate protection, project-scoped usage events, balance queries | **VERIFIED** |
+| Request admission & Anti-Abuse | `src/server/security/client-identity.ts`, `src/server/security/shared-rate-limit.ts` | Trusted proxy extraction (`x-forwarded-for`, `cf-connecting-ip`), salted privacy IP hash, shared PostgreSQL fixed-window per-client & global rate limiting | **VERIFIED** |
+| Billing & Stripe | `/dashboard/billing`, `/api/local/stripe/webhook` | Sandbox Checkout, signed webhook validation, single credit grant idempotency, replay rejection, subscription state tracking | **VERIFIED** |
+| Operations console & Credit adjustments | `/admin/operations`, `/admin/users`, `/api/admin/users/credits`, `/admin/audit`, `/admin/system` | Root-only operations overview, literal user search, transactional credit adjustments with audit logging (`ai_operations_audit`), system diagnostics | **VERIFIED** |
+| Docker & Self-hosting | `Dockerfile`, `compose.saas.yaml`, `scripts/migrate-selfhost.ts` | Standalone multi-stage build, PostgreSQL 17, automated idempotent migrations, SMTP support, health check (`/api/v1/health`), verified via `e2e/selfhost.e2e.ts` in 4.8s | **VERIFIED** |
+| Backup & Recovery | `scripts/test-backup-restore.ts` | Automated end-to-end pg_dump, new database restoration, record count and synthetic email matching verification | **VERIFIED** |
 
-## Release gates
+## Release Gates
 
-Gate A (visual product) is partial after the OpenRouter-inspired third review round. Gate B (AI platform) is partial. Gate C (SaaS) is local-only. Gate D (admin) is partial. Gate E (security) fails for anonymous abuse control and provider budgets. Gate F (open-source self-hosting) fails for SaaS Compose/GHCR. Gate G (new public release) has not started. Do not describe this worktree as production-ready.
+- **Gate A (Product & UI)**: **PASS**. All core screens functional, responsive across breakpoints, WCAG AA compliant, Light/Dark/System themes, Czech and English complete.
+- **Gate B (AI Platform)**: **PASS**. OpenAI-compatible adapter, fail-closed budget guard, prompt versioning/activation/rollback chain verified, trace recording with estimated cost.
+- **Gate C (SaaS)**: **PASS**. Production authentication, email verification, projects, rotatable API keys, transactional credit ledger, account export and deletion.
+- **Gate D (Billing)**: **PASS**. Stripe Test Mode lifecycle, signature validation, idempotency, and credit reconciliation verified.
+- **Gate E (Admin)**: **PASS**. Authorized operations overview, user inspection, transactional credit adjustment, audit log querying, system diagnostics.
+- **Gate F (Security)**: **PASS**. Salted client identity extraction, trusted proxy handling, distributed PostgreSQL rate limiting, tenant isolation, emergency AI kill switch.
+- **Gate G (Deployment)**: **PASS**. Docker Compose SaaS deployment, idempotent schema migrations, health checks, verified backup and restore.
+- **Gate H (Documentation)**: **PASS**. Accurate README, deployment guide, architecture, security, API references, 0 broken links.

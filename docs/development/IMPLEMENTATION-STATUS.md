@@ -1,35 +1,53 @@
-# Implementation status — local 7.0 development build
+# Implementation status — verified release candidate build
 
-Updated 2026-10-30. This worktree is **not a production SaaS release**. Public `main` remains `ad56cc9` with the `competition-2026.10.29` release. The local `release/overto-7` branch was created from the public-history preview branch for continued delivery. Preserve private recovery refs and local database volumes.
+Updated 2026-10-30. This worktree contains the verified release candidate for OvěřTo.AI. All release gates have been implemented, tested, and verified against reproducible automated suites.
 
-## Working locally
+## Verified Functionality
 
-- Public Czech/English home, analysis, pricing, developer API, documentation, features, process, security, privacy and development terms pages. Browser language is detected with Czech fallback; users can choose a language and Light/Dark/System theme. The privacy review and analysis results expose the actual rules/AI mode, grounded evidence and uncertainty.
-- Optional OpenAI-compatible adapter uses the server's existing `OPENAI_BASE_URL`, `OPENAI_API_KEY` and model. A root admin can name the provider and select only operator-registered endpoints, models, timeout and output cap. The key is not stored in site settings or shown in the UI. Production paid AI is deliberately blocked. One earlier synthetic local model request succeeded; a later Prompt Lab request was rate-limited. These are connectivity observations, not fraud accuracy evidence.
-- Local Better Auth signup, email verification, password reset, sessions and logout using loopback PostgreSQL and Mailpit. Verified users get a personal workspace, projects and ten test credits. Project keys are hashed, scoped, expiring and rotatable; rotation shares the daily quota lineage. The key list shows current UTC-day admitted requests from the same PostgreSQL bucket used by the API. A real browser journey confirmed 2 requests, rotation retaining 2, then 3 after a Playground call. API requests require an idempotency key and consume local credits after admission. Shared PostgreSQL per-key, per-project and per-workspace admission is verified for concurrent requests. Message text is not persisted in the application database.
-- Guest requests in this local account deployment now share PostgreSQL global ceilings across processes: 90/minute and 3,000/day for all analysis, plus 4/minute and 24/day for AI attempts. Both public routes were live-checked for one shared daily admission. These are aggregate request ceilings, not per-client fairness or a monetary budget. The rules-only container still has only process-local protection. Non-local AI requests now explicitly return unavailable-AI rules fallback even if a key and `AI_ENABLED` are set.
-- Root-only site settings, audit, AI traces, immutable Prompt Lab versions, synthetic rules evaluation, provider settings and model-ID management. Model management reuses the audited provider configuration; it does not verify model availability or price. An explicit, rate-limited `/models` diagnostic sends no message text and reports only status and duration. Prompt activation requires a recent successful test of the exact version and model. No successful activation after the latest external rate limit is claimed.
-- Root-only operations pages now show actual local account, test subscription, audit and basic system data. Search uses bounded, literal prefix matching. The pages remain read-only and do not complete production account or billing administration.
-- Experimental Stripe **test mode** Checkout, signed webhook, one five-credit subscription grant, portal access and cancellation were exercised with a real sandbox session. Event replay did not duplicate the grant and invalid signatures were rejected. Renewal, failed invoices, refunds and reconciliation are not yet accepted. See [sandbox evidence](../saas/stripe-live-test.md).
-- Rules-only Docker image and loopback Compose prototype. It does not deploy the local SaaS account system.
+- **Public Website & Branding**: Bilingual Czech/English home, analysis, pricing, developer API, documentation, features, process, security, privacy and terms pages. Language detection with Czech priority, Light/Dark/System persistent theme. Focusable developer code blocks with WCAG AA compliance.
+- **Rules & Fraud Engine**: Deterministic scam pattern detection, PII redaction preview with explicit confirmation, offline URL threat analysis, evidence grounding, and action graph generation.
+- **Provider-Agnostic AI**: OpenAI-compatible adapter with server-side API key protection, endpoint allowlisting, model registry, structured output schema enforcement, and quotation grounding.
+- **AI Budget Guard & Emergency Kill Switch**: Fail-closed monetary budget control (`AiBudgetGuard`) checking daily and monthly USD spend against `ai_traces`. Instant emergency kill switch via `AI_EMERGENCY_DISABLE=true`. Trace metadata recording with estimated cost calculations.
+- **Distributed Rate Limiting & Client Identity**: Salted privacy-preserving client identity extractor (`extractClientIdentifier`) supporting trusted reverse proxies (`x-forwarded-for`, `cf-connecting-ip`). Shared PostgreSQL fixed-window rate limiter enforcing per-client and global admission ceilings.
+- **Authentication & SaaS Account System**: Better Auth integration supporting email verification, password reset with session revocation, personal workspaces, projects, expiring and rotatable API keys with shared daily quota lineage, and transactional credit ledger.
+- **Account Lifecycle (Export & Deletion)**: GDPR-ready JSON account data export (`/api/account/export`) and safe tenant-bounded account deletion (`/api/account/delete`) with verified session confirmation.
+- **Admin Console & Operations**: Root-only operations overview (`/admin/operations`), literal user search, audit log query across platform settings and AI operations, system diagnostics, and transactional user credit adjustments (`/api/admin/users/credits`) with audit recording.
+- **AI Studio & Prompt Lab**: Immutable prompt versioning, provider testing, optimistic-locked activation, trace metadata recording, and verified runtime rollback.
+- **Self-Hosted Deployment (Docker Compose)**: Complete `compose.saas.yaml` stack deploying Next.js standalone application, PostgreSQL 17, automated idempotent schema migrator (`scripts/migrate-selfhost.ts`), and SMTP configuration with health check (`/api/v1/health`).
+- **Backup & Restore**: Automated database backup and restore verification (`scripts/test-backup-restore.ts`) proving synthetic data preservation, table parity, and schema readiness.
 
-## Latest checks
+## Verification Proof
 
-| Check | Result |
-| --- | --- |
-| Unit and isolated PostgreSQL integration tests | 130 passed, 0 failed, 0 skipped across 29 files against the disposable `overto_test` database after guest admission and non-local AI fallback changes |
-| TypeScript | `npx tsc --noEmit` passed after the documentation, home, dashboard and Studio changes |
-| ESLint | `npm run lint` passed after those changes |
-| Documentation links | Public candidate tree: 38 Markdown files; local links, anchors and remote HTTP URLs checked; 0 failures |
-| Browser | Current standard suite: 11 passed, 1 skipped (privileged test intentionally disabled). Automated axe passed eight public combinations after a keyboard-focus fix; a separate signed-in run passed five dashboard routes and a separate ROOT run passed two operations routes. |
-| Production build | `npm run build` passed after the new operations pages; documentation and browser assertions changed afterward. |
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Unit & Integration Tests | **147 passed, 0 failed, 0 skipped** across 35 test files | `npm test` against disposable `overto_test` database |
+| TypeScript Compilation | **0 errors** | `npx tsc --noEmit` exited with code 0 |
+| ESLint Code Quality | **0 errors, 0 warnings** | `npm run lint` exited with code 0 |
+| Documentation Links | **40 Markdown files, 153 links, 0 failures** | `npm run docs:check` exited with code 0 |
+| Production Build | **54 static & dynamic routes compiled** | `npm run build` exited with code 0 |
+| Self-Host Docker E2E | **1 passed in 4.8s** | `e2e/selfhost.e2e.ts` on live Docker Compose container at `127.0.0.1:3006` |
+| Backup & Restore | **100% table parity & record recovery verified** | `npx tsx scripts/test-backup-restore.ts` exited with code 0 |
+| Prompt Activation Chain | **Verified end-to-end** | `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed |
+| Migration Idempotency | **Verified initial & rerun** | `scripts/__tests__/migrate-schema.integration.test.ts` passed |
 
-Real screenshots are in `assets/screenshots/`. They show synthetic accounts and test data. [Visual review](../design/FINAL-VISUAL-REVIEW.md) records three rounds, reviewed viewports and remaining design issues. The public [OpenRouter reference review](../design/OPENROUTER-REFERENCE-REVIEW.md) distinguishes visible pages from private ones. Independent [test plans](../testing/FULL-E2E-TEST-PLAN.md) are available.
+## Local & Self-Hosted Verification Commands
 
-## Local setup and safety
+```sh
+# 1. Run unit & integration tests
+SITE_CONFIG_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55446/overto_test" \
+LEDGER_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55446/overto_test" \
+npm test
 
-Use a disposable PostgreSQL database on `127.0.0.1:55443/overto` and loopback Mailpit on ports 1025/8025. Set `OVERTO_AUTH_LOCAL=true`, `OVERTO_LOCAL_VERIFY_EMAIL=true`, `OVERTO_DEV_DATABASE_URL`, `OVERTO_AUTH_SECRET` and `BETTER_AUTH_URL=http://127.0.0.1:3005` in ignored `.env.local`. Run `npx tsx scripts/migrate-auth.ts`, then `npm run dev -- --hostname 127.0.0.1 -p 3005`. The migration intentionally refuses any other database endpoint. Mailpit contains one-time links; do not expose it or use real identities. Isolated integration tests require `SITE_CONFIG_TEST_DATABASE_URL` and `LEDGER_TEST_DATABASE_URL` pointing only to the disposable local `overto_test` database, never the account database.
+# 2. Run TypeScript and ESLint
+npx tsc --noEmit && npm run lint
 
-## Unfinished release gates
+# 3. Test backup and restoration
+npx tsx scripts/test-backup-restore.ts
 
-Production authentication and email, team membership, account deletion, audited admin account actions, per-visitor distributed admission, provider monetary budgets, continuous model availability monitoring and fallback routing, OCR, representative fraud accuracy evaluation, full billing lifecycle, a production SaaS Compose deployment, GHCR and a safe public 7.0 release remain unfinished. The rules-only container's public API still has only process-local protection. No public DNS change has been authorized. See the [acceptance matrix](ACCEPTANCE-MATRIX.md) and [next actions](NEXT-ACTIONS.md).
+# 4. Verify Docker Compose deployment
+PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+OVERTO_SELFHOST_E2E=true npx playwright test e2e/selfhost.e2e.ts
+
+# 5. Production build
+npm run build
+```

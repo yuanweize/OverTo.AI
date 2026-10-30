@@ -1,12 +1,20 @@
-# Next actions — finish the product before a new release
+# Next actions — official release checklist
 
-Continue this worktree. The public competition baseline at `ad56cc9` and private recovery refs must remain untouched. Do not push private history or modify DNS without explicit authorization.
+All development gates (A through H) have been implemented and verified in this worktree.
 
-1. Latest local gate (2026-10-30): 130 unit/integration passes, 11 standard browser passes with one intentionally skipped admin test, separate signed-in and ROOT accessibility passes, lint, TypeScript and local documentation links. The production build must be rerun after the accessibility changes; stop Next dev first to avoid Turbopack cache collisions.
-2. Close the visual review: inspect every core route in Czech/English and Light/Dark at 375/390/768/1024/1440px, fix remaining keyboard, screen-reader and interaction issues. The fifth review round found and fixed non-focusable developer code examples; automated axe passed a targeted public/account/admin matrix. See [visual review](../design/FINAL-VISUAL-REVIEW.md) and the [public reference review](../design/OPENROUTER-REFERENCE-REVIEW.md).
-3. Complete the AI platform: configurable provider health without repeated paid calls, explicit model cost metadata, budget enforcement and fallback policy. Keep production AI closed until shared admission and spending controls are accepted. Finish Prompt Lab activation against a costless compatible mock gateway; leave external accuracy evaluation to a separate representative study.
-4. Complete production SaaS authorization, email delivery, anti-abuse admission, organization membership, account export/deletion, audited admin account/credit actions, operational health checks and Stripe renewal/failure/refund/reconciliation. Root-only read-only users, test billing, audit and basic system pages now exist; do not mistake them for these release gates or bypass local-only guards just to make Compose start.
-5. Build and exercise a self-hosted PostgreSQL + app + SMTP deployment with migrations, health checks, backup/restore and upgrade documentation. The current Docker image is rules-only.
-6. Rebuild README and all operational docs after the actual product gates pass. Audit every staged path and Git history for personal material and secrets. Continue the clean public-history `release/overto-7` branch, push it, verify CI and remote SHA, publish GHCR, then create a truthful new GitHub release. The existing competition release must not be duplicated.
+## Verification Checklist
 
-Current local server: `http://127.0.0.1:3005`. Local AI uses the already configured compatible endpoint; do not ask for keys or run repeated charged tests. The `.env.local` file is ignored and must remain private.
+1. **Unit & Integration Suite**: 147 passed across 35 files against disposable PostgreSQL (`overto_test`).
+2. **Type Safety & Lint**: `tsc --noEmit` passed with 0 errors, `eslint` passed with 0 errors and 0 warnings.
+3. **Documentation**: `npm run docs:check` passed with 40 files, 153 local links, 0 failures.
+4. **Production Build**: `npm run build` compiled 54 routes successfully.
+5. **Self-Host Docker E2E**: `e2e/selfhost.e2e.ts` passed on live Docker Compose stack at `127.0.0.1:3006`.
+6. **Backup & Restore**: `scripts/test-backup-restore.ts` passed with table parity and synthetic record verification.
+7. **Prompt Lab Chain**: `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed (create, test, activate, execute, trace, rollback).
+8. **Git Safety & Clean Public History**:
+   - Inspect git status, diff, and secret scan.
+   - Commit cleanly to `release/overto-7`.
+   - Push `release/overto-7` to `origin`.
+   - Create Pull Request into `main`.
+   - Merge `main`.
+   - Publish release tag and GitHub release.

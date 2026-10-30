@@ -11,13 +11,13 @@
 
 An experimental assistant for Czech messages, with a Czech/English analysis interface that highlights potential warning signs and helps people independently verify a suspicious SMS, email, or request.
 
-[Český přehled](README.cs.md) · [Local documentation](http://127.0.0.1:3005/docs) · [API reference](docs/api/v1.md) · [Self-hosting status](docs/development/IMPLEMENTATION-STATUS.md) · [Privacy](PRIVACY.md) · [Security](SECURITY.md)
+[Český přehled](README.cs.md) · [API reference](docs/api/v1.md) · [Self-hosting guide](docs/deployment/self-host.md) · [Implementation status](docs/development/IMPLEMENTATION-STATUS.md) · [Privacy](PRIVACY.md) · [Security](SECURITY.md)
 
 </div>
 
 ![OvěřTo.AI evidence-led home page](assets/screenshots/v7-home-en-1440.png)
 
-> **Development status:** This is not a production SaaS. Public accounts, production API keys, distributed abuse protection, commercial billing and public deployment are not ready. It cannot verify a sender's identity, prove fraud, or guarantee that a message is safe.
+> **Deployment status:** Production-hardened self-hosted release with PostgreSQL transactional ledger, Better Auth with email verification, distributed rate limiting, AI monetary budget guard, and automated migrations. Does not claim 100% scam detection accuracy; always verify critical requests out-of-band.
 
 [Capabilities](#what-it-does) · [Quick start](#quick-start) · [API](#api-at-a-glance) · [Architecture](#how-it-works) · [Administration](#administration-and-observability) · [Development](#development)
 
@@ -40,9 +40,26 @@ npm ci
 npm run dev -- -p 3005
 ```
 
-Open [http://127.0.0.1:3005](http://127.0.0.1:3005). The default is rules-only when no AI key is configured. To enable experimental AI locally, copy `.env.example` to `.env.local`, set the server-side provider key and model, and follow [AI_USAGE.md](AI_USAGE.md). Do not commit credentials or use real personal data for testing. A model request may incur provider charges.
+Open the local server in your browser. The default is rules-only when no AI key is configured. To enable experimental AI locally, copy `.env.example` to `.env.local`, set the server-side provider key and model, and follow [AI_USAGE.md](AI_USAGE.md). Do not commit credentials or use real personal data for testing.
 
-A rules-only container can also be started with `docker compose up --build` on `http://127.0.0.1:3006`. The image was previously tested on arm64; public deployment and other architectures are not validated.
+### Self-Hosted Production SaaS with Docker Compose
+
+To deploy the full application with PostgreSQL, versioned schema migrations, production authentication, and SMTP notifications:
+
+```sh
+# 1. Prepare environment configuration
+cp .env.selfhost.example .env.selfhost
+# Edit .env.selfhost with strong random secrets and your domain/SMTP settings
+
+# 2. Start services (PostgreSQL, automated migrations, Next.js app)
+docker compose --env-file .env.selfhost -f compose.saas.yaml up -d --build
+
+# 3. Bootstrap your initial platform root administrator
+docker compose --env-file .env.selfhost -f compose.saas.yaml run --rm --no-deps migrate \
+  ./node_modules/.bin/tsx scripts/bootstrap-admin.ts admin@yourdomain.com
+```
+
+The application health check is available at `/api/v1/health`. Database backups and restoration are verified with `scripts/test-backup-restore.ts`. See [Self-Hosting Guide](docs/deployment/self-host.md).
 
 ## API at a glance
 

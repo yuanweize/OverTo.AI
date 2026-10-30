@@ -1,0 +1,50 @@
+name: overto-saas
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: overto
+      POSTGRES_DB: overto
+      POSTGRES_PASSWORD: ${OVERTO_DB_PASSWORD:?Set OVERTO_DB_PASSWORD in the private env file}
+    volumes:
+      - overto_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U overto -d overto"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      target: migrator
+    env_file: .env.selfhost
+    environment:
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build: .
+    env_file: .env.selfhost
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:${OVERTO_HOST_PORT:-3006}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    profiles: ["test-mail"]
+    ports:
+      - "127.0.0.1:8026:8025"
+    restart: unless-stopped
+
+volumes:
+  overto_pgdata:

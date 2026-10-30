@@ -1,13 +1,14 @@
-/** Trusted local CLI only. Grants the first root to an existing verified account. */
+/** Trusted CLI only. Grants the first root to an existing verified account. */
 import { loadEnvConfig } from '@next/env';
 import { Pool } from 'pg';
+import { accountDeployment } from '../src/auth/deployment';
 loadEnvConfig(process.cwd(), true);
 async function main() {
   const email = process.argv[2]?.trim();
-  if (!email || !process.env.OVERTO_DEV_DATABASE_URL) throw new Error('USAGE');
-  const url = new URL(process.env.OVERTO_DEV_DATABASE_URL);
-  if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.port !== '55443' || url.pathname !== '/overto') throw new Error('LOCAL_ONLY');
-  const pool = new Pool({ connectionString: process.env.OVERTO_DEV_DATABASE_URL });
+  if (!email) throw new Error('USAGE');
+  const deployment = accountDeployment({ ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' });
+  if (!deployment) throw new Error('ACCOUNT_DEPLOYMENT_REQUIRED');
+  const pool = new Pool({ connectionString: deployment.databaseUrl });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -20,4 +21,4 @@ async function main() {
     console.log('First platform administrator initialized. Bootstrap is now closed.');
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); await pool.end(); }
 }
-main().catch(error => { console.error(error instanceof Error && ['USAGE','LOCAL_ONLY','ALREADY_INITIALIZED','VERIFIED_ACCOUNT_REQUIRED'].includes(error.message) ? error.message : 'BOOTSTRAP_FAILED'); process.exitCode = 1; });
+main().catch(error => { console.error(error instanceof Error && ['USAGE','ACCOUNT_DEPLOYMENT_REQUIRED','ALREADY_INITIALIZED','VERIFIED_ACCOUNT_REQUIRED'].includes(error.message) ? error.message : 'BOOTSTRAP_FAILED'); process.exitCode = 1; });

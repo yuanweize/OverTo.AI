@@ -3,6 +3,13 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
+FROM dependencies AS migrator
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
+COPY scripts ./scripts
+COPY migrations ./migrations
+COPY src/auth/deployment.ts ./src/auth/deployment.ts
+CMD ["./node_modules/.bin/tsx", "scripts/migrate-selfhost.ts"]
+
 FROM node:22-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1

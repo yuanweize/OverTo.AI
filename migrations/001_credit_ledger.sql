@@ -1,8 +1,8 @@
 -- Experimental ledger foundation. Apply only to a dedicated test database.
-CREATE TABLE credit_accounts (
+CREATE TABLE IF NOT EXISTS credit_accounts (
   id text PRIMARY KEY
 );
-CREATE TABLE credit_grants (
+CREATE TABLE IF NOT EXISTS credit_grants (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   account_id text NOT NULL REFERENCES credit_accounts(id),
   idempotency_key text NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE credit_grants (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (account_id, idempotency_key)
 );
-CREATE TABLE credit_reservations (
+CREATE TABLE IF NOT EXISTS credit_reservations (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   account_id text NOT NULL REFERENCES credit_accounts(id),
   idempotency_key text NOT NULL,
@@ -23,11 +23,11 @@ CREATE TABLE credit_reservations (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (account_id, idempotency_key)
 );
-CREATE TABLE credit_transactions (
+CREATE TABLE IF NOT EXISTS credit_transactions (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   account_id text NOT NULL REFERENCES credit_accounts(id),
   reservation_id bigint NOT NULL UNIQUE REFERENCES credit_reservations(id),
   amount integer NOT NULL CHECK (amount > 0),
   created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE INDEX credit_reservations_account_status ON credit_reservations (account_id, status);
+CREATE INDEX IF NOT EXISTS credit_reservations_account_status ON credit_reservations (account_id, status);

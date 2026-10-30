@@ -11,6 +11,9 @@ import { analysisLimiter } from '@/lib/process-limiter';
 import { resolveLocale } from '@/i18n/locale';
 import { readRequestBody } from '@/lib/read-request-body';
 import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
+import { accountDeployment } from '@/auth/deployment';
+import { extractClientIdentifier } from '@/server/security/client-identity';
+import { AiBudgetGuard } from '@/server/ai/budgets';
 
 
 export async function POST(request: NextRequest) {
@@ -55,19 +58,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pro analýzu pomocí AI je nutný souhlas s odesláním upraveného textu poskytovateli.' }, { status: 400 });
     }
     if (body.locale !== undefined && body.locale !== 'cs' && body.locale !== 'en') return NextResponse.json({ error: 'INVALID_LOCALE' }, { status: 400 });
-    // Public AI is restricted to the dedicated local deployment until a real monetary budget exists.
-    const localSharedAdmission = process.env.NODE_ENV === 'development' && process.env.OVERTO_AUTH_LOCAL === 'true';
-    const publicAiUnavailable = body.enableLlm === true && !localSharedAdmission;
-    if (localSharedAdmission) {
+    // Public AI is restricted to the dedicated local deployment or configured self-host with active budget.
+    const deployment = accountDeployment(process.env);
+    let publicAiUnavailable = body.enableLlm === true && deployment?.mode !== 'local' && deployment?.mode !== 'selfhost';
+    let admissionPool = null;
+
+    if (deployment) {
       try {
         const { pool } = await import('@/auth/server');
         if (!pool) throw new Error('ADMISSION_DATABASE_UNAVAILABLE');
+        admissionPool = pool;
+        const clientId = extractClientIdentifier(request);
         const policies = [
           { bucket: 'public-rules-minute', limit: 90, windowSeconds: 60 },
           { bucket: 'public-rules-day', limit: 3000, windowSeconds: 86400 },
+          { bucket: `client-rules-minute:${clientId}`, limit: 20, windowSeconds: 60 },
+          { bucket: `client-rules-day:${clientId}`, limit: 200, windowSeconds: 86400 },
           ...(body.enableLlm === true ? [
             { bucket: 'public-ai-minute', limit: 4, windowSeconds: 60 },
             { bucket: 'public-ai-day', limit: 24, windowSeconds: 86400 },
+            { bucket: `client-ai-minute:${clientId}`, limit: 2, windowSeconds: 60 },
+            { bucket: `client-ai-day:${clientId}`, limit: 10, windowSeconds: 86400 },
           ] : []),
         ];
         const admission = await new SharedRateLimiter(pool).consume(policies);
@@ -76,13 +87,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Ochrana veřejného API není dostupná.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
       }
     }
+
+    // Provider monetary budget guard & emergency kill switch
+    if (body.enableLlm === true) {
+      const budgetGuard = new AiBudgetGuard(admissionPool);
+      const budgetCheck = await budgetGuard.checkBudget();
+      if (!budgetCheck.allowed) {
+        publicAiUnavailable = true;
+      }
+    }
+
     const locale = resolveLocale(body.locale, request.headers.get('accept-language'));
     let prompt = defaultPrompt;
     let settings = defaultProviderSettings();
     if (publicAiUnavailable) settings = { ...settings, enabled: false };
-    if (body.enableLlm === true && process.env.NODE_ENV === 'development' && process.env.OVERTO_AUTH_LOCAL === 'true') {
-      const {pool} = await import('@/auth/server');
-      if (pool) { const {PromptRepository} = await import('@/ai/prompts/repository'); prompt = await new PromptRepository(pool).active(); const {ProviderRepository}=await import('@/ai/providers/repository'); settings=(await new ProviderRepository(pool).read()).config; }
+    if (body.enableLlm === true && deployment && admissionPool) {
+      const { PromptRepository } = await import('@/ai/prompts/repository');
+      prompt = await new PromptRepository(admissionPool).active();
+      const { ProviderRepository } = await import('@/ai/providers/repository');
+      settings = (await new ProviderRepository(admissionPool).read()).config;
+      if (publicAiUnavailable) settings = { ...settings, enabled: false };
     }
     const result = await analyzeSuspiciousMessage(body.text, body.enableLlm === true, locale, prompt, settings);
 
@@ -90,22 +114,26 @@ export async function POST(request: NextRequest) {
       const traceId = crypto.randomUUID();
       result.metadata.traceId = traceId;
       result.metadata.traceRecorded = false;
-      // Optional local observability. A storage failure must not discard the user's result.
-      if (process.env.NODE_ENV === 'development' && process.env.OVERTO_AUTH_LOCAL === 'true') {
+      // Optional observability. A storage failure must not discard the user's result.
+      if (deployment && admissionPool) {
         try {
-          const { pool } = await import('@/auth/server');
-          if (pool) {
-            const { TraceRepository } = await import('@/ai/traces/repository');
-            await new TraceRepository(pool).record({ id: traceId,
-              provider: settings.providerName,
-              model: result.metadata.aiModel || settings.model,
-              promptVersion: prompt.version, status: result.metadata.aiStatus,
-              failureReason: result.metadata.aiReason || null,
-              durationMs: result.metadata.providerDurationMs ?? result.metadata.processingTimeMs,
-              inputTokens: result.metadata.inputTokens ?? null, outputTokens: result.metadata.outputTokens ?? null,
-              rejectedEvidence: result.metadata.rejectedAiEvidence ?? null, estimatedCostUsd: null });
-            result.metadata.traceRecorded = true;
-          }
+          const { TraceRepository } = await import('@/ai/traces/repository');
+          const estimatedCost = (result.metadata.inputTokens || result.metadata.outputTokens)
+            ? AiBudgetGuard.calculateEstimatedCost(
+                result.metadata.aiModel || settings.model,
+                result.metadata.inputTokens ?? 0,
+                result.metadata.outputTokens ?? 0
+              )
+            : null;
+          await new TraceRepository(admissionPool).record({ id: traceId,
+            provider: settings.providerName,
+            model: result.metadata.aiModel || settings.model,
+            promptVersion: prompt.version, status: result.metadata.aiStatus,
+            failureReason: result.metadata.aiReason || null,
+            durationMs: result.metadata.providerDurationMs ?? result.metadata.processingTimeMs,
+            inputTokens: result.metadata.inputTokens ?? null, outputTokens: result.metadata.outputTokens ?? null,
+            rejectedEvidence: result.metadata.rejectedAiEvidence ?? null, estimatedCostUsd: estimatedCost });
+          result.metadata.traceRecorded = true;
         } catch { console.warn('[AI_TRACE] Metadata storage unavailable'); }
       }
     }

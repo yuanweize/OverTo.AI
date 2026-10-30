@@ -1,6 +1,6 @@
 {
-  "name": "ai-vyzva-cesko-2026",
-  "version": "0.1.0",
+  "name": "overto-ai",
+  "version": "7.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",

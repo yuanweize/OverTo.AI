@@ -1,8 +1,6 @@
 import { loadEnvConfig } from '@next/env';
-import { getMigrations } from 'better-auth/db/migration';
-import { betterAuth } from 'better-auth';
 import { Pool } from 'pg';
-import { readFile } from 'node:fs/promises';
+import { migrateSchema } from './migrate-schema';
 loadEnvConfig(process.cwd(), true);
 async function main() {
   if (process.env.OVERTO_AUTH_LOCAL !== 'true' || !process.env.OVERTO_DEV_DATABASE_URL || !process.env.OVERTO_AUTH_SECRET) throw new Error('Local auth configuration missing');
@@ -10,25 +8,7 @@ async function main() {
   if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.port !== '55443' || url.pathname !== '/overto') throw new Error('Migration restricted to dedicated local development database');
   const pool = new Pool({ connectionString: process.env.OVERTO_DEV_DATABASE_URL });
   try {
-    const auth = betterAuth({ database: pool, secret: process.env.OVERTO_AUTH_SECRET, emailAndPassword: { enabled: true, minPasswordLength: 10 } });
-    const migration = await getMigrations(auth.options);
-    await migration.runMigrations();
-    await pool.query(await readFile('migrations/002_local_workspace.sql', 'utf8'));
-    const existing = await pool.query("SELECT to_regclass('public.credit_accounts') AS name");
-    if (!existing.rows[0].name) await pool.query(await readFile('migrations/001_credit_ledger.sql', 'utf8'));
-    await pool.query(await readFile('migrations/003_local_usage.sql', 'utf8'));
-    await pool.query(await readFile('migrations/004_local_api_keys.sql', 'utf8'));
-    await pool.query(await readFile('migrations/005_local_project_archive.sql', 'utf8'));
-    await pool.query(await readFile('migrations/006_stripe_test.sql', 'utf8'));
-    await pool.query(await readFile('migrations/007_platform_settings.sql', 'utf8'));
-    await pool.query(await readFile('migrations/008_ai_traces.sql', 'utf8'));
-    await pool.query(await readFile('migrations/009_shared_rate_limits.sql', 'utf8'));
-    await pool.query(await readFile('migrations/010_ai_prompts.sql', 'utf8'));
-    await pool.query(await readFile('migrations/011_prompt_test_metrics.sql', 'utf8'));
-    await pool.query(await readFile('migrations/012_ai_evaluations.sql', 'utf8'));
-    await pool.query(await readFile('migrations/013_ai_provider_settings.sql', 'utf8'));
-    await pool.query(await readFile('migrations/014_key_permissions.sql', 'utf8'));
-    await pool.query(await readFile('migrations/015_provider_identity.sql', 'utf8'));
+    await migrateSchema(pool, process.env.OVERTO_AUTH_SECRET, false);
     console.log('Local authentication and workspace tables ready.');
   } finally { await pool.end(); }
 }
