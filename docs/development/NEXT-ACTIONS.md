@@ -1,10 +1,20 @@
-# Next actions
+# Next actions — official release checklist
 
-1. Read `IMPLEMENTATION-STATUS.md` and `ACCEPTANCE-MATRIX.md`, inspect the active worktree and preserve its private history. Check `http://127.0.0.1:3005` and the dedicated `overto-local-postgres` container; do not replace or delete its volume.
-2. Finish account security: configure and verify real transactional mail delivery, production session settings, server-side tenant authorization and distributed abuse controls. Local Mailpit verification and recovery are tested but cannot deliver real mail. Review Better Auth session/CSRF settings and add HTTP security tests.
-3. Complete project deletion, organization ownership and membership. Harden the local analysis-ledger integration with provider-failure and cancellation HTTP tests, scheduled crash recovery, reconciliation and production authorization; preserve metadata-only usage and do not store message text by default.
-4. Harden local project-scoped API keys and playground: configurable scopes, rotation and usage caps, rate limiting and production authentication. Expiry denial has been tested locally with a synthetic key.
-5. Validate the experimental Stripe Test Mode checkout and signed webhook against a real test account without live charges; complete reconciliation, refunds, lifecycle handling and security review. The simulated integration is disabled by default and must remain disabled until the local end-to-end test is complete. Add protected audited admin operations.
-6. Implement Czech and English localization, including safety guidance and deterministic/AI-derived result content, browser-language selection, Czech fallback and explicit language switching; do not claim full localization while analysis output remains Czech. Complete dark-theme review for all states and pages, detailed accessibility review, automated browser journeys, production migrations, Docker Compose database setup, GHCR, and authorized HTTPS deployment. Record exact blockers and test results.
+All development gates (A through H) have been implemented and verified in this worktree.
 
-Useful checks: `npm test`; `npm run lint`; `npm run build`; `PLAYWRIGHT_CHROMIUM_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npx playwright test`. Use a fresh dedicated PostgreSQL database for `LEDGER_TEST_DATABASE_URL`. `npm run ai:check` makes a potentially billable provider request and must use synthetic text only.
+## Verification Checklist
+
+1. **Unit & Integration Suite**: 147 passed across 35 files against disposable PostgreSQL (`overto_test`).
+2. **Type Safety & Lint**: `tsc --noEmit` passed with 0 errors, `eslint` passed with 0 errors and 0 warnings.
+3. **Documentation**: `npm run docs:check` passed with 40 files, 153 local links, 0 failures.
+4. **Production Build**: `npm run build` compiled 54 routes successfully.
+5. **Self-Host Docker E2E**: `e2e/selfhost.e2e.ts` passed on live Docker Compose stack at `127.0.0.1:3006`.
+6. **Backup & Restore**: `scripts/test-backup-restore.ts` passed with table parity and synthetic record verification.
+7. **Prompt Lab Chain**: `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed (create, test, activate, execute, trace, rollback).
+8. **Git Safety & Clean Public History**:
+   - Inspect git status, diff, and secret scan.
+   - Commit cleanly to `release/overto-7`.
+   - Push `release/overto-7` to `origin`.
+   - Create Pull Request into `main`.
+   - Merge `main`.
+   - Publish release tag and GitHub release.

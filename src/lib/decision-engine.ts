@@ -1,3 +1,5 @@
+import { defaultProviderSettings, type ProviderSettings } from '@/ai/providers-config';
+import { defaultPrompt, type RuntimePrompt } from '@/ai/prompts/default';
 /**
  * OvěřTo.AI - Core Decision & Evidence Aggregation Engine
  * Sjednocuje výstupy sanitizéru, URL analyzátoru, deterministických pravidel
@@ -9,9 +11,10 @@ import { sanitizeInput } from './sanitizer';
 import { analyzeUrls } from './url-analyzer';
 import { evaluateDeterministicRules } from './rules-engine';
 import { runLlmAnalysisIfConfigured, type ProviderResult } from './llm-adapter';
+import { localizeAnalysis } from '@/i18n/analysis';
 import { decideRisk } from '@/fraud-engine/decision-policy';
 
-export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boolean = false): Promise<AnalysisResult> {
+export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boolean = false, locale: 'cs' | 'en' = 'cs', prompt: RuntimePrompt = defaultPrompt, settings: ProviderSettings = defaultProviderSettings()): Promise<AnalysisResult> {
   const startTime = Date.now();
 
   // 1. Ochrana soukromí - PII Sanitizace
@@ -42,6 +45,7 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
   // Pokud odkaz obsahuje podvod, přidáme specifické kroky pro URL
   if (urlResult.hasUrl && urlResult.suspiciousScore > 30) {
     combinedActions.unshift({
+      id: 'URL_VERIFY',
       step: 1,
       action: 'V žádném případě na odkaz v této zprávě neklikejte',
       rationale: 'Odkaz vykazuje znaky podvržené domény. Může vést na podvodnou platební bránu nebo instalaci škodlivého kódu.',
@@ -52,8 +56,11 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
   // 4. Volitelné zapojení LLM vrstvy (pokud je povoleno a nakonfigurováno)
   let engineType: 'HYBRID_RULES_AND_LLM' | 'DETERMINISTIC_RULES' = 'DETERMINISTIC_RULES';
   let aiResult: ProviderResult = { status: 'NOT_REQUESTED' };
+  let providerDurationMs: number | undefined;
   if (enableLlm) {
-    aiResult = await runLlmAnalysisIfConfigured(sanitizedText);
+    const providerStart = Date.now();
+    aiResult = await runLlmAnalysisIfConfigured(sanitizedText, prompt, settings);
+    providerDurationMs = Date.now() - providerStart;
     if (aiResult.status === 'SUCCESS' && aiResult.analysis) {
       engineType = 'HYBRID_RULES_AND_LLM';
       for (const [index, signal] of aiResult.analysis.riskSignals.entries()) {
@@ -101,6 +108,7 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
   // Standardní verifikační krok, pokud žádné akce nevznikly
   if (combinedActions.length === 0) {
     combinedActions.push({
+      id: 'INDEPENDENT_VERIFY',
       step: 1,
       action: 'Ověřte si odesílatele nezávislým oficiálním kanálem',
       rationale: 'Pokud zpráva požaduje jakoukoliv reakci, nepoužívejte kontakty uvedené ve zprávě, ale oficiální web či známé telefonní číslo.',
@@ -118,7 +126,7 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
 
   const processingTimeMs = Date.now() - startTime;
 
-  return {
+  return localizeAnalysis({
     riskLevel,
     riskScore: finalRiskScore,
     headlineCzech,
@@ -133,6 +141,10 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
     semanticAnalysis: aiResult.analysis,
     metadata: {
       aiStatus: aiResult.status,
+      promptVersion: enableLlm ? prompt.version : undefined,
+      providerDurationMs,
+      inputTokens: aiResult.inputTokens,
+      outputTokens: aiResult.outputTokens,
       aiReason: aiResult.reason,
       aiProvider: aiResult.status === 'SUCCESS' ? 'AI' : null,
       aiModel: aiResult.model,
@@ -142,5 +154,5 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
       processingTimeMs,
       ruleMatches: combinedEvidences.length,
     },
-  };
+  }, locale);
 }

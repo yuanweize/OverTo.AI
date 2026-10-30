@@ -1,0 +1,22 @@
+name: Feature request
+description: Propose an improvement to the analysis, workspace or self-hosting experience.
+title: "Feature: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user task and current friction.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the result you expect, including any security or privacy implications.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -42,6 +42,7 @@ export interface RedactedItem {
 }
 
 export interface VerificationAction {
+  id?: string;
   step: number;
   action: string;
   rationale: string;
@@ -49,6 +50,9 @@ export interface VerificationAction {
 }
 
 export interface AnalysisResult {
+  locale?: 'cs' | 'en';
+  headline?: string;
+  summary?: string;
   riskLevel: RiskLevel;
   riskScore: number; // 0 až 100
   summaryCzech: string;
@@ -62,6 +66,12 @@ export interface AnalysisResult {
   uncertaintyNotice: string;
   semanticAnalysis?: SemanticAnalysis;
   metadata: {
+    promptVersion?: string;
+    traceId?: string;
+    traceRecorded?: boolean;
+    providerDurationMs?: number;
+    inputTokens?: number;
+    outputTokens?: number;
     analyzedAt: string;
     engine: 'HYBRID_RULES_AND_LLM' | 'DETERMINISTIC_RULES';
     aiStatus: AiStatus;
@@ -79,6 +89,7 @@ export interface AnalyzeRequest {
   contextHint?: 'SMS' | 'EMAIL' | 'WHATSAPP' | 'WEB' | 'UNKNOWN';
   enableLlm?: boolean;
   aiConsent?: boolean;
+  locale?: 'cs' | 'en';
 }
 
 export interface DemoScenario {

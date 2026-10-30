@@ -1,210 +1,35 @@
-# Design System Master File
+# OvěřTo.AI design system
 
-> Generated suggestions for exploration only. See PROJECT-NOTES.md for project decisions; these suggestions have not been validated or applied to the interface.
+Implemented foundation, 2026-10-29. Source: `src/app/globals.css`. Replaces the earlier generated exploration; it does not imply all product pages have been redesigned.
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
+## Semantic colors
 
----
+| Token | Light | Dark | Purpose |
+|---|---|---|---|
+| canvas | #f5f7fb | #101a26 | Page background |
+| surface | #ffffff | #172536 | Interactive panels |
+| surface-alt | #edf1f7 | #213348 | Message excerpt and inset areas |
+| ink | #152534 | #edf3fc | Primary text |
+| muted | #526579 | #b3c2d5 | Secondary text |
+| line | #ccd6e3 | #3d526a | Structural boundaries |
+| accent-text | #2454cf | #a8bfff | Links and information |
+| warning-text | #814700 | #ffdfa4 | Caution, paired with words/icons |
+| danger-text | #a42c45 | #ffb6c5 | High-risk guidance, paired with words/icons |
 
-**Project:** OvěřTo AI
-**Generated:** 2026-10-28 23:30:29
-**Category:** AI/Chatbot Platform
+Primary button fill defaults to #2454cf. Administrator changes require at least 4.5:1 contrast with white button text. The configured action color does not recolor risk states. System mode follows CSS media preference; manual mode is rendered from a persistent cookie before hydration.
 
----
+## Type and layout
 
-## Global Rules
+Inter, Latin Extended, variable weights. Body 16px, supporting text 14px, small metadata 12px. Headline 40–60px; mobile 43px. Body copy uses 1.5–1.8 line height. Shell maximum 1180px, 20px side gutters (16px on mobile). Layout breakpoints: 700px and 900px. Existing Tailwind workspace layouts retain their responsive breakpoints during migration.
 
-### Color Palette
+Spacing follows a 4px base, with 8/12/16/24/32/48px common steps. Controls use 9px radius, message insets 10px, signature evidence panel 18px. Only the signature panel has a broad shadow; borders carry most hierarchy. Buttons reserve at least 44px touch height. Focus ring: 3px, 4px offset. Reduced motion removes transitions. No information is conveyed solely through color.
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#7C3AED` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#6366F1` | `--color-secondary` |
-| Accent/CTA | `#EC4899` | `--color-accent` |
-| Background | `#FAF5FF` | `--color-background` |
-| Foreground | `#0F172A` | `--color-foreground` |
-| Muted | `#F7F3FD` | `--color-muted` |
-| Border | `#EFE7FC` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| Ring | `#7C3AED` | `--color-ring` |
+## Implemented components
 
-**Color Notes:** AI purple + generation pink
+Brand lockup, Header, Footer, native preference selects, primary/secondary button styles, evidence demo, safe site settings form with status feedback and version conflicts. Native controls retain keyboard behavior. Existing analysis and account controls share semantic colors but still need layout and full bilingual review.
 
-### Typography
+Do not add unused complex controls merely to satisfy a component inventory. When a real flow needs dialogs, comboboxes, menus or data grids, use a maintained accessible primitive and test keyboard behavior. Such components are not implemented by this foundation.
 
-- **Heading Font:** Space Grotesk
-- **Body Font:** DM Sans
-- **Mood:** tech, startup, modern, innovative, bold, futuristic
-- **Google Fonts:** [Space Grotesk + DM Sans](https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap)
+## Review requirements
 
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-```
-
-### Spacing Variables
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
-
-### Shadow Depths
-
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
-
----
-
-## Component Specs
-
-### Buttons
-
-```css
-/* Primary Button */
-.btn-primary {
-  background: #EC4899;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #7C3AED;
-  border: 2px solid #7C3AED;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-```
-
-### Cards
-
-```css
-.card {
-  background: #FAF5FF;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
-
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #7C3AED;
-  outline: none;
-  box-shadow: 0 0 0 3px #7C3AED20;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
-```
-
----
-
-## Style Guidelines
-
-**Style:** AI-Native UI
-
-**Keywords:** Chatbot, conversational, voice, assistant, agentic, ambient, minimal chrome, streaming text, AI interactions
-
-**Best For:** AI products, chatbots, voice assistants, copilots, AI-powered tools, conversational interfaces
-
-**Key Effects:** Typing indicators (3-dot pulse), streaming text animations, pulse animations, context cards, smooth reveals
-
-### Page Pattern
-
-**Pattern Name:** AI Personalization Landing
-
-- **Conversion Strategy:** Personalization is a suggested pattern, not a measured or promised conversion rate.
-- **CTA Placement:** Context-aware placement based on user segment
-- **Section Order:** 1. Dynamic hero (personalized), 2. Relevant features, 3. Tailored testimonials, 4. Smart CTA
-
----
-
-## Anti-Patterns (Do NOT Use)
-
-- ❌ Heavy chrome
-- ❌ Slow response feedback
-
-### Additional Forbidden Patterns
-
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
-
----
-
-## Pre-Delivery Checklist
-
-Before delivering any UI code, verify:
-
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+Check 375/390/768/1024/1440px, both themes and languages, keyboard focus, zoom, validation, disabled/loading/empty/error states and reduced motion. Capture the running app. See [review evidence](../../docs/design/DESIGN-REVIEW.md) for actual coverage and remaining gaps.

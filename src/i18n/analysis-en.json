@@ -1,0 +1,46 @@
+{
+  "decisions": {
+    "HIGH_RISK": { "title": "High risk", "description": "The message contains possible risk signals. Verify the situation independently before paying or sharing information; this result alone does not prove fraud." },
+    "VERIFICATION_RECOMMENDED": { "title": "Independent verification recommended", "description": "The message contains suspicious elements or an unverified link. This does not prove fraud. Check the request independently before acting." },
+    "INSUFFICIENT_EVIDENCE": { "title": "Insufficient evidence", "description": "No typical warning signs were detected in this text. That does not mean the message is safe. Verify any unusual request independently." }
+  },
+  "signals": {
+    "REMOTE_ACCESS_DEMAND": { "title": "Remote-access software mentioned", "description": "The text mentions remote access or installing software. Do not grant access based on an unsolicited request; check its context independently." },
+    "SAFE_ACCOUNT_FRAUD": { "title": "Account-threat or safe-account language", "description": "The text contains language associated with an account being threatened or money being moved. This pattern alone does not verify the sender or prove fraud." },
+    "FAMILY_EMERGENCY_SCAM": { "title": "Possible payment request in a family conversation", "description": "A family or changed-contact context appears alongside a request for money. It may be a real relative or impersonation; verify independently before paying." },
+    "OTP_CREDENTIAL_HARVEST": { "title": "Possible request for a code or password", "description": "The message appears to request a verification code, password or PIN. Sharing these can allow account access or authorize transactions." },
+    "PACKAGE_DELIVERY_SCAM": { "title": "Delivery problem or information-update request", "description": "The message mentions a delivery problem or asks for updated details. Such wording can also occur in fraudulent messages; verify the parcel separately." },
+    "PSYCHOLOGICAL_URGENCY": { "title": "Urgency or threatening language", "description": "The text contains urgency, deadlines or threats. Pressure can make independent checking harder; the wording alone does not establish intent." },
+    "INVESTMENT_FRAUD_DETECTED": { "title": "Investment or guaranteed-return language", "description": "The text contains patterns associated with investment promotions or guaranteed returns. Claims about returns and affiliation have not been verified." },
+    "MARKETPLACE_FRAUD": { "title": "Marketplace payment or courier language", "description": "The text matches patterns used in marketplace payment or courier requests. Verify payment through the platform or your bank before sharing sensitive information." },
+    "URL_USERINFO": { "title": "Address contains information before an @ sign", "description": "The part before @ is not the destination domain. Check the actual hostname independently. The link was not opened." },
+    "URL_IP_ADDRESS": { "title": "Link uses an IP address", "description": "The destination uses a numeric IP address rather than a domain name. This does not by itself prove fraud; verify who operates it." },
+    "URL_SHORTENER": { "title": "Shortened link conceals the destination", "description": "A link-shortening service hides the final destination. The application did not follow the link or verify that destination." },
+    "URL_PUNYCODE": { "title": "Internationalized domain name", "description": "The domain uses international characters. This is not proof of fraud; check the intended name carefully." },
+    "URL_HOMOGLYPH_CHAR": { "title": "Look-alike character in the address", "description": "The address contains a Cyrillic character that may resemble a Latin character. It may also be a legitimate international name." },
+    "URL_MISLEADING_SUBDOMAIN": { "title": "Service name in a subdomain", "description": "A service-related word appears before the registrable domain. This does not prove affiliation or fraud; verify the operator independently." },
+    "IMPERSONATION": { "title": "Possible look-alike domain", "description": "The hostname contains a known brand name but does not match the configured domain list. The list may be incomplete; the address alone does not prove fraud." },
+    "AI": { "title": "Possible signal proposed by AI", "description": "The model proposed this interpretation of the quoted text. A matching quotation does not prove the interpretation is correct." },
+    "UNKNOWN": { "title": "Possible risk signal", "description": "Review the quoted text and verify the request independently. This signal does not prove fraud." }
+  },
+  "actions": {
+    "REMOTE_ACCESS_DEMAND_1": { "action": "Pause the conversation and do not install software on request", "rationale": "Remote-access software can allow another person to control your device and access sensitive information." },
+    "SAFE_ACCOUNT_FRAUD_1": { "action": "Contact your bank using the number on your card or in its app", "rationale": "Ask the bank to check the claim. Do not use a phone number supplied in the suspicious message." },
+    "FAMILY_EMERGENCY_SCAM_1": { "action": "Call your relative on their previously known number", "rationale": "A familiar greeting or a claim about a new phone number does not establish identity." },
+    "FAMILY_EMERGENCY_SCAM_2": { "action": "Ask a question whose answer you and your relative know", "rationale": "An answer alone is not proof of identity; also use a previously known contact." },
+    "OTP_CREDENTIAL_HARVEST_1": { "action": "Do not forward verification codes or approve unfamiliar banking requests", "rationale": "A code or approval can authorize access or a transaction. Check the request through a trusted channel." },
+    "PACKAGE_DELIVERY_SCAM_1": { "action": "Open the carrier’s app or a website address you already know", "rationale": "Check the tracking number there instead of following the message’s link." },
+    "PSYCHOLOGICAL_URGENCY_1": { "action": "Pause and resist pressure to rush", "rationale": "An urgent deadline is not proof of legitimacy. Take time to verify the request through a trusted channel." },
+    "INVESTMENT_FRAUD_DETECTED_1": { "action": "Independently check the investment provider’s authorization", "rationale": "Use the relevant financial regulator’s official register and check that the contact details match. Authorization does not guarantee an investment’s safety." },
+    "MARKETPLACE_FRAUD_1": { "action": "Check the payment through the marketplace or your bank", "rationale": "Do not provide a card security code or approve a transaction merely because a message claims this is necessary to receive money." },
+    "URL_VERIFY": { "action": "Avoid opening the message’s link until you verify it", "rationale": "The address has warning signs. Use an independently known website or app to check the request." },
+    "INDEPENDENT_VERIFY": { "action": "Verify the sender through an independent channel", "rationale": "Use a previously known phone number, app or independently located official website instead of contact details in the message." }
+  },
+  "semanticActions": {
+    "PAYMENT": "Possible payment request", "SHARE_CREDENTIALS": "Possible request for login credentials", "SHARE_OTP": "Possible request for a verification code", "OPEN_LINK": "Possible request to open a link", "INSTALL_SOFTWARE": "Possible software installation request", "CONTACT": "Possible contact request", "OTHER": "Another possible request"
+  },
+  "uncertainty": "No automated system or AI can guarantee that unknown communication is safe. This result supports your own decision; it does not verify the sender, certify safety or prove fraud.",
+  "semanticSummary": "The model proposed possible signals based on quoted parts of the message.",
+  "semanticMissing": "The sender’s identity and the authenticity of the request have not been verified.",
+  "semanticUncertainty": "The model can be wrong; a matching quotation does not prove its interpretation."
+}

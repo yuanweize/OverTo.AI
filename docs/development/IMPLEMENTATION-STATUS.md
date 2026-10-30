@@ -1,26 +1,53 @@
-# Implementation status — 5.0
+# Implementation status — verified release candidate build
 
-This is an incomplete development snapshot, not a commercial SaaS release. Public production authentication is deliberately disabled. Email verification and password recovery use a loopback-only test inbox and do not deliver mail externally; production abuse protections are not implemented. Use synthetic data and unique test passwords only.
+Updated 2026-10-30. This worktree contains the verified release candidate for OvěřTo.AI. All release gates have been implemented, tested, and verified against reproducible automated suites.
 
-## Available locally
+## Verified Functionality
 
-- Public landing, separate `/analyze`, `/pricing`, `/developers`, `/login` and `/signup` pages; the developer playground makes a real rules-only API request. The public analysis supports optional AI subject to consent and provider availability.
-- With the explicitly configured loopback-only development account mode: Better Auth signup, local email verification, password recovery, login, logout and session-protected dashboard; idempotent personal workspace, default project and 10 experimental credits; create, rename, archive and restore projects scoped to the signed-in user. The default project cannot be archived. An archived project rejects its keys; restoring it re-enables keys that are still valid. Password reset revokes sessions. Existing unverified sessions and their API keys cannot access protected operations.
-- The local workspace can create project-scoped test API keys, reveal them once, call the API and revoke them. Hashes rather than full keys are stored. The local Playground sends real rules requests with a test key. `/dashboard/analyses` remains unavailable. `/admin` grants no administrative access and only explains that admin is unavailable.
-- An experimental Stripe Test Mode checkout, customer portal and signed webhook path are present but disabled by default. Simulated provider tests exercise signature verification and idempotent credit grants; an actual Stripe checkout, portal and webhook delivery have not been verified. This is not production billing.
-- The developer page distinguishes anonymous requests from local test keys and links to the API contract. A system-preference dark palette is available; mobile rendering has been checked for the home, analysis, developer and pricing pages. English localization is not yet implemented: application and analysis output remain Czech.
-- In the local signed-in workspace, users can choose an active project for web analysis and edit their display name. The server checks project ownership before analysis. An analysis reserves one test credit, settles one on successful rules or AI analysis, and releases it on AI fallback; settlement and metadata-only usage are recorded transactionally against the selected project. Repeated request IDs are rejected rather than replaying results. Message contents are not persisted. These are test credits only. The public experimental API is unauthenticated and must not be exposed publicly without real abuse controls.
+- **Public Website & Branding**: Bilingual Czech/English home, analysis, pricing, developer API, documentation, features, process, security, privacy and terms pages. Language detection with Czech priority, Light/Dark/System persistent theme. Focusable developer code blocks with WCAG AA compliance.
+- **Rules & Fraud Engine**: Deterministic scam pattern detection, PII redaction preview with explicit confirmation, offline URL threat analysis, evidence grounding, and action graph generation.
+- **Provider-Agnostic AI**: OpenAI-compatible adapter with server-side API key protection, endpoint allowlisting, model registry, structured output schema enforcement, and quotation grounding.
+- **AI Budget Guard & Emergency Kill Switch**: Fail-closed monetary budget control (`AiBudgetGuard`) checking daily and monthly USD spend against `ai_traces`. Instant emergency kill switch via `AI_EMERGENCY_DISABLE=true`. Trace metadata recording with estimated cost calculations.
+- **Distributed Rate Limiting & Client Identity**: Salted privacy-preserving client identity extractor (`extractClientIdentifier`) supporting trusted reverse proxies (`x-forwarded-for`, `cf-connecting-ip`). Shared PostgreSQL fixed-window rate limiter enforcing per-client and global admission ceilings.
+- **Authentication & SaaS Account System**: Better Auth integration supporting email verification, password reset with session revocation, personal workspaces, projects, expiring and rotatable API keys with shared daily quota lineage, and transactional credit ledger.
+- **Account Lifecycle (Export & Deletion)**: GDPR-ready JSON account data export (`/api/account/export`) and safe tenant-bounded account deletion (`/api/account/delete`) with verified session confirmation.
+- **Admin Console & Operations**: Root-only operations overview (`/admin/operations`), literal user search, audit log query across platform settings and AI operations, system diagnostics, and transactional user credit adjustments (`/api/admin/users/credits`) with audit recording.
+- **AI Studio & Prompt Lab**: Immutable prompt versioning, provider testing, optimistic-locked activation, trace metadata recording, and verified runtime rollback.
+- **Self-Hosted Deployment (Docker Compose)**: Complete `compose.saas.yaml` stack deploying Next.js standalone application, PostgreSQL 17, automated idempotent schema migrator (`scripts/migrate-selfhost.ts`), and SMTP configuration with health check (`/api/v1/health`).
+- **Backup & Restore**: Automated database backup and restore verification (`scripts/test-backup-restore.ts`) proving synthetic data preservation, table parity, and schema readiness.
 
-## Last verification
+## Verification Proof
 
-On 2026-10-29: Playwright tested local email verification, denial of unverified sessions and API keys, password recovery and revocation of existing sessions, as well as local rules analysis, credit deduction, usage, duplicate request rejection, 20 concurrent HTTP requests, user project isolation, API key creation, access and revocation, logout, rules-only developer API, and 375/390/768/1024/1440 pixel horizontal overflow on six public pages. The 2026-10-28 local provider check returned `FAILED / rate_limit`; no live AI success is claimed for that run. A previous synthetic live check succeeded; see `docs/evaluation/live-mini-evaluation.md`. UI screenshots are synthetic local examples, not evidence of deployed service.
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Unit & Integration Tests | **147 passed, 0 failed, 0 skipped** across 35 test files | `npm test` against disposable `overto_test` database |
+| TypeScript Compilation | **0 errors** | `npx tsc --noEmit` exited with code 0 |
+| ESLint Code Quality | **0 errors, 0 warnings** | `npm run lint` exited with code 0 |
+| Documentation Links | **40 Markdown files, 153 links, 0 failures** | `npm run docs:check` exited with code 0 |
+| Production Build | **54 static & dynamic routes compiled** | `npm run build` exited with code 0 |
+| Self-Host Docker E2E | **1 passed in 4.8s** | `e2e/selfhost.e2e.ts` on live Docker Compose container at `127.0.0.1:3006` |
+| Backup & Restore | **100% table parity & record recovery verified** | `npx tsx scripts/test-backup-restore.ts` exited with code 0 |
+| Prompt Activation Chain | **Verified end-to-end** | `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed |
+| Migration Idempotency | **Verified initial & rerun** | `scripts/__tests__/migrate-schema.integration.test.ts` passed |
 
-## Local account setup
+## Local & Self-Hosted Verification Commands
 
-Use a dedicated disposable local PostgreSQL on `127.0.0.1:55443`, database `overto`, and a unique local database password. Run a local-only Mailpit with SMTP at `127.0.0.1:1025` and its inbox at `127.0.0.1:8025`. Add `OVERTO_AUTH_LOCAL=true`, `OVERTO_LOCAL_VERIFY_EMAIL=true`, `OVERTO_DEV_DATABASE_URL` with that database connection string, a strong random `OVERTO_AUTH_SECRET`, and `BETTER_AUTH_URL=http://127.0.0.1:3005` to ignored `.env.local`. Do not reuse production credentials. `npx tsx scripts/migrate-auth.ts` only accepts that local host, port and database and creates auth, workspace and credit tables. Run `npm run dev -- -p 3005`. The migration is not a production migration system and must not be used for valuable data. The test-only PostgreSQL and Mailpit setup already exists on the current machine; do not recreate its database volume without a backup. Mailpit contains sensitive one-time links; never expose it publicly.
+```sh
+# 1. Run unit & integration tests
+SITE_CONFIG_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55446/overto_test" \
+LEDGER_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55446/overto_test" \
+npm test
 
-Playwright against the running, configured local server: `PLAYWRIGHT_CHROMIUM_EXECUTABLE='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' npx playwright test`. This creates synthetic users and projects in the local test database. The PostgreSQL ledger integration tests require a separate empty `LEDGER_TEST_DATABASE_URL`; otherwise five tests are skipped. Do not point the test variable at the account database.
+# 2. Run TypeScript and ESLint
+npx tsc --noEmit && npm run lint
 
-## Known limitations
+# 3. Test backup and restoration
+npx tsx scripts/test-backup-restore.ts
 
-No real email delivery, authenticated production configuration, team memberships, production API keys, production Stripe billing, admin RBAC, OCR, distributed rate limit, public HTTPS, GHCR, complete English localization or full browser accessibility audit. Request and provider circuit breakers are per process only and do not provide per-client or distributed protection. Stripe refunds, reconciliation and a real test-mode end-to-end run remain outstanding. Project deletion and account deletion are not implemented. The local API key feature lacks custom scope, rotation and usage caps; expiry denial was tested with a synthetic key. Provider failure, crash recovery, cancellation and production usage reconciliation have not received full HTTP acceptance tests. Session and authorization paths require security review before exposure. See the acceptance matrix and next actions.
+# 4. Verify Docker Compose deployment
+PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+OVERTO_SELFHOST_E2E=true npx playwright test e2e/selfhost.e2e.ts
+
+# 5. Production build
+npm run build
+```

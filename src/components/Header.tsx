@@ -1,9 +1,11 @@
+'use client';
 import Link from 'next/link';
-import { ShieldCheck } from 'lucide-react';
-
+import { useLocale, useTranslations } from 'next-intl';
+import { Brand } from './branding/Brand';
+import { useSite } from './branding/SiteProvider';
+import { Preferences } from './layout/Preferences';
 export function Header() {
-  return <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center justify-between gap-x-4 px-5">
-    <Link href="/" className="inline-flex min-h-11 items-center gap-2 rounded font-bold text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-700"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-800 text-white"><ShieldCheck size={20} aria-hidden="true"/></span><span className="text-xl tracking-tight">OvěřTo<span className="text-teal-700">.AI</span></span></Link>
-    <nav aria-label="Hlavní navigace" className="flex items-center gap-4 text-sm font-semibold"><Link href="/analyze" className="py-3 text-slate-700 hover:text-teal-800">Analýza</Link><Link href="/developers" className="hidden py-3 text-slate-700 hover:text-teal-800 sm:inline">API</Link><Link href="/pricing" className="hidden py-3 text-slate-700 hover:text-teal-800 sm:inline">Ceník</Link><Link href="/login" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-3 text-slate-800 hover:bg-slate-50">Přihlásit se</Link></nav>
-  </div></header>;
+  const t = useTranslations('Common'); const locale = useLocale(); const site = useSite();
+  const announcement = locale === 'en' ? site.announcementEn : site.announcementCs;
+  return <><a href="#main" className="skip-link">{t('skip')}</a>{announcement && <div className="announcement" role="status">{announcement}</div>}<header className="site-header"><div className="shell header-row"><Brand/><nav aria-label={t('navigation')}><Link href="/analyze">{t('analyze')}</Link><Link href="/developers">{t('developers')}</Link><Link href="/pricing">{t('pricing')}</Link><Link className="button button-secondary" href="/login">{t('login')}</Link></nav></div><div className="shell preference-row"><Preferences/></div></header></>;
 }

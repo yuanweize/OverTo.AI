@@ -4,7 +4,7 @@
  * a generuje exaktní důkazy a akční verifikační kroky.
  */
 
-import { RiskEvidence, VerificationAction, ScamCategory, Severity } from '@/types/analyzer';
+import { VerificationAction, ScamCategory, Severity } from '@/types/analyzer';
 
 export interface RuleMatch {
   ruleId: string;
@@ -21,7 +21,6 @@ export function stripDiacritics(str: string): string {
 }
 
 export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]; actions: VerificationAction[] } {
-  const normalized = text.toLowerCase();
   const stripped = stripDiacritics(text);
   const matches: RuleMatch[] = [];
   const actions: VerificationAction[] = [];
@@ -38,10 +37,6 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
     return undefined;
   };
 
-  const testRegex = (patternWithDiacritics: RegExp, patternWithoutDiacritics: RegExp): boolean => {
-    return patternWithDiacritics.test(normalized) || patternWithoutDiacritics.test(stripped);
-  };
-
   // 1. Vzdálený přístup (AnyDesk, TeamViewer...) - KRITICKÉ
   const remotePatterns = /\b(anydesk|teamviewer|supremo|rustdesk|quicksupport|vzdalenou spravu|vzdalenou pomoc|vzdaleny pristup|nainstalujte (si )?(aplikaci|program))\b/i;
   if (remotePatterns.test(stripped)) {
@@ -50,14 +45,15 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       category: 'REMOTE_ACCESS',
       severity: 'CRITICAL',
       title: 'Požadavek na instalaci vzdáleného přístupu',
-      description: 'Zpráva vás navádí k instalaci programu pro vzdálenou správu počítače nebo mobilu. Žádná banka ani policie toto po klientech nikdy nepožaduje!',
+      description: 'Text zmiňuje vzdálený přístup nebo instalaci programu. Kontext může být různý; nepovolujte přístup na základě nevyžádané žádosti a ověřte ji nezávisle.',
       snippet: findSnippet(remotePatterns),
       weight: 60,
     });
     actions.push({
+      id: 'REMOTE_ACCESS_DEMAND_1',
       step: actions.length + 1,
       action: 'Okamžitě přerušte komunikaci a nic neinstalujte',
-      rationale: 'Instalací programů jako AnyDesk předáte útočníkovi plnou kontrolu nad svým zařízením i bankovnictvím.',
+      rationale: 'Povolením vzdáleného přístupu můžete jiné osobě umožnit ovládat zařízení a získat citlivé údaje.',
       isWarning: true,
     });
   }
@@ -75,9 +71,10 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       weight: 55,
     });
     actions.push({
+      id: 'SAFE_ACCOUNT_FRAUD_1',
       step: actions.length + 1,
       action: 'Vezměte svou platební kartu a zavolejte na oficiální telefonní číslo na její zadní straně',
-      rationale: 'Oficiální klientská linka vaší banky vám okamžitě potvrdí, zda s vaším účtem skutečně existuje jakýkoliv problém. Nikdy nepoužívejte číslo ze zprávy.',
+      rationale: 'Požádejte banku o prověření tvrzení. Nepoužívejte číslo uvedené v podezřelé zprávě.',
       isWarning: false,
     });
   }
@@ -108,12 +105,14 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       weight: 50,
     });
     actions.push({
+      id: 'FAMILY_EMERGENCY_SCAM_1',
       step: actions.length + 1,
       action: 'Zavolejte svému potomkovi / příbuznému na jeho PŮVODNÍ běžné telefonní číslo',
       rationale: 'Podvodníci se spoléhají na to, že budete jednat v emocích a neověříte si situaci u skutečné osoby.',
       isWarning: false,
     });
     actions.push({
+      id: 'FAMILY_EMERGENCY_SCAM_2',
       step: actions.length + 1,
       action: 'Položte kontrolní otázku, jejíž odpověď znáte pouze vy a váš příbuzný',
       rationale: 'Odpověď sama o sobě není důkaz totožnosti; použijte také dříve známý kontakt.',
@@ -131,14 +130,15 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       category: 'OTP_THEFT',
       severity: 'CRITICAL',
       title: 'Pokus o vylákání autorizačního kódu / hesla',
-      description: 'Zpráva žádá o zadání nebo přeposlání autorizačního kódu, hesla či PINu. Tyto údaje slouží k potvrzení neoprávněných transakcí z vašeho účtu!',
+      description: 'Zpráva žádá o zadání nebo přeposlání autorizačního kódu, hesla či PINu. Jejich sdílení může umožnit přístup k účtu nebo potvrzení transakce.',
       snippet: findSnippet(otpPatterns),
       weight: 45,
     });
     actions.push({
+      id: 'OTP_CREDENTIAL_HARVEST_1',
       step: actions.length + 1,
       action: 'Nikdy nikomu nepřeposílejte SMS kód ani nepotvrzujte neznámé výzvy v bankovní aplikaci',
-      rationale: 'Banka ani pošta po vás nikdy nebude chtít, abyste jim sdělovali SMS kódy přijaté na váš telefon.',
+      rationale: 'Kód nebo potvrzení může povolit přístup či platbu. Žádost ověřte důvěryhodným kanálem.',
       isWarning: true,
     });
   }
@@ -157,6 +157,7 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       weight: 35,
     });
     actions.push({
+      id: 'PACKAGE_DELIVERY_SCAM_1',
       step: actions.length + 1,
       action: 'Otevřete si oficiální web dopravce přímo v prohlížeči (např. ceskaposta.cz)',
       rationale: 'Zadejte číslo zásilky do oficiálního sledování zásilek. Neklikejte na odkaz ve zprávě.',
@@ -172,14 +173,15 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       category: 'URGENCY_PRESSURE',
       severity: 'HIGH',
       title: 'Agresivní časový nátlak a hrozby',
-      description: 'Zpráva používá výrazy jako „okamžitě“, „poslední varování“ nebo vyhrožuje pokutou či zablokováním. Cílem nátlaku je zabránit vám v klidném ověření faktů.',
+      description: 'Zpráva používá výrazy jako „okamžitě“, „poslední varování“ nebo vyhrožuje pokutou či zablokováním. Nátlak může ztížit klidné ověření; samotná formulace neprokazuje úmysl odesílatele.',
       snippet: findSnippet(urgencyPatterns),
       weight: 25,
     });
     actions.push({
+      id: 'PSYCHOLOGICAL_URGENCY_1',
       step: actions.length + 1,
       action: 'Zastavte se a nenechte se nutit do spěchu',
-      rationale: 'Skutečné úřady a banky neposílají ultimáta na minuty či hodiny s odkazem na okamžitou platbu v SMS.',
+      rationale: 'Naléhavá lhůta nepotvrzuje pravost žádosti. Dopřejte si čas na ověření důvěryhodným kanálem.',
       isWarning: false,
     });
   }
@@ -192,11 +194,12 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       category: 'INVESTMENT_FRAUD',
       severity: 'CRITICAL',
       title: 'Příslib nereálného zhodnocení / zneužití značky ČEZ',
-      description: 'Zpráva láká na investice do ČEZ nebo krypto s vysokým zaručeným výnosem. Společnost ČEZ ani stát žádné takové platformy neprovozují.',
+      description: 'Text obsahuje formulace spojované s investiční nabídkou či garantovaným výnosem. Výnosy ani tvrzené spojení s institucí nebyly ověřeny.',
       snippet: findSnippet(investPatterns),
       weight: 50,
     });
     actions.push({
+      id: 'INVESTMENT_FRAUD_DETECTED_1',
       step: actions.length + 1,
       action: 'Prověřte poskytovatele v seznamu regulovaných subjektů České národní banky (cnb.cz)',
       rationale: 'ČNB vede veřejný registr oprávněných investičních zprostředkovatelů a vydává varování před podvodnými platformami.',
@@ -212,14 +215,15 @@ export function evaluateDeterministicRules(text: string): { matches: RuleMatch[]
       category: 'PAYMENT_DEMAND',
       severity: 'HIGH',
       title: 'Inzertní podvod s falešným kurýrem / přijetím platby',
-      description: 'Zpráva tvrdí, že pro přijetí peněz za prodávané zboží musíte na odkazu zadat údaje své karty včetně CVV. Pro příjem platby NIKDY není potřeba zadávat údaje platební karty!',
+      description: 'Text odpovídá vzorcům žádostí o platbu nebo kurýrní službu na inzertních portálech. Platbu ověřte přímo v platformě či bance, než sdělíte citlivé údaje.',
       snippet: findSnippet(marketplacePatterns),
       weight: 40,
     });
     actions.push({
+      id: 'MARKETPLACE_FRAUD_1',
       step: actions.length + 1,
-      action: 'K příjmu peněz stačí kupujícímu POUZE číslo vašeho bankovního účtu',
-      rationale: 'Pokud po vás kdokoliv při prodeji chce číslo platební karty, datum platnosti nebo CVV kód, jedná se o pokus o vykradení účtu.',
+      action: 'Ověřte platbu přímo v platformě nebo ve své bance',
+      rationale: 'Nesdělujte bezpečnostní kód karty ani nepotvrzujte transakci jen proto, že zpráva tvrdí, že je to nutné pro přijetí peněz.',
       isWarning: true,
     });
   }

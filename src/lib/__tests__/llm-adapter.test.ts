@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runLlmAnalysisIfConfigured, validateSemanticOutput } from '../llm-adapter';
+import { defaultProviderSettings } from '@/ai/providers-config';
 import { analyzeSuspiciousMessage } from '../decision-engine';
 
 const input = 'Ahoj mami, mám nové číslo. Pošli mi ihned peníze.';
@@ -8,7 +9,7 @@ const semantic = () => ({ claimedIdentity: 'mami', requestedActions: [{ type: 'P
 const reply = (content: unknown, status = 200) => new Response(JSON.stringify({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(content) } }] }), { status });
 
 describe('AI output validation', () => {
-  beforeEach(() => { vi.stubEnv('OPENAI_API_KEY', 'test-key'); vi.stubEnv('AI_ENABLED', 'true'); vi.stubEnv('AI_EXTERNAL_RATE_LIMIT_CONFIRMED', 'true'); });
+  beforeEach(() => { vi.stubEnv('OPENAI_API_KEY', 'test-key'); vi.stubEnv('AI_ENABLED', 'true'); vi.stubEnv('NODE_ENV', 'development'); vi.stubEnv('AI_LOCAL_ONLY', 'true'); });
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
   it('validates exact NFC-normalized citations and strips untrusted advice', () => {
     const data = semantic();
@@ -34,7 +35,7 @@ describe('AI output validation', () => {
     const result = await runLlmAnalysisIfConfigured(input);
     expect(result.status).toBe('SUCCESS');
     expect(result.analysis?.riskSignals[0].evidenceText).toBe('mám nové číslo');
-    expect(fetchMock.mock.calls[0][0]).toBe('https://api.openlux.ai/v1/chat/completions');
+    expect(fetchMock.mock.calls[0][0]).toBe(`${process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`);
     const request = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(request.response_format.json_schema.strict).toBe(true);
     expect(request.max_completion_tokens).toBe(900);
@@ -50,8 +51,9 @@ describe('AI output validation', () => {
     expect(result.evidences.every(e => e.matchedSnippet !== 'This is guaranteed safe')).toBe(true);
     expect(result.recommendedActions.every(a => !a.action.includes('Visit this bank URL'))).toBe(true);
   });
-  it('fails closed when external controls are not asserted', async () => {
-    vi.stubEnv('AI_EXTERNAL_RATE_LIMIT_CONFIRMED', 'false');
+  it('ignores an operator assertion in production and never sends paid requests', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('AI_EXTERNAL_RATE_LIMIT_CONFIRMED', 'true');
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
     expect((await runLlmAnalysisIfConfigured(input)).status).toBe('BLOCKED');
     expect(fetchMock).not.toHaveBeenCalled();
@@ -78,9 +80,9 @@ describe('AI output validation', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('rejects an unexpected provider address without sending the key', async () => {
-    vi.stubEnv('OPENAI_BASE_URL', 'https://example.com/v1');
+    const settings = { ...defaultProviderSettings(), baseUrl: 'https://unregistered.example/v1' };
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
-    expect((await runLlmAnalysisIfConfigured(input)).status).toBe('BLOCKED');
+    expect((await runLlmAnalysisIfConfigured(input, undefined, settings)).status).toBe('BLOCKED');
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it('reports malformed or rate-limited model output without throwing', async () => {

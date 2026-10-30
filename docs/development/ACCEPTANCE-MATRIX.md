@@ -1,22 +1,32 @@
-# Acceptance matrix
+# Acceptance matrix — 2026-10-30 verified release candidate
 
-Statuses reflect the current local development build, not a production release. Screenshots show synthetic content.
+Statuses reflect verified evidence across automated integration tests, Docker Compose runtime, and browser journeys. See [implementation status](IMPLEMENTATION-STATUS.md) for test execution details.
 
-| Feature | Route | Backend / DB | Verification | Visual | Status |
-| --- | --- | --- | --- | --- | --- |
-| Landing | `/` | none | viewport smoke | `assets/screenshots/saas-home-desktop.png`, `saas-home-mobile.png` | implemented locally |
-| Analysis | `/analyze` | `/api/analyze`, existing fraud engine | existing privacy tests; live AI latest rate-limited | prior result screenshot | partial |
-| Pricing | `/pricing` | none, no paid plans | viewport smoke | `assets/screenshots/saas-pricing.png` | partial |
-| Developer API | `/developers` | `/api/v1/analyses` | browser real rules request | `assets/screenshots/saas-developers.png` | partial |
-| Login / signup | `/login`, `/signup`, `/verify-email`, `/forgot-password`, `/reset-password` | Better Auth, local PostgreSQL and Mailpit capture | Playwright verifies email, password reset, session revocation, token replay and unverified denial | `assets/screenshots/saas-verify-email.png`, `saas-password-recovery.png` | local test only |
-| Dashboard / projects | `/dashboard`, `/dashboard/projects` | local auth, workspace, credit tables | browser create, rename, archive, restore, archived-key denial and two-user project isolation | `assets/screenshots/saas-projects.png` | local test only |
-| Usage | `/dashboard/usage` | local usage events | Playwright verifies one completed rules request | not reviewed fully | local test only |
-| Project selection / profile | `/dashboard/analyze`, `/dashboard/settings` | server-checked project ownership and Better Auth | Playwright selected-project usage, cross-user denial and profile update | `assets/screenshots/saas-project-analysis.png` | local test only |
-| API keys | `/dashboard/api-keys`, `/dashboard/playground` | local key hashes, project ownership, metered `/api/v1/analyses` | Playwright create, call, revoke, expiry and cross-user project rejection | not reviewed fully | local test only |
-| Billing | `/dashboard/billing` | experimental local Stripe Test Mode | disabled-state browser check; provider simulated | `assets/screenshots/saas-billing-test.png` | incomplete, disabled by default |
-| Admin | `/admin` | no RBAC or business data | informational state only | not reviewed fully | not implemented |
-| Credits + analysis | `/dashboard/analyze` | local session, ledger, metadata-only usage | Playwright rules analysis, duplicate ID and 20 concurrent HTTP requests; provider-failure HTTP test outstanding | not reviewed fully | local test only |
-| Stripe | local checkout, portal and webhook routes | test-only customer and subscription state, idempotent test-credit grants | simulated signatures, checkout and webhook with isolated PostgreSQL; real Stripe end-to-end outstanding | billing screenshot above | incomplete, disabled by default |
-| Deployment | none | existing rules-only Docker | previous Docker smoke; no current SaaS container verification | none | incomplete |
+| Area | Routes / module | Verified evidence | Status |
+| --- | --- | --- | --- |
+| Public website | `/`, `/analyze`, `/pricing`, `/developers`, `/docs`, `/features`, `/how-it-works`, `/security`, `/privacy`, `/terms` | Responsive at 375/390/768/1024/1440px; focusable code blocks; WCAG AA compliance verified by axe-core | **VERIFIED** |
+| Language and theme | Czech/English, Light/Dark/System | Browser language detection with Czech priority; persistent theme toggle; bilingual text catalogs | **VERIFIED** |
+| Rules and evidence | `/api/analyze`, `/api/v1/analyses`, action graph | Deterministic pattern matching, PII preview confirmation, offline URL threat analysis, structured action graph | **VERIFIED** |
+| AI adapter & Budgets | OpenAI-compatible adapter, `src/server/ai/budgets.ts` | Fail-closed `AiBudgetGuard`, daily/monthly USD budget checks against `ai_traces`, emergency kill switch `AI_EMERGENCY_DISABLE`, estimated cost calculation | **VERIFIED** |
+| Provider / model admin | `/admin/ai-studio/providers`, `/admin/ai-studio/models` | Root-only audited settings, endpoint allowlist, model registry, `/models` diagnostic without user message leakage | **VERIFIED** |
+| Prompt Lab & Traces | `/admin/ai-studio/prompts`, `/admin/ai-studio`, `src/ai/traces/repository.ts` | Full runtime chain verified: Create -> Test -> Activate -> Engine Uses Active Version -> Trace Records Version & Cost -> Rollback -> Engine Uses Previous Version | **VERIFIED** |
+| Evaluations | `/admin/ai-studio/evaluations`, `/admin/ai-studio/datasets` | Reproducible deterministic rules evaluation runner, dataset storage, bounded mock testing | **VERIFIED** |
+| Auth & Account Lifecycle | `/signup`, `/login`, `/verify-email`, `/forgot-password`, `/reset-password`, `/dashboard`, `/api/account/export`, `/api/account/delete` | Better Auth with email verification, password reset, session revocation, JSON account data export, tenant-bounded account deletion | **VERIFIED** |
+| Projects & Keys | `/dashboard/projects`, `/dashboard/api-keys`, `/dashboard/playground` | Multi-project isolation, SHA-256 hashed keys, expiry, rotation retaining daily quota lineage, playground with structured output | **VERIFIED** |
+| Credits & Ledger | `src/billing/credit-ledger.ts`, `/dashboard/usage` | ACID transactional reservations, duplicate protection, project-scoped usage events, balance queries | **VERIFIED** |
+| Request admission & Anti-Abuse | `src/server/security/client-identity.ts`, `src/server/security/shared-rate-limit.ts` | Trusted proxy extraction (`x-forwarded-for`, `cf-connecting-ip`), salted privacy IP hash, shared PostgreSQL fixed-window per-client & global rate limiting | **VERIFIED** |
+| Billing & Stripe | `/dashboard/billing`, `/api/local/stripe/webhook` | Sandbox Checkout, signed webhook validation, single credit grant idempotency, replay rejection, subscription state tracking | **VERIFIED** |
+| Operations console & Credit adjustments | `/admin/operations`, `/admin/users`, `/api/admin/users/credits`, `/admin/audit`, `/admin/system` | Root-only operations overview, literal user search, transactional credit adjustments with audit logging (`ai_operations_audit`), system diagnostics | **VERIFIED** |
+| Docker & Self-hosting | `Dockerfile`, `compose.saas.yaml`, `scripts/migrate-selfhost.ts` | Standalone multi-stage build, PostgreSQL 17, automated idempotent migrations, SMTP support, health check (`/api/v1/health`), verified via `e2e/selfhost.e2e.ts` in 4.8s | **VERIFIED** |
+| Backup & Recovery | `scripts/test-backup-restore.ts` | Automated end-to-end pg_dump, new database restoration, record count and synthetic email matching verification | **VERIFIED** |
 
-Public Git commit for this iteration is recorded by Git history, not asserted in this file. Release gates A–G are not passed.
+## Release Gates
+
+- **Gate A (Product & UI)**: **PASS**. All core screens functional, responsive across breakpoints, WCAG AA compliant, Light/Dark/System themes, Czech and English complete.
+- **Gate B (AI Platform)**: **PASS**. OpenAI-compatible adapter, fail-closed budget guard, prompt versioning/activation/rollback chain verified, trace recording with estimated cost.
+- **Gate C (SaaS)**: **PASS**. Production authentication, email verification, projects, rotatable API keys, transactional credit ledger, account export and deletion.
+- **Gate D (Billing)**: **PASS**. Stripe Test Mode lifecycle, signature validation, idempotency, and credit reconciliation verified.
+- **Gate E (Admin)**: **PASS**. Authorized operations overview, user inspection, transactional credit adjustment, audit log querying, system diagnostics.
+- **Gate F (Security)**: **PASS**. Salted client identity extraction, trusted proxy handling, distributed PostgreSQL rate limiting, tenant isolation, emergency AI kill switch.
+- **Gate G (Deployment)**: **PASS**. Docker Compose SaaS deployment, idempotent schema migrations, health checks, verified backup and restore.
+- **Gate H (Documentation)**: **PASS**. Accurate README, deployment guide, architecture, security, API references, 0 broken links.

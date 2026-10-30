@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { loadEnvConfig } from '@next/env';
 import { Pool } from 'pg';
@@ -51,14 +52,32 @@ async function verifiedSignup(page: Page, name: string, email: string, password:
   await expect(page.getByRole('heading', { name: `Vítejte, ${name}.` })).toBeVisible();
 }
 
+async function captureDarkMobile(page: Page, path: string) {
+  const desktop = page.viewportSize();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  const height = await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); return document.documentElement.scrollHeight; });
+  await page.setViewportSize({ width: 390, height: Math.min(height, 5000) });
+  await page.screenshot({ path, animations: 'disabled' });
+  await page.emulateMedia({ colorScheme: 'light' });
+  if (desktop) await page.setViewportSize(desktop);
+}
+
 test('local registration, workspace, project, logout and isolation', async ({ browser }) => {
-  const one = await browser.newContext(); const two = await browser.newContext();
+  const one = await browser.newContext({ locale: 'cs-CZ', viewport: { width: 1440, height: 900 } }); const two = await browser.newContext({ locale: 'cs-CZ' });
   const a = await one.newPage(); const b = await two.newPage();
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const password = 'unique-local-test-password-42';
   const aEmail = `a-${suffix}@example.com`;
   await verifiedSignup(a, 'Test A', aEmail, password);
   await expect(a.getByRole('heading', { name: 'Testovací kredity' })).toBeVisible(); await expect(a.getByText('10', { exact: true })).toBeVisible();
+  if (process.env.OVERTO_CAPTURE_UI === 'true') { await a.screenshot({ path: 'assets/screenshots/v7-dashboard-cs-1440.png', fullPage: true }); await captureDarkMobile(a, 'assets/screenshots/v7-dashboard-cs-dark-390.png'); }
+  if (process.env.OVERTO_CAPTURE_UI === 'true') {
+    await a.goto('/dashboard/billing');
+    await expect(a.getByRole('heading', { name: 'Fakturace', exact: true })).toBeVisible();
+    await a.screenshot({ path: 'assets/screenshots/v7-billing-cs-1440.png', fullPage: true });
+    await captureDarkMobile(a, 'assets/screenshots/v7-billing-cs-dark-390.png');
+  }
   await a.goto('/dashboard/analyze');
   await a.getByLabel('Vložte podezřelou zprávu').fill('Ahoj mami, mám nové číslo. Pošli mi ihned peníze.');
   await a.getByRole('button', { name: 'Pokračovat ke kontrole textu' }).click();
@@ -78,11 +97,24 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   });
   expect(repeat).toEqual([200, 409]);
   await a.goto('/dashboard/api-keys');
-  const aProjectId = await a.locator('select').inputValue();
+  const aProjectId = await a.getByRole('combobox', { name: /^Projekt/ }).inputValue();
   await a.getByLabel('Název klíče').fill('Testovací klíč'); await a.getByRole('button', { name: 'Vytvořit klíč' }).click();
-  const apiKey = await a.getByLabel('Nový API klíč').inputValue();
+  let apiKey = await a.getByLabel('Nový API klíč').inputValue();
   const apiResult = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${apiKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
   expect(apiResult.status()).toBe(200); expect((await apiResult.json()).metadata.testCreditsCharged).toBe(1);
+  const deniedAi = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${apiKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: true, aiConsent: true } });
+  expect(deniedAi.status()).toBe(403);
+  await a.reload();
+  await expect(a.locator('li').filter({ hasText: apiKey.slice(0, 15) }).getByLabel('Dnes využito 2 z 1000 požadavků')).toBeVisible();
+  a.once('dialog', dialog => dialog.accept());
+  await a.getByRole('button', { name: 'Vyměnit klíč' }).click();
+  const replacement = await a.getByLabel('Nový API klíč').inputValue();
+  expect(replacement).not.toBe(apiKey);
+  await a.reload();
+  await expect(a.locator('li').filter({ hasText: replacement.slice(0, 15) }).getByLabel('Dnes využito 2 z 1000 požadavků')).toBeVisible();
+  const oldKeyDenied = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${apiKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
+  expect(oldKeyDenied.status()).toBe(401);
+  apiKey = replacement;
   await setSyntheticUserVerified(aEmail, false);
   try {
     const unverified = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${apiKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
@@ -92,10 +124,16 @@ test('local registration, workspace, project, logout and isolation', async ({ br
     await a.goto('/dashboard'); await expect(a).toHaveURL(/\/login/);
   } finally { await setSyntheticUserVerified(aEmail, true); }
   await a.goto('/dashboard/playground'); await a.getByLabel(/Testovací API klíč/).fill(apiKey); await a.getByRole('button', { name: 'Odeslat test' }).click();
-  await expect(a.getByRole('status')).toContainText('HTTP 200'); await expect(a.locator('pre')).toContainText('testCreditsCharged');
+  await expect(a.getByRole('status')).toContainText('HTTP 200'); await expect(a.locator('main pre')).toContainText('testCreditsCharged');
+  await a.getByLabel(/Testovací API klíč/).fill('');
+  if (process.env.OVERTO_CAPTURE_UI === 'true') await a.screenshot({ path: 'assets/screenshots/v7-playground-cs-1440.png', fullPage: true });
   await a.goto('/dashboard/api-keys');
   await expect(a.getByLabel('Nový API klíč')).toHaveCount(0);
-  await a.getByRole('button', { name: 'Zrušit klíč' }).click(); await expect(a.getByText(/Zrušen/)).toBeVisible();
+  const activeKeyRow = a.locator('li').filter({ hasText: apiKey.slice(0, 15) });
+  await expect(activeKeyRow.getByLabel('Dnes využito 3 z 1000 požadavků')).toBeVisible();
+  if (process.env.OVERTO_CAPTURE_UI === 'true') { await a.screenshot({ path: 'assets/screenshots/v7-api-keys-cs-1440.png', fullPage: true }); await captureDarkMobile(a, 'assets/screenshots/v7-api-keys-cs-dark-390.png'); }
+  await activeKeyRow.getByRole('button', { name: 'Zrušit klíč' }).click();
+  await expect(activeKeyRow).toContainText('Zrušen');
   const revoked = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${apiKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
   expect(revoked.status()).toBe(401);
   const concurrent = await a.evaluate(async () => Promise.all(Array.from({ length: 20 }, async () => {
@@ -104,9 +142,10 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   })));
   expect(concurrent.filter(status => status === 200)).toHaveLength(6);
   expect(concurrent.filter(status => status === 402)).toHaveLength(14);
-  await a.goto('/dashboard'); await expect(a.getByText('0', { exact: true })).toBeVisible();
+  await a.goto('/dashboard'); await expect(a.getByRole('main').getByText('0', { exact: true })).toBeVisible();
   await a.getByRole('link', { name: 'Projekty', exact: true }).click();
   const defaultRow = a.locator(`li[data-project-id="${aProjectId}"]`);
+  await defaultRow.getByRole('button', { name: 'Přejmenovat' }).click();
   await defaultRow.getByLabel('Nový název').fill('Můj výchozí projekt'); await defaultRow.getByRole('button', { name: 'Uložit název' }).click();
   await expect(defaultRow.getByText('Můj výchozí projekt')).toBeVisible(); await a.goto('/dashboard'); await expect(a.getByRole('heading', { name: 'Projekty' })).toBeVisible(); await a.goto('/dashboard/projects');
   const defaultArchive = await a.request.patch(`/api/local/projects/${aProjectId}`, { headers: { Origin: 'http://127.0.0.1:3005' }, data: { archived: true } }); expect(defaultArchive.status()).toBe(409);
@@ -116,6 +155,7 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   await a.getByLabel('Název nového projektu').fill('Projekt pouze A'); await a.getByRole('button', { name: 'Vytvořit projekt' }).click(); await expect(a.getByText('Projekt pouze A')).toBeVisible();
   const projectRow = a.locator('li[data-project-id]').filter({ hasText: 'Projekt pouze A' });
   const privateProjectId = await projectRow.getAttribute('data-project-id'); expect(privateProjectId).toBeTruthy();
+  await projectRow.getByRole('button', { name: 'Přejmenovat' }).click();
   await projectRow.getByLabel('Nový název').fill('Přejmenovaný projekt A'); await projectRow.getByRole('button', { name: 'Uložit název' }).click();
   const renamedRow = a.locator(`li[data-project-id="${privateProjectId}"]`); await expect(renamedRow.getByText('Přejmenovaný projekt A')).toBeVisible();
   const projectKeyResponse = await a.request.post('/api/local/api-keys', { headers: { Origin: 'http://127.0.0.1:3005' }, data: { name: 'Project key', projectId: privateProjectId } });
@@ -138,6 +178,26 @@ test('local registration, workspace, project, logout and isolation', async ({ br
   await expireSyntheticKey(aEmail, projectKey);
   const expired = await a.request.post('/api/v1/analyses', { headers: { Authorization: `Bearer ${projectKey}`, 'Idempotency-Key': crypto.randomUUID() }, data: { text: 'Test zpráva', enableLlm: false } });
   expect(expired.status()).toBe(401);
+  await a.getByLabel('Jazyk', { exact: true }).selectOption('en');
+  await expect(a.locator('html')).toHaveAttribute('lang','en');
+  for (const [route,title] of [['projects','Projects'],['api-keys','API keys'],['usage','Usage'],['settings','Settings'],['billing','Billing']]) {
+    await a.goto(`/dashboard/${route}`); await expect(a.getByRole('heading',{name:title,exact:true})).toBeVisible();
+    if (process.env.OVERTO_A11Y_ACCOUNT === 'true') {
+      const scan = await new AxeBuilder({ page: a }).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa','wcag22aa']).analyze();
+      expect(scan.violations.map(v => ({ rule: v.id, targets: v.nodes.map(n => n.target) })), `dashboard/${route}`).toEqual([]);
+    }
+  }
+  await a.goto('/dashboard/projects');
+  await expect(a.getByRole('heading',{name:'Projects',exact:true})).toBeVisible();
+  if (process.env.OVERTO_CAPTURE_UI === 'true') await a.screenshot({path:'assets/screenshots/v7-workspace-en.png',fullPage:true});
+  await a.setViewportSize({width:390,height:844}); await a.emulateMedia({colorScheme:'dark'});
+  await a.locator('.workspace-mobile-nav summary').click();
+  await expect(a.getByRole('link',{name:'Projects',exact:true})).toHaveAttribute('aria-current','page');
+  expect(await a.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+  await a.locator('.workspace-mobile-nav summary').click();
+  if (process.env.OVERTO_CAPTURE_UI === 'true') await a.screenshot({path:'assets/screenshots/v7-workspace-mobile.png',fullPage:true});
+  await a.getByLabel('Language',{exact:true}).selectOption('cs'); await expect(a.locator('html')).toHaveAttribute('lang','cs');
+  await a.setViewportSize({width:1280,height:900});
   await a.getByRole('button', { name: 'Odhlásit se' }).click(); await expect(a).toHaveURL(/\/login/); await a.goto('/dashboard'); await expect(a).toHaveURL(/\/login/);
   await one.close(); await two.close();
 });
@@ -167,7 +227,7 @@ test('web analysis records usage against the selected project', async ({ page })
 });
 
 test('password reset invalidates existing session and old password', async ({ browser }) => {
-  const first = await browser.newContext(); const second = await browser.newContext();
+  const first = await browser.newContext({ locale: 'cs-CZ' }); const second = await browser.newContext({ locale: 'cs-CZ' });
   const page = await first.newPage(); const other = await second.newPage();
   const email = `reset-${Date.now()}-${Math.floor(Math.random() * 1000000)}@example.com`;
   const oldPassword = 'old-test-password-42'; const newPassword = 'new-test-password-57';
@@ -204,10 +264,10 @@ test('system dark theme keeps the main surfaces readable on mobile', async ({ pa
   for (const path of ['/', '/analyze', '/developers', '/pricing']) {
     await page.goto(path);
     await expect(page.locator('h1')).toBeVisible();
-    await expect(page.locator('header')).toHaveCSS('background-color', 'rgb(25, 40, 42)');
+    await expect(page.locator('header')).toHaveCSS('background-color', 'rgb(23, 37, 54)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), path).toBe(false);
   }
   await page.goto('/analyze');
-  await expect(page.locator('#top')).toHaveCSS('background-color', 'rgb(16, 26, 28)');
-  await expect(page.locator('#message-input')).toHaveCSS('background-color', 'rgb(16, 26, 28)');
+  await expect(page.locator('#top')).toHaveCSS('background-color', 'rgb(16, 26, 38)');
+  await expect(page.locator('#message-input')).toHaveCSS('background-color', 'rgb(16, 26, 38)');
 });
