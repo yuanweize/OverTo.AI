@@ -449,6 +449,7 @@
     "deleteAccount": "Delete account",
     "deleteNote": "Permanently removes your projects, API keys, and account. This action cannot be undone.",
     "deleteConfirmPrompt": "Type your email to confirm deletion:",
+    "deletePasswordPrompt": "Enter your password to verify:",
     "confirmDelete": "Permanently delete account",
     "deleting": "Deleting…",
     "accountDeleted": "Account was successfully deleted.",

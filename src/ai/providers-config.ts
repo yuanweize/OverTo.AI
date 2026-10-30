@@ -21,7 +21,7 @@ export function isAllowedProviderBaseUrl(value: string): boolean {
   if (!registered.includes(value)) return false;
   if (url.protocol === 'https:') return true;
   const localAddresses = new Set(['127.0.0.1', '[::1]', ...Object.values(networkInterfaces()).flatMap(entries => entries ?? []).map(entry => entry.address)]);
-  return process.env.NODE_ENV === 'development' && process.env.AI_LOCAL_ONLY === 'true' && url.protocol === 'http:' && localAddresses.has(url.hostname);
+  return (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') && process.env.AI_LOCAL_ONLY === 'true' && url.protocol === 'http:' && localAddresses.has(url.hostname);
 }
 
 export function validateProviderSettings(input: unknown): ProviderSettings {

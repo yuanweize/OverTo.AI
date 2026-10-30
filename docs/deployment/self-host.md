@@ -2,14 +2,29 @@
 
 This guide explains how to install, configure, verify, backup, restore, and upgrade a production self-hosted installation of OvěřTo.AI using Docker Compose and PostgreSQL.
 
+## Port Allocation Matrix
+
+To prevent port conflicts when running both local development servers and Docker Compose simultaneously, OvěřTo.AI adheres to the following port convention:
+
+| Environment | Service | Host Binding | Internal Port | Description |
+|---|---|---|---|---|
+| **Local Dev** | Next.js Server | `127.0.0.1:3005` | `3005` | Started via `npm run dev -- -p 3005` |
+| **Local Dev** | Mailpit Web UI | `127.0.0.1:8025` | `8025` | Local developer email inbox |
+| **Local Dev** | Mailpit SMTP | `127.0.0.1:1025` | `1025` | Local SMTP for magic links |
+| **Local Dev** | Test PostgreSQL | `127.0.0.1:55443` | `5432` | Disposable dev database |
+| **Self-Host Compose** | OverTo App | `127.0.0.1:3006` | `3000` | Production Next.js web application |
+| **Self-Host Compose** | PostgreSQL | `127.0.0.1:5432` | `5432` | SaaS persistent database |
+| **Self-Host Compose** | Mailpit Web UI | `127.0.0.1:8026` | `8025` | Self-host email testing (`--profile test-mail`) |
+| **Self-Host Compose** | Mailpit SMTP | `mailpit:1025` | `1025` | Internal Docker bridge SMTP |
+
 ## Architecture Overview
 
 A self-hosted deployment consists of:
 
-1. **Next.js Application** (`app`): Serves the frontend, API, and background processes in standalone container mode.
-2. **PostgreSQL** (`postgres`): PostgreSQL 17 database storing accounts, workspaces, projects, rate limits, credit ledger, and AI trace metadata.
-3. **Automated Migrator** (`migrate`): Runs before the application starts, executing all versioned schema migrations (`migrations/001_...` through `015_...`) idempotently.
-4. **SMTP Service**: Any standard RFC 5321 SMTP server for sending email verification and password reset links (or Mailpit in development).
+1. **Next.js Application** (`app`): Serves the frontend, API, and background processes in standalone container mode on port `3006`.
+2. **PostgreSQL** (`postgres`): PostgreSQL 17 database storing accounts, workspaces, projects, rate limits, credit ledger, atomic AI reservations, and AI trace metadata.
+3. **Automated Migrator** (`migrate`): Runs before the application starts, executing all versioned schema migrations (`migrations/001_...` through `016_...`) idempotently.
+4. **SMTP Service**: Any standard RFC 5321 SMTP server for sending email verification and password reset links (or Mailpit on port `8026` via `--profile test-mail`).
 
 ## Prerequisites
 
@@ -119,3 +134,32 @@ This script generates synthetic records, creates a dump, restores into a new dis
    ```
 
 All database migrations are idempotent and backward-compatible.
+
+## Reverse Proxy & Security Hardening
+
+When deploying behind reverse proxies (Cloudflare, Nginx, Caddy, AWS ALB):
+- Set `OVERTO_TRUST_PROXY=true` ONLY if the proxy strips unverified client headers and provides genuine `cf-connecting-ip` / `x-forwarded-for` headers.
+- If directly exposed without an external filtering proxy, leave `OVERTO_TRUST_PROXY=false` so spoofed headers are safely discarded.
+- Supply `OVERTO_CLIENT_IDENTITY_SALT` with a high-entropy string (min 32 bytes) to salt client IP hashes.
+
+## GitHub Container Registry (GHCR)
+
+Pre-built production multi-arch images (`linux/amd64`, `linux/arm64`) are published to GHCR:
+
+```sh
+docker pull ghcr.io/yuanweize/overto-ai:v7.0.1
+docker pull ghcr.io/yuanweize/overto-ai:latest
+```
+
+To build and push manually using a GitHub Personal Access Token (classic):
+1. Ensure the token has `write:packages` and `read:packages` permissions.
+2. Log in:
+   ```sh
+   echo "$GITHUB_PAT" | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin
+   ```
+3. Build and push:
+   ```sh
+   docker buildx build --platform linux/amd64,linux/arm64 \
+     -t ghcr.io/yuanweize/overto-ai:v7.0.1 \
+     -t ghcr.io/yuanweize/overto-ai:latest --push .
+   ```

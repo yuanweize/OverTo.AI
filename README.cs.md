@@ -17,6 +17,24 @@ npm run dev -- -p 3005
 
 Otevřete [http://127.0.0.1:3005](http://127.0.0.1:3005). Bez nastavení AI fungují pravidla. Volitelná integrace s OpenAI-kompatibilním API vyžaduje konfiguraci serveru a výslovný souhlas uživatele. Při nedostupnosti modelu se vrátí výsledek pravidel; aktuální stav je uveden ve výsledku. Omezené živé testy už proběhly, ale nejde o nezávislou reprezentativní evaluaci.
 
+### Self-Host provoz v Docker Compose
+
+Pro spuštění kompletního stacku s PostgreSQL a migracemi:
+
+```sh
+cp .env.selfhost.example .env.selfhost
+docker compose --env-file .env.selfhost -f compose.saas.yaml up -d --build
+```
+
+#### Přehled portů
+
+| Režim | Aplikace OverTo | Mailpit Web UI | Mailpit SMTP | PostgreSQL |
+|---|---|---|---|---|
+| **Místní vývoj** (`npm run dev -- -p 3005`) | `http://127.0.0.1:3005` | `http://127.0.0.1:8025` | `127.0.0.1:1025` | `127.0.0.1:55443` |
+| **Self-Host Compose** (`compose.saas.yaml`) | `http://127.0.0.1:3006` | `http://127.0.0.1:8026` | `mailpit:1025` | `127.0.0.1:5432` |
+
+Podrobný návod k provozu, zálohování a správě je v [Průvodci vlastním provozem](docs/deployment/self-host.md).
+
 Prohlížeč i server se pokoušejí odstranit některé citlivé údaje, ale nemusí najít všechny. Před odesláním text zkontrolujte. Pokud povolíte AI, nakonfigurovaná služba a případný další poskytovatel modelu mohou dostat údaje, které v textu zůstanou.
 
 ## API a bezpečnost

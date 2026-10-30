@@ -19,8 +19,8 @@ describe.skipIf(!connectionString)('Stripe test webhook with PostgreSQL and a si
   const workspace = 'workspace-synthetic'; const customer = 'cus_synthetic'; const subscription = 'sub_synthetic';
   const invoice = { id: 'in_synthetic', livemode: false, status: 'paid', customer, parent: { subscription_details: { subscription } }, billing_reason: 'subscription_cycle', lines: { has_more: false, data: [{ pricing: { price_details: { price: 'price_synthetic' } }, parent: { subscription_item_details: { proration: false } }, quantity: 1 }] } };
   const provider = { webhooks: stripe.webhooks, invoices: { retrieve: vi.fn(async () => invoice) }, subscriptions: { retrieve: vi.fn(async () => ({ id: subscription, customer, livemode: false, status: 'active', cancel_at_period_end: false })) } };
-  function request(eventId: string, live = false, signed = true) {
-    const payload = JSON.stringify({ id: eventId, object: 'event', type: 'invoice.paid', livemode: live, data: { object: { id: invoice.id, object: 'invoice' } } });
+  function request(eventId: string, live = false, signed = true, type = 'invoice.paid', data: unknown = { object: { id: invoice.id, object: 'invoice' } }) {
+    const payload = JSON.stringify({ id: eventId, object: 'event', type, livemode: live, data });
     const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: signed ? secret : 'whsec_other' });
     return new NextRequest('http://127.0.0.1/api/local/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': signature }, body: payload });
   }
@@ -64,5 +64,69 @@ describe.skipIf(!connectionString)('Stripe test webhook with PostgreSQL and a si
     expect((await POST(request('evt_price_mismatch'))).status).toBe(500);
     expect((await pool.query('SELECT count(*)::int AS n FROM credit_grants')).rows[0].n).toBe(1);
     expect((await pool.query('SELECT count(*)::int AS n FROM local_stripe_events')).rows[0].n).toBe(3);
+  });
+
+  it('updates subscription to past_due on invoice.payment_failed', async () => {
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
+    const res = await POST(request('evt_failed_invoice', false, true, 'invoice.payment_failed'));
+    expect(res.status).toBe(200);
+    const sub = await pool.query('SELECT status FROM local_stripe_subscriptions WHERE workspace_id=$1', [workspace]);
+    expect(sub.rows[0].status).toBe('past_due');
+  });
+
+  it('updates subscription state on customer.subscription.updated', async () => {
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
+    provider.subscriptions.retrieve = vi.fn(async () => ({ id: subscription, customer, livemode: false, status: 'canceled', cancel_at_period_end: true }));
+    const res = await POST(request('evt_sub_update', false, true, 'customer.subscription.updated', {
+      object: {
+        id: subscription,
+        customer,
+      },
+    }));
+    expect(res.status).toBe(200);
+    const sub = await pool.query('SELECT status, cancel_at_period_end FROM local_stripe_subscriptions WHERE workspace_id=$1', [workspace]);
+    expect(sub.rows[0].status).toBe('canceled');
+    expect(sub.rows[0].cancel_at_period_end).toBe(true);
+  });
+
+  it('revokes credit grants on charge.refunded', async () => {
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
+    expect((await pool.query('SELECT count(*)::int AS n FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${invoice.id}`])).rows[0].n).toBe(1);
+    const res = await POST(request('evt_refund_test', false, true, 'charge.refunded', {
+      object: {
+        id: 'ch_synthetic_1',
+        customer,
+        invoice: invoice.id,
+      },
+    }));
+    expect(res.status).toBe(200);
+    expect((await pool.query('SELECT count(*)::int AS n FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${invoice.id}`])).rows[0].n).toBe(0);
+  });
+
+  it('ensures atomic rollback: no credits or events are committed if transaction fails midway', async () => {
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
+    provider.subscriptions.retrieve = vi.fn(async () => ({ id: subscription, customer, livemode: false, status: 'active', cancel_at_period_end: false }));
+    
+    // Add a check constraint to simulate a database failure during event logging
+    await pool.query("ALTER TABLE local_stripe_events ADD CONSTRAINT test_simulated_fail CHECK (event_id != 'evt_atomic_fail')");
+
+    const grantsBefore = (await pool.query('SELECT count(*)::int AS n FROM credit_grants')).rows[0].n;
+
+    // Create a new invoice ID to attempt grant
+    const failInvoice = { ...invoice, id: 'in_atomic_fail' };
+    provider.invoices.retrieve = vi.fn(async () => failInvoice);
+
+    const res = await POST(request('evt_atomic_fail', false, true, 'invoice.paid', { object: { id: 'in_atomic_fail', object: 'invoice' } }));
+    expect(res.status).toBe(500);
+
+    // Verify atomic rollback: no credits were added and no events were committed
+    const grantsAfter = (await pool.query('SELECT count(*)::int AS n FROM credit_grants')).rows[0].n;
+    expect(grantsAfter).toBe(grantsBefore);
+
+    const eventCheck = await pool.query('SELECT event_id FROM local_stripe_events WHERE event_id=$1', ['evt_atomic_fail']);
+    expect(eventCheck.rowCount).toBe(0);
+
+    // Clean up test constraint
+    await pool.query('ALTER TABLE local_stripe_events DROP CONSTRAINT test_simulated_fail');
   });
 });

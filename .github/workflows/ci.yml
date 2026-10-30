@@ -22,8 +22,14 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
+      DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/overto_test
       LEDGER_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/overto_test
       SITE_CONFIG_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/overto_test
+      OVERTO_TRUST_PROXY: 'false'
+      OVERTO_CLIENT_IDENTITY_SALT: 'ci-identity-salt-test-only-32bytes-secure'
+      BETTER_AUTH_SECRET: 'ci-better-auth-secret-32-chars-long-1234567890'
+      BETTER_AUTH_URL: 'http://127.0.0.1:3000'
+      OVERTO_PUBLIC_URL: 'http://127.0.0.1:3000'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -86,3 +92,50 @@ jobs:
           curl -fsS http://127.0.0.1:3005/ >/dev/null
           npm run test:e2e
           OVERTO_ADMIN_E2E=true npx playwright test e2e/admin-settings.e2e.ts --workers=1
+  selfhost-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Configure and start self-host Docker Compose stack
+        run: |
+          cp .env.selfhost.example .env.selfhost
+          sed -i 's|OVERTO_HOST_PORT=.*|OVERTO_HOST_PORT=3006|' .env.selfhost
+          sed -i 's|BETTER_AUTH_URL=.*|BETTER_AUTH_URL=http://127.0.0.1:3006|' .env.selfhost
+          sed -i 's|OVERTO_PUBLIC_URL=.*|OVERTO_PUBLIC_URL=http://127.0.0.1:3006|' .env.selfhost
+          sed -i 's|SMTP_HOST=.*|SMTP_HOST=mailpit|' .env.selfhost
+          sed -i 's|SMTP_PORT=.*|SMTP_PORT=1025|' .env.selfhost
+          sed -i 's|SMTP_SECURE=.*|SMTP_SECURE=false|' .env.selfhost
+          sed -i 's|SMTP_REQUIRE_TLS=.*|SMTP_REQUIRE_TLS=false|' .env.selfhost
+          docker compose --env-file .env.selfhost -f compose.saas.yaml --profile test-mail up -d --build
+      - name: Wait for services health check
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3006/api/v1/health >/dev/null; then
+              echo "OverTo self-host instance is healthy!"
+              break
+            fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:3006/api/v1/health
+      - name: Run Self-Host Playwright E2E verification
+        env:
+          OVERTO_SELFHOST_E2E: 'true'
+          OVERTO_BASE_URL: 'http://127.0.0.1:3006'
+          OVERTO_MAILPIT_URL: 'http://127.0.0.1:8026'
+        run: |
+          npx playwright test e2e/selfhost.e2e.ts --workers=1
+      - name: Dump Compose logs on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env.selfhost -f compose.saas.yaml logs --tail=100
+      - name: Tear down Compose
+        if: always()
+        run: |
+          docker compose --env-file .env.selfhost -f compose.saas.yaml down -v

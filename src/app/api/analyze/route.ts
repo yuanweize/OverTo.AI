@@ -88,15 +88,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Provider monetary budget guard & emergency kill switch
-    if (body.enableLlm === true) {
-      const budgetGuard = new AiBudgetGuard(admissionPool);
-      const budgetCheck = await budgetGuard.checkBudget();
-      if (!budgetCheck.allowed) {
-        publicAiUnavailable = true;
-      }
-    }
-
     const locale = resolveLocale(body.locale, request.headers.get('accept-language'));
     let prompt = defaultPrompt;
     let settings = defaultProviderSettings();
@@ -108,33 +99,72 @@ export async function POST(request: NextRequest) {
       settings = (await new ProviderRepository(admissionPool).read()).config;
       if (publicAiUnavailable) settings = { ...settings, enabled: false };
     }
+
+    // Atomic budget reservation before billable model invocation
+    let reservationId: string | undefined;
+    let budgetGuard: AiBudgetGuard | null = null;
+    if (body.enableLlm === true && !publicAiUnavailable && deployment && admissionPool) {
+      budgetGuard = new AiBudgetGuard(admissionPool);
+      const reservation = await budgetGuard.reserve({
+        provider: settings.providerName,
+        model: settings.model,
+        maxInputTokens: 3000,
+        maxOutputTokens: settings.maxCompletionTokens,
+      });
+
+      if (!reservation.allowed) {
+        publicAiUnavailable = true;
+        settings = { ...settings, enabled: false };
+      } else {
+        reservationId = reservation.reservationId;
+      }
+    }
+
     const result = await analyzeSuspiciousMessage(body.text, body.enableLlm === true, locale, prompt, settings);
 
     if (result.metadata.aiStatus !== 'NOT_REQUESTED') {
       const traceId = crypto.randomUUID();
       result.metadata.traceId = traceId;
       result.metadata.traceRecorded = false;
+      // Settle or release budget reservation
+      let finalCost: number | null = null;
+      if (budgetGuard && reservationId) {
+        if (result.metadata.aiStatus === 'SUCCESS') {
+          try {
+            const { settledCost } = await budgetGuard.settle(reservationId, {
+              inputTokens: result.metadata.inputTokens,
+              outputTokens: result.metadata.outputTokens,
+            });
+            finalCost = settledCost;
+          } catch {
+            finalCost = null;
+          }
+        } else {
+          await budgetGuard.release(reservationId).catch(() => {});
+        }
+      }
+
       // Optional observability. A storage failure must not discard the user's result.
       if (deployment && admissionPool) {
         try {
           const { TraceRepository } = await import('@/ai/traces/repository');
-          const estimatedCost = (result.metadata.inputTokens || result.metadata.outputTokens)
-            ? AiBudgetGuard.calculateEstimatedCost(
-                result.metadata.aiModel || settings.model,
-                result.metadata.inputTokens ?? 0,
-                result.metadata.outputTokens ?? 0
-              )
-            : null;
-          await new TraceRepository(admissionPool).record({ id: traceId,
+          await new TraceRepository(admissionPool).record({
+            id: traceId,
             provider: settings.providerName,
             model: result.metadata.aiModel || settings.model,
-            promptVersion: prompt.version, status: result.metadata.aiStatus,
+            promptVersion: prompt.version,
+            status: result.metadata.aiStatus,
             failureReason: result.metadata.aiReason || null,
             durationMs: result.metadata.providerDurationMs ?? result.metadata.processingTimeMs,
-            inputTokens: result.metadata.inputTokens ?? null, outputTokens: result.metadata.outputTokens ?? null,
-            rejectedEvidence: result.metadata.rejectedAiEvidence ?? null, estimatedCostUsd: estimatedCost });
+            inputTokens: result.metadata.inputTokens ?? null,
+            outputTokens: result.metadata.outputTokens ?? null,
+            rejectedEvidence: result.metadata.rejectedAiEvidence ?? null,
+            estimatedCostUsd: finalCost,
+          });
           result.metadata.traceRecorded = true;
-        } catch { console.warn('[AI_TRACE] Metadata storage unavailable'); }
+        } catch {
+          console.warn('[AI_TRACE] Metadata storage unavailable');
+        }
       }
     }
 

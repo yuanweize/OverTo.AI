@@ -8,6 +8,8 @@ services:
       POSTGRES_PASSWORD: ${OVERTO_DB_PASSWORD:?Set OVERTO_DB_PASSWORD in the private env file}
     volumes:
       - overto_pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${OVERTO_DB_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U overto -d overto"]
       interval: 5s

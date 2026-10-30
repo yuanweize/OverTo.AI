@@ -61,6 +61,13 @@ test('fresh self-hosted install supports verified account, metered rules and roo
     await expect(page.getByRole('heading', { name: 'Přehled provozu' })).toBeVisible();
     await page.goto(`${origin}/admin/ai-studio`);
     await expect(page.getByRole('heading', { name: 'AI Studio', exact: true })).toBeVisible();
+
+    // Verify multi-language switching
+    await page.goto(`${origin}/`);
+    const langSelect = page.locator('select[aria-label="Jazyk"], select[aria-label="Language"]');
+    await expect(langSelect).toBeVisible();
+    await langSelect.selectOption('en');
+    await expect(page.locator('body')).toContainText('Analyze');
   } finally {
     if (rootAssigned) {
       execFileSync('docker', ['compose', '--env-file', '.env.selfhost', '-f', 'compose.saas.yaml', 'exec', '-T', 'postgres', 'psql', '-U', 'overto', '-d', 'overto', '-c', `DELETE FROM platform_admins WHERE user_id=(SELECT id FROM "user" WHERE email='${email}')`], { cwd: process.cwd(), stdio: 'pipe' });

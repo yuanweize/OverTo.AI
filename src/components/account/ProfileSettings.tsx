@@ -13,6 +13,7 @@ export function ProfileSettings({ initialName, email }: { initialName: string; e
 
   const [exporting, setExporting] = useState(false);
   const [deleteEmail, setDeleteEmail] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const router = useRouter();
@@ -60,14 +61,17 @@ export function ProfileSettings({ initialName, email }: { initialName: string; e
 
   async function handleDelete(event: React.FormEvent) {
     event.preventDefault();
-    if (deleteEmail.trim().toLowerCase() !== email.toLowerCase()) return;
+    if (deleteEmail.trim().toLowerCase() !== email.toLowerCase() || !deletePassword) return;
     setDeleteBusy(true);
     setDeleteError('');
     try {
       const res = await fetch('/api/account/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmEmail: deleteEmail.trim() }),
+        body: JSON.stringify({
+          confirmEmail: deleteEmail.trim(),
+          password: deletePassword,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -139,12 +143,25 @@ export function ProfileSettings({ initialName, email }: { initialName: string; e
               value={deleteEmail}
               onChange={e => setDeleteEmail(e.target.value)}
               placeholder={email}
+              required
+              className="mt-1 min-h-10 w-full rounded-lg border border-rose-300 bg-white px-3 text-sm text-slate-900 dark:border-rose-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            {t('deletePasswordPrompt')}
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              placeholder="••••••••••••"
+              required
+              autoComplete="current-password"
               className="mt-1 min-h-10 w-full rounded-lg border border-rose-300 bg-white px-3 text-sm text-slate-900 dark:border-rose-800 dark:bg-slate-900 dark:text-slate-100"
             />
           </label>
           <button
             type="submit"
-            disabled={deleteBusy || deleteEmail.trim().toLowerCase() !== email.toLowerCase()}
+            disabled={deleteBusy || !deletePassword || deleteEmail.trim().toLowerCase() !== email.toLowerCase()}
             className="min-h-11 rounded-lg bg-rose-700 px-4 font-semibold text-white hover:bg-rose-800 disabled:opacity-40"
           >
             {deleteBusy ? t('deleting') : t('confirmDelete')}
