@@ -10,6 +10,7 @@ import { analyzeSuspiciousMessage } from '@/lib/decision-engine';
 import { analysisLimiter } from '@/lib/process-limiter';
 import { resolveLocale } from '@/i18n/locale';
 import { readRequestBody } from '@/lib/read-request-body';
+import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
 
 
 export async function POST(request: NextRequest) {
@@ -54,9 +55,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pro analýzu pomocí AI je nutný souhlas s odesláním upraveného textu poskytovateli.' }, { status: 400 });
     }
     if (body.locale !== undefined && body.locale !== 'cs' && body.locale !== 'en') return NextResponse.json({ error: 'INVALID_LOCALE' }, { status: 400 });
+    // Public AI is restricted to the dedicated local deployment until a real monetary budget exists.
+    const localSharedAdmission = process.env.NODE_ENV === 'development' && process.env.OVERTO_AUTH_LOCAL === 'true';
+    const publicAiUnavailable = body.enableLlm === true && !localSharedAdmission;
+    if (localSharedAdmission) {
+      try {
+        const { pool } = await import('@/auth/server');
+        if (!pool) throw new Error('ADMISSION_DATABASE_UNAVAILABLE');
+        const policies = [
+          { bucket: 'public-rules-minute', limit: 90, windowSeconds: 60 },
+          { bucket: 'public-rules-day', limit: 3000, windowSeconds: 86400 },
+          ...(body.enableLlm === true ? [
+            { bucket: 'public-ai-minute', limit: 4, windowSeconds: 60 },
+            { bucket: 'public-ai-day', limit: 24, windowSeconds: 86400 },
+          ] : []),
+        ];
+        const admission = await new SharedRateLimiter(pool).consume(policies);
+        if (!admission.allowed) return NextResponse.json({ error: 'Denní nebo krátkodobý limit veřejné analýzy byl vyčerpán.' }, { status: 429, headers: { 'Retry-After': String(admission.retryAfter), 'Cache-Control': 'no-store' } });
+      } catch {
+        return NextResponse.json({ error: 'Ochrana veřejného API není dostupná.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+      }
+    }
     const locale = resolveLocale(body.locale, request.headers.get('accept-language'));
     let prompt = defaultPrompt;
     let settings = defaultProviderSettings();
+    if (publicAiUnavailable) settings = { ...settings, enabled: false };
     if (body.enableLlm === true && process.env.NODE_ENV === 'development' && process.env.OVERTO_AUTH_LOCAL === 'true') {
       const {pool} = await import('@/auth/server');
       if (pool) { const {PromptRepository} = await import('@/ai/prompts/repository'); prompt = await new PromptRepository(pool).active(); const {ProviderRepository}=await import('@/ai/providers/repository'); settings=(await new ProviderRepository(pool).read()).config; }

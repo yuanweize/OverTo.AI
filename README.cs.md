@@ -43,7 +43,7 @@ Správce platformy může změnit název, lokální logo, barvu, popisy a oznám
 
 AI Studio zobrazuje metadata volání a jejich stav, dobu a tokeny. Chybějící cenu neoznačuje jako nulovou. Neuchovává celé zprávy; verze administračních instrukcí jsou uloženy jako konfigurace. Prompt Lab podporuje neměnné verze, syntetické testy a řízenou aktivaci. Evaluace spouští autorskou sadu pravidly a omezené AI testy se souhlasem. [Dokumentace záznamů](docs/administration/ai-traces.md).
 
-Přihlášené místní požadavky nově sdílejí limity PostgreSQL podle klíče, projektu a prostoru. Nejde o kompletní ochranu veřejného SaaS. Produkční placená AI zůstává blokovaná. [Sdílené limity](docs/administration/shared-limits.md).
+Přihlášené místní požadavky sdílejí limity PostgreSQL podle klíče, projektu a prostoru. Ve stejné místní instalaci mají nepřihlášené požadavky společný limit 90/minutu a 3 000/den; pokusy o AI navíc 4/minutu a 24/den. Limity nerozlišují jednotlivé návštěvníky ani skutečnou cenu modelu. Produkční placená AI vrací pouze pravidlový výsledek. [Sdílené limity](docs/administration/shared-limits.md).
 
 ![OvěřTo.AI — česká mobilní úvodní stránka v tmavém tématu](assets/screenshots/v7-home-cs-dark-390.png)
 

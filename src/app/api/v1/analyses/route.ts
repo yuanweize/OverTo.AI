@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     const headers: Record<string, string> = { 'Cache-Control': 'no-store' };
     const retryAfter = response.headers.get('retry-after');
     if (retryAfter) headers['Retry-After'] = retryAfter;
-    return NextResponse.json({ schemaVersion: '1.0', error: { code: response.status === 429 ? 'RATE_LIMITED' : 'ANALYSIS_REQUEST_FAILED', message: body.error } }, { status: response.status, headers });
+    return NextResponse.json({ schemaVersion: '1.0', error: { code: response.status === 429 ? 'RATE_LIMITED' : response.status === 503 ? 'RATE_LIMIT_UNAVAILABLE' : 'ANALYSIS_REQUEST_FAILED', message: body.error } }, { status: response.status, headers });
   }
   const payload = await response.json();
   const result: AnalysisResult = metered ? payload.result : payload;
