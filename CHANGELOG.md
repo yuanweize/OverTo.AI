@@ -2,6 +2,20 @@
 
 All notable changes to OvěřTo.AI are documented in this file.
 
+## [7.0.1] - 2026-10-30
+
+### Security & Hardening
+- **PostgreSQL Atomic AI Budget Reservations**: Replaced historical trace queries with strict atomic pre-call budget reservations (`migrations/016_ai_budget_reservations.sql` & `src/server/ai/budgets.ts`). Concurrency race conditions are eliminated using transactional row/advisory locks, official model pricing tables, fail-closed unknown model caps, settlement on completion, release on failure/timeout, and crash reconciliation.
+- **Client Identity & Reverse Proxy Hardening**: Hardened `src/server/security/client-identity.ts` against IP and header spoofing. Direct connections safely discard untrusted `x-forwarded-for`, `cf-connecting-ip`, and `x-real-ip` headers. Enforced mandatory high-entropy identity salt (`OVERTO_CLIENT_IDENTITY_SALT`) in production.
+- **Transactional Webhook & Credit Ledger Alignment**: Refactored `src/app/api/local/stripe/webhook/route.ts` to perform all third-party Stripe API calls outside database transactions, executing subscription state updates, credit grants, and event logging within a single atomic PostgreSQL transaction. Added support for `invoice.payment_failed` and `charge.refunded` clawbacks.
+- **GDPR & Account Lifecycle Hardening**: Added mandatory password re-authentication to `/api/account/delete`, root administrator deletion prevention, cascading session and API key revocation, and comprehensive JSON data export (`/api/account/export`) covering projects, keys, usage, credit transactions, and statutory tax/accounting notices.
+- **Prompt Lab Runtime Loop Verification**: Validated runtime integration through local OpenAI-compatible mock server ensuring activated prompts are received by LLM adapters and recorded into traces with zero synthetic fakes.
+
+### Infrastructure & CI/CD
+- **Automated GHCR Container Publishing**: Added `.github/workflows/docker-release.yml` for multi-architecture (`linux/amd64`, `linux/arm64`) image publishing to GitHub Container Registry (`ghcr.io/yuanweize/overto-ai`) on release tags.
+- **Self-Host E2E CI Workflow**: Added dedicated `selfhost-e2e` job to `.github/workflows/ci.yml` verifying the full Docker Compose stack, database migrations, health checks, email verification via Mailpit, rules analysis, API keys, and multi-language switching.
+- **Port Allocation Documentation**: Formally standardized port allocations across all documentation to avoid collisions between local development (`3005`/`8025`) and self-hosted container stacks (`3006`/`8026`).
+
 ## [7.0.0] - 2026-10-30
 
 ### Added

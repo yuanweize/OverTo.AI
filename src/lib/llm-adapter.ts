@@ -92,7 +92,7 @@ const schema = {
 export async function runLlmAnalysisIfConfigured(sanitizedText: string, prompt: RuntimePrompt = defaultPrompt, settings: ProviderSettings = defaultProviderSettings()): Promise<ProviderResult> {
   if (!process.env.OPENAI_API_KEY || process.env.AI_ENABLED !== 'true' || !settings.enabled) return { status: 'UNAVAILABLE', reason: 'not_configured' };
   // Public paid calls stay closed until shared authorization and budgets are implemented.
-  const localDevelopment = process.env.NODE_ENV === 'development' && process.env.AI_LOCAL_ONLY === 'true';
+  const localDevelopment = (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') && process.env.AI_LOCAL_ONLY === 'true';
   if (!localDevelopment) return { status: 'BLOCKED', reason: 'deployment_gate' };
   const model = settings.model;
   const baseUrl = settings.baseUrl;

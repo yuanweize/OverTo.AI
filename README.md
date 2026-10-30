@@ -61,6 +61,13 @@ docker compose --env-file .env.selfhost -f compose.saas.yaml run --rm --no-deps 
 
 The application health check is available at `/api/v1/health`. Database backups and restoration are verified with `scripts/test-backup-restore.ts`. See [Self-Hosting Guide](docs/deployment/self-host.md).
 
+#### Port Allocation Matrix
+
+| Mode | OverTo App | Mailpit Web UI | Mailpit SMTP | PostgreSQL |
+|---|---|---|---|---|
+| **Local Dev** (`npm run dev -- -p 3005`) | `http://127.0.0.1:3005` | `http://127.0.0.1:8025` | `127.0.0.1:1025` | `127.0.0.1:55443` |
+| **Self-Host Compose** (`compose.saas.yaml`) | `http://127.0.0.1:3006` | `http://127.0.0.1:8026` | `mailpit:1025` | `127.0.0.1:5432` |
+
 ## API at a glance
 
 A local guest request requires **no API key** and consumes no credits:

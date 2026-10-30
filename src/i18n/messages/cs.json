@@ -450,6 +450,7 @@
     "deleteAccount": "Smazat účet",
     "deleteNote": "Trvale odstraní vaše projekty, API klíče a účet. Tuto akci nelze vrátit zpět.",
     "deleteConfirmPrompt": "Pro potvrzení zadejte svůj e-mail:",
+    "deletePasswordPrompt": "Zadejte své heslo pro ověření:",
     "confirmDelete": "Trvale smazat účet",
     "deleting": "Mazání…",
     "accountDeleted": "Účet byl úspěšně smazán.",

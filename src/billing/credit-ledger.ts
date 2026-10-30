@@ -25,16 +25,30 @@ export class CreditLedger {
   }
 
   async grant(accountId: string, key: string, amount: number, category: Category): Promise<void> {
+    await this.locked(accountId, async client => {
+      await this.grantInTransaction(client, accountId, key, amount, category);
+    });
+  }
+
+  async grantInTransaction(client: PoolClient, accountId: string, key: string, amount: number, category: Category): Promise<void> {
     requireKey(key); requireAmount(amount);
     if (!['PROMOTIONAL', 'SUBSCRIPTION', 'PURCHASED'].includes(category)) throw new Error('INVALID_CATEGORY');
-    await this.locked(accountId, async client => {
-      const previous = await client.query('SELECT amount, category FROM credit_grants WHERE account_id = $1 AND idempotency_key = $2', [accountId, key]);
-      if (previous.rowCount) {
-        if (previous.rows[0].amount !== amount || previous.rows[0].category !== category) throw new Error('IDEMPOTENCY_CONFLICT');
-        return;
-      }
-      await client.query('INSERT INTO credit_grants (account_id, idempotency_key, amount, category) VALUES ($1,$2,$3,$4)', [accountId, key, amount, category]);
-    });
+    const account = await client.query('SELECT id FROM credit_accounts WHERE id = $1 FOR UPDATE', [accountId]);
+    if (!account.rowCount) throw new Error('ACCOUNT_NOT_FOUND');
+    const previous = await client.query('SELECT amount, category FROM credit_grants WHERE account_id = $1 AND idempotency_key = $2', [accountId, key]);
+    if (previous.rowCount) {
+      if (previous.rows[0].amount !== amount || previous.rows[0].category !== category) throw new Error('IDEMPOTENCY_CONFLICT');
+      return;
+    }
+    await client.query('INSERT INTO credit_grants (account_id, idempotency_key, amount, category) VALUES ($1,$2,$3,$4)', [accountId, key, amount, category]);
+  }
+
+  async revokeInTransaction(client: PoolClient, accountId: string, key: string): Promise<boolean> {
+    requireKey(key);
+    const account = await client.query('SELECT id FROM credit_accounts WHERE id = $1 FOR UPDATE', [accountId]);
+    if (!account.rowCount) throw new Error('ACCOUNT_NOT_FOUND');
+    const deleted = await client.query('DELETE FROM credit_grants WHERE account_id = $1 AND idempotency_key = $2', [accountId, key]);
+    return (deleted.rowCount ?? 0) > 0;
   }
 
   async balance(accountId: string): Promise<{ granted: number; consumed: number; reserved: number; available: number }> {
