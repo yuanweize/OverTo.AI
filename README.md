@@ -97,41 +97,80 @@ flowchart LR
 
 With consent, the configured model endpoint and any upstream provider may receive data remaining after redaction, including URL hosts. Hosting and provider retention depend on their configuration and terms. The application does not store submitted message contents in a database. Read [privacy details](PRIVACY.md) before use.
 
-## Local account and billing experiments
+## Account and billing capabilities
 
-A dedicated local PostgreSQL and loopback-only Mailpit support signup, email verification, password recovery, projects, test API keys and credits. Mailpit captures sensitive one-time links and does not deliver real email. Production auth and real email are disabled. Stripe Test Mode is disabled by default. An [actual sandbox checkout, signed webhooks, credit grant, portal opening and cancellation](docs/saas/stripe-live-test.md) have been verified; renewal, failure handling and reconciliation still need acceptance. Never use live Stripe keys here. Setup, test results and remaining work are recorded in [implementation status](docs/development/IMPLEMENTATION-STATUS.md), [acceptance matrix](docs/development/ACCEPTANCE-MATRIX.md), and [credit ledger](docs/saas/ledger.md).
+In local development (`3005`), a dedicated local PostgreSQL and loopback-only Mailpit (`8025`) capture sensitive one-time links without delivering real emails. In self-hosted production (`compose.saas.yaml` on `3006`), real SMTP delivery (or Mailpit via `--profile test-mail`) and PostgreSQL 17 persistence are fully supported. Stripe Test Mode provides verified sandbox checkout, webhook idempotency, credit grants, billing portal access, cancellation, failure handling, and refund clawbacks. Setup and test results are recorded in [implementation status](docs/development/IMPLEMENTATION-STATUS.md), [acceptance matrix](docs/development/ACCEPTANCE-MATRIX.md), and [credit ledger](docs/saas/ledger.md).
 
 ## Administration and observability
 
-Verified platform administrators can edit public branding with validated settings, version-conflict detection and transactional audit history. First-root assignment is a trusted local CLI operation. The [operations console](docs/administration/operations.md) shows live local account, test billing, audit and basic system data behind the same ROOT check. It does not provide production account or billing actions. See [site settings](docs/administration/site-settings.md) for the supported branding fields.
+Platform administrators (`ROOT`) can manage public branding with version-conflict detection and transactional audit history. Initial root assignment is performed via `scripts/bootstrap-admin.ts`. The [operations console](docs/administration/operations.md) provides real-time tenant metrics, transactional audit logs, and system health status. See [site settings](docs/administration/site-settings.md) for supported branding fields.
 
-The local AI Studio shows trace metadata and 24-hour operational counts. Message contents are not stored; administrator-authored prompt versions **are** stored as configuration. Missing tokens and cost remain unknown. The [Prompt Lab](docs/administration/prompts.md) supports immutable drafts, real tests and audited activation/rollback. The [evaluation console](docs/administration/evaluations.md) runs the authored rules set and bounded AI smoke tests. [Model service settings](docs/administration/providers.md) control the registered endpoint, default and allowed models, timeout, output cap and an explicit metadata-only connection check. Dataset editing, multi-provider routing and production budgets remain unfinished. See [AI traces](docs/administration/ai-traces.md).
+The AI Studio records trace metadata, token usage, duration, and estimated USD costs in PostgreSQL. Message bodies are never stored; administrator-authored prompt versions **are** stored as configuration. The [Prompt Lab](docs/administration/prompts.md) provides immutable versioning, live model testing, and optimistic-locked activation/rollback. The [evaluation console](docs/administration/evaluations.md) executes deterministic test suites and bounded AI checks. [Model service settings](docs/administration/providers.md) configure registered endpoints, default and allowed models, timeouts, output caps, and health verification. Concurrent spending is protected by PostgreSQL row/advisory locks and fail-closed caps (`migrations/016_ai_budget_reservations.sql`). See [AI traces](docs/administration/ai-traces.md).
 
-| Current view | Screenshot |
+## Visual Showcase & Interface Gallery
+
+### 1. Evidence-Led Analysis & Landing Experience
+
+<p align="center">
+  <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="Analysis Result with Grounded Signals" />
+  <br />
+  <sub><strong>Analysis Result & Verdict (Czech, 1440px Desktop)</strong> — Grounded evidence excerpts, risk assessment score, and verified out-of-band next steps.</sub>
+</p>
+
+| English Dark Mobile Analysis (390px) | Czech Dark Mobile Home (390px) |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-analyze-en-dark-390.png" width="85%" alt="English Dark Mobile Analysis" /><br /><sub><strong>Evidence-led Analysis (Dark Mobile)</strong></sub> | <img src="assets/screenshots/v7-home-cs-dark-390.png" width="85%" alt="Czech Dark Mobile Home" /><br /><sub><strong>Interactive Hero & Input (Dark Mobile)</strong></sub> |
+
+### 2. Tenant Dashboard & Developer Console
+
+<p align="center">
+  <img src="assets/screenshots/v7-dashboard-cs-1440.png" width="100%" alt="Tenant Dashboard" />
+  <br />
+  <sub><strong>Personal Workspace Dashboard (1440px Desktop)</strong> — Synthetic usage activity, credit balance, and project management.</sub>
+</p>
+
+| API Keys & Quota Lineage (1440px Desktop) | Interactive API Playground (1440px Desktop) |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-api-keys-cs-1440.png" width="100%" alt="API Keys & Daily Limits" /><br /><sub><strong>API Keys & Shared Daily Limits</strong> — Scoped permissions, token lineage & rate limits.</sub> | <img src="assets/screenshots/v7-playground-cs-1440.png" width="100%" alt="Interactive Playground" /><br /><sub><strong>Interactive API Playground</strong> — Live request testing with formatted JSON response.</sub> |
+
+| Developer API Reference (1024px Tablet) | Sandbox Billing & Stripe Portal (1440px Desktop) |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-developers-cs-dark-1024-a11y.png" width="100%" alt="Developer Guide" /><br /><sub><strong>Developer Documentation (Dark Tablet)</strong> — WCAG AA accessible API reference.</sub> | <img src="assets/screenshots/v7-billing-cs-1440.png" width="100%" alt="Credit Ledger & Billing" /><br /><sub><strong>Credit Ledger & Subscriptions</strong> — Metered credit allocation & test billing.</sub> |
+
+### 3. Platform Administration & AI Studio (ROOT Only)
+
+<p align="center">
+  <img src="assets/screenshots/v7-admin-overview-en-1440.png" width="100%" alt="Administration Overview" />
+  <br />
+  <sub><strong>Platform Operations Console (1440px Desktop)</strong> — Live tenant statistics, transactional audit logs, and system health status.</sub>
+</p>
+
+| AI Studio Traces & Budgets (Dark Mode) | Prompt Lab & Rollback Management |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-ai-studio-en-dark.png" width="100%" alt="AI Studio Traces" /><br /><sub><strong>AI Studio Operational Traces (Dark Mode)</strong> — Real Token usage, duration, and atomic budget tracking.</sub> | <img src="assets/screenshots/v7-prompt-lab.png" width="100%" alt="Prompt Lab" /><br /><sub><strong>Prompt Lab & Version Control</strong> — Immutable prompt versioning, testing, and audited rollback.</sub> |
+
+<details>
+<summary><strong>View Additional Screenshots (Mobile Views & Light/Dark Modes)</strong></summary>
+
+| View | Screenshot Preview |
 |---|---|
-| Czech dark mobile home | [View](assets/screenshots/v7-home-cs-dark-390.png) |
-| English dark mobile analysis | [View](assets/screenshots/v7-analyze-en-dark-390.png) |
-| Czech dashboard, synthetic test account | [View](assets/screenshots/v7-dashboard-cs-1440.png) |
-| Czech dashboard, dark mobile | [View](assets/screenshots/v7-dashboard-cs-dark-390.png) |
-| Czech API keys and shared daily usage | [View](assets/screenshots/v7-api-keys-cs-1440.png) |
-| Czech API keys, dark mobile | [View](assets/screenshots/v7-api-keys-cs-dark-390.png) |
-| Czech billing, light desktop and dark mobile | [Desktop](assets/screenshots/v7-billing-cs-1440.png) · [Mobile](assets/screenshots/v7-billing-cs-dark-390.png) |
-| Czech API Playground with structured result | [View](assets/screenshots/v7-playground-cs-1440.png) |
-| Czech developer API guide, dark tablet | [View](assets/screenshots/v7-developers-cs-dark-1024-a11y.png) |
-| English workspace, synthetic test account | [View](assets/screenshots/v7-workspace-mobile.png) |
-| Czech pricing, desktop | [View](assets/screenshots/v7-pricing-cs-1440.png) |
-| English documentation, desktop | [View](assets/screenshots/v7-docs-en-1024.png) |
-| AI Studio models, synthetic administrator | [View](assets/screenshots/v7-model-registry.png) |
-| Administrator settings, synthetic test branding | [View](assets/screenshots/v6-admin-settings.png) |
-| AI Studio traces, light and dark | [Light](assets/screenshots/v7-ai-studio-en-light.png) · [Dark](assets/screenshots/v7-ai-studio-en-dark.png) |
-| Administrator overview, English light and dark mobile | [Desktop](assets/screenshots/v7-admin-overview-en-1440.png) · [Mobile](assets/screenshots/v7-admin-overview-en-dark-390.png) |
-| Administrator overview, Czech light | [View](assets/screenshots/v7-admin-overview-cs-1440.png) |
+| Czech Pricing (1440px Desktop) | <img src="assets/screenshots/v7-pricing-cs-1440.png" width="100%" alt="Pricing Desktop" /><br /><sub><strong>Pricing (Czech, 1440px)</strong></sub> |
+| English Documentation (1024px Desktop) | <img src="assets/screenshots/v7-docs-en-1024.png" width="100%" alt="Documentation Desktop" /><br /><sub><strong>Documentation (English, 1024px)</strong></sub> |
+| Model Registry & Health Checks | <img src="assets/screenshots/v7-model-registry.png" width="100%" alt="Model Registry" /><br /><sub><strong>Registered AI Providers & Health Verification</strong></sub> |
+| User Table & Identity Search | <img src="assets/screenshots/v7-admin-users-en-1440.png" width="100%" alt="Admin Users Table" /><br /><sub><strong>Platform Admin User Management & Credit Adjustments</strong></sub> |
+| Czech Billing (Dark Mobile, 390px) | <img src="assets/screenshots/v7-billing-cs-dark-390.png" width="50%" alt="Billing Mobile" /><br /><sub><strong>Billing & Credits (Dark Mobile)</strong></sub> |
+| Czech API Keys (Dark Mobile, 390px) | <img src="assets/screenshots/v7-api-keys-cs-dark-390.png" width="50%" alt="API Keys Mobile" /><br /><sub><strong>API Keys (Dark Mobile)</strong></sub> |
+| Czech Dashboard (Dark Mobile, 390px) | <img src="assets/screenshots/v7-dashboard-cs-dark-390.png" width="50%" alt="Dashboard Mobile" /><br /><sub><strong>Dashboard (Dark Mobile)</strong></sub> |
+| Admin Overview (Dark Mobile, 390px) | <img src="assets/screenshots/v7-admin-overview-en-dark-390.png" width="50%" alt="Admin Mobile" /><br /><sub><strong>Admin Operations (Dark Mobile)</strong></sub> |
+| AI Studio (Light Desktop) | <img src="assets/screenshots/v7-ai-studio-en-light.png" width="100%" alt="AI Studio Light" /><br /><sub><strong>AI Studio Traces (Light Desktop)</strong></sub> |
 
-Theme and language choices persist. Public pages, authentication forms and account screens have Czech and English catalogs. Backend error responses and email templates still need localization. See the [three-round visual review](docs/design/FINAL-VISUAL-REVIEW.md), [public reference review](docs/design/OPENROUTER-REFERENCE-REVIEW.md) and [branding policy](BRANDING.md). Screenshots show local operation, not a hosted production SaaS.
+</details>
+
+Theme and language choices persist across sessions. Public pages, authentication forms, and account screens have complete Czech and English catalogs. See [three-round visual review](docs/design/FINAL-VISUAL-REVIEW.md), [public reference review](docs/design/OPENROUTER-REFERENCE-REVIEW.md), and [branding policy](BRANDING.md).
 
 ## Model providers
 
-Set `OPENAI_BASE_URL`, `OPENAI_MODEL` and the server-only `OPENAI_API_KEY` in ignored `.env.local`. The adapter accepts an OpenAI-compatible `/v1/chat/completions` endpoint. Root administrators can choose only endpoints registered by the server operator through `OPENAI_BASE_URL` or `AI_ALLOWED_BASE_URLS`; the latter is a comma-separated list for trusted alternatives. Local HTTP gateways are permitted only on an address assigned to the development machine. Provider names and model IDs are configuration, not product branding. No key is written to PostgreSQL or returned to the browser. The `/models` check is an explicit admin action and does not test completion quality. Production paid AI remains blocked until distributed authorization and spending controls are accepted.
+Set `OPENAI_BASE_URL`, `OPENAI_MODEL`, and server-only `OPENAI_API_KEY` in `.env.local` or `.env.selfhost`. The adapter accepts OpenAI-compatible `/v1/chat/completions` endpoints. Root administrators can select only endpoints registered by the operator through `OPENAI_BASE_URL` or `AI_ALLOWED_BASE_URLS`. Concurrency race conditions and spending caps are enforced atomically via `AiBudgetGuard` (`migrations/016_ai_budget_reservations.sql`). When budget caps are exhausted, requests fail closed and fall back to deterministic rules. The `/models` check is an explicit admin action and does not test completion quality.
 
 ## Development
 

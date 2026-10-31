@@ -47,22 +47,73 @@ curl http://127.0.0.1:3005/api/v1/analyses \
   --data '{"text":"Podezřelá zpráva", "enableLlm":false}'
 ```
 
-Testovací API klíče a kredity jsou dostupné jen v nakonfigurovaném místním účtu. Klíče mají rozsah oprávnění, expiraci, denní limit a možnost výměny. Rozhraní není připraveno pro veřejný provoz: omezení v jednom procesu nenahrazuje distribuované limity pro anonymní návštěvníky, produkční přihlášení ani rozpočty poskytovatele. Podrobnosti a příklad s klíčem jsou v [dokumentaci API](docs/api/v1.md).
+Testovací i produkční API klíče mají rozsah oprávnění, expiraci, denní limit a možnost okamžité výměny (revokace). Ochrana proti podvržení identity návštěvníků a rychlostní limity jsou vynucovány na úrovni Trusted Reverse Proxy s bezpečným fallbackem. Podrobnosti a příklad volání jsou v [dokumentaci API](docs/api/v1.md).
 
-Místní e-mailová schránka zachytává testovací zprávy a neodesílá skutečné e-maily. Stripe Test Mode je experimentální a ve výchozím nastavení vypnutý. Skutečný testovací Checkout, podepsané webhooky, jednorázové připsání kreditů, portál i zrušení předplatného byly ověřeny; obnovení, selhání plateb a úplné odsouhlasení ještě ne. Produkční účty ani platby nejsou dostupné. [Záznam ověření](docs/saas/stripe-live-test.md).
+V režimu lokálního vývoje zachytává Mailpit citlivé jednorázové odkazy bez odesílání do reálné sítě. V self-hosted produkci (`compose.saas.yaml`) je plně podporováno reálné doručování přes SMTP. Stripe Test Mode poskytuje ověřený proces: idempotenci webhooků, automatické připsání kreditů, portál pro zákazníky, zrušení předplatného, zpracování selhání i vrácení plateb v PostgreSQL knize. Záznam testů a stav implementace viz [záznam ověření](docs/saas/stripe-live-test.md) a [kreditní kniha](docs/saas/ledger.md).
 
 Projekt je poskytován pod [Apache-2.0](LICENSE); závislosti mají vlastní licence. Příspěvky popisuje [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Rozhraní a správa
+## Vizuální přehled a galerie rozhraní
 
-Domovská stránka, analýza včetně doporučení, přihlášení, obnova hesla, ceník a vývojářská stránka mají české a anglické texty. Jazyk se volí podle prohlížeče; ruční volba má přednost. Citace původních zpráv se nepřekládají. Témata Světlé / Tmavé / Systém se ukládají. Pracovní prostor a fakturace ještě nejsou kompletně přeloženy.
+### 1. Analýza založená na důkazech a hlavní stránka
 
-Správce platformy může změnit název, lokální logo, barvu, popisy a oznámení. Uložení kontroluje oprávnění, verzi a vytváří auditní záznam. Prvního správce přiřazuje důvěryhodné místní CLI, nikoli veřejná registrace. [Přehled provozu](docs/administration/operations.md) nyní zobrazuje skutečné místní účty, testovací předplatná, audit a základní stav systému. Produkční správa účtů a plateb ještě není hotová. [Postup nastavení](docs/administration/site-settings.md).
+<p align="center">
+  <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="Výsledek analýzy se signály a důkazy" />
+  <br />
+  <sub><strong>Výsledek analýzy a verdikt (čeština, 1440px Desktop)</strong> — Citace ověřených signálů z textu, skóre rizika a bezpečné kroky nezávislého ověření.</sub>
+</p>
 
-AI Studio zobrazuje metadata volání a jejich stav, dobu a tokeny. Chybějící cenu neoznačuje jako nulovou. Neuchovává celé zprávy; verze administračních instrukcí jsou uloženy jako konfigurace. Prompt Lab podporuje neměnné verze, syntetické testy a řízenou aktivaci. Evaluace spouští autorskou sadu pravidly a omezené AI testy se souhlasem. [Dokumentace záznamů](docs/administration/ai-traces.md).
+| Anglická mobilní analýza v tmavém režimu (390px) | Česká mobilní úvodní stránka v tmavém režimu (390px) |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-analyze-en-dark-390.png" width="85%" alt="Anglická mobilní analýza v tmavém režimu" /><br /><sub><strong>Analýza zprávy (tmavý mobilní režim)</strong></sub> | <img src="assets/screenshots/v7-home-cs-dark-390.png" width="85%" alt="Česká mobilní úvodní stránka v tmavém režimu" /><br /><sub><strong>Úvodní stránka a zadání textu (tmavý mobilní režim)</strong></sub> |
 
-Přihlášené místní požadavky sdílejí limity PostgreSQL podle klíče, projektu a prostoru. Ve stejné místní instalaci mají nepřihlášené požadavky společný limit 90/minutu a 3 000/den; pokusy o AI navíc 4/minutu a 24/den. Limity nerozlišují jednotlivé návštěvníky ani skutečnou cenu modelu. Produkční placená AI vrací pouze pravidlový výsledek. [Sdílené limity](docs/administration/shared-limits.md).
+### 2. Klientský dashboard a vývojářská konzole
 
-![OvěřTo.AI — česká mobilní úvodní stránka v tmavém tématu](assets/screenshots/v7-home-cs-dark-390.png)
+<p align="center">
+  <img src="assets/screenshots/v7-dashboard-cs-1440.png" width="100%" alt="Klientský dashboard" />
+  <br />
+  <sub><strong>Klientský dashboard pracovního prostoru (1440px Desktop)</strong> — Přehled spotřeby, zůstatek kreditů a správa projektů.</sub>
+</p>
 
-Snímky zobrazují místní aplikaci se syntetickým obsahem. Další záběry [dashboardu](assets/screenshots/v7-dashboard-cs-1440.png), [API klíčů](assets/screenshots/v7-api-keys-cs-1440.png), [Playgroundu](assets/screenshots/v7-playground-cs-1440.png) a [dokumentace](assets/screenshots/v7-docs-en-1024.png) jsou z reálného prohlížeče. [Vizuální revize](docs/design/FINAL-VISUAL-REVIEW.md) uvádí zjištění a zbývající práci. [Značka a vlastní hosting](BRANDING.md).
+| API klíče a limity spotřeby (1440px Desktop) | Interaktivní API Playground (1440px Desktop) |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-api-keys-cs-1440.png" width="100%" alt="API klíče a denní limity" /><br /><sub><strong>Správa API klíčů a limitů</strong> — Rozsahy oprávnění, linie tokenů a sdílené limity.</sub> | <img src="assets/screenshots/v7-playground-cs-1440.png" width="100%" alt="Interaktivní API Playground" /><br /><sub><strong>Interaktivní API Playground</strong> — Živé testování požadavků s formátovanou JSON odpovědí.</sub> |
+
+| Vývojářská dokumentace API (1024px Tablet) | Testovací fakturace a portál Stripe (1440px Desktop) |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-developers-cs-dark-1024-a11y.png" width="100%" alt="Vývojářská dokumentace" /><br /><sub><strong>Dokumentace pro vývojáře (tmavý tablet)</strong> — Přístupná referenční dokumentace API podle WCAG AA.</sub> | <img src="assets/screenshots/v7-billing-cs-1440.png" width="100%" alt="Kreditní kniha a předplatná" /><br /><sub><strong>Kreditní kniha a předplatná</strong> — Atomické připisování kreditů a testovací fakturace.</sub> |
+
+### 3. Správa platformy a AI Studio (pouze ROOT)
+
+<p align="center">
+  <img src="assets/screenshots/v7-admin-overview-en-1440.png" width="100%" alt="Přehled správy platformy" />
+  <br />
+  <sub><strong>Provozní konzole platformy (1440px Desktop)</strong> — Živé metriky nájemců, transakční auditní záznamy a stav systému.</sub>
+</p>
+
+| AI Studio: Záznamy a rozpočty (tmavý režim) | Prompt Lab a správa verzí |
+|:---:|:---:|
+| <img src="assets/screenshots/v7-ai-studio-en-dark.png" width="100%" alt="AI Studio záznamy" /><br /><sub><strong>Provozní záznamy AI Studia (tmavý režim)</strong> — Skutečné využití tokenů, latence a atomické sledování rozpočtu.</sub> | <img src="assets/screenshots/v7-prompt-lab.png" width="100%" alt="Prompt Lab" /><br /><sub><strong>Prompt Lab a verzování systémových instrukcí</strong> — Neměnné verze promptů, testování a auditovaný návrat k předchozí verzi.</sub> |
+
+<details>
+<summary><strong>Zobrazit další snímky rozhraní (mobilní zobrazení, světlý a tmavý režim)</strong></summary>
+
+| Zobrazení | Náhled rozhraní |
+|---|---|
+| Český ceník (1440px Desktop) | <img src="assets/screenshots/v7-pricing-cs-1440.png" width="100%" alt="Ceník Desktop" /><br /><sub><strong>Ceník (čeština, 1440px)</strong></sub> |
+| Anglická dokumentace (1024px Desktop) | <img src="assets/screenshots/v7-docs-en-1024.png" width="100%" alt="Dokumentace Desktop" /><br /><sub><strong>Dokumentace (angličtina, 1024px)</strong></sub> |
+| Registr modelů a kontrola dostupnosti | <img src="assets/screenshots/v7-model-registry.png" width="100%" alt="Registr modelů" /><br /><sub><strong>Registr AI poskytovatelů a ověření spojení</strong></sub> |
+| Tabulka uživatelů a vyhledávání identit | <img src="assets/screenshots/v7-admin-users-en-1440.png" width="100%" alt="Tabulka administrátorských uživatelů" /><br /><sub><strong>Správa uživatelů platformy a úprava kreditů</strong></sub> |
+| Česká fakturace (tmavý mobil, 390px) | <img src="assets/screenshots/v7-billing-cs-dark-390.png" width="50%" alt="Fakturace mobil" /><br /><sub><strong>Fakturace a kredity (tmavý mobil)</strong></sub> |
+| České API klíče (tmavý mobil, 390px) | <img src="assets/screenshots/v7-api-keys-cs-dark-390.png" width="50%" alt="API klíče mobil" /><br /><sub><strong>API klíče (tmavý mobil)</strong></sub> |
+| Český dashboard (tmavý mobil, 390px) | <img src="assets/screenshots/v7-dashboard-cs-dark-390.png" width="50%" alt="Dashboard mobil" /><br /><sub><strong>Dashboard (tmavý mobil)</strong></sub> |
+| Přehled správce (tmavý mobil, 390px) | <img src="assets/screenshots/v7-admin-overview-en-dark-390.png" width="50%" alt="Správa mobil" /><br /><sub><strong>Provozní správa (tmavý mobil)</strong></sub> |
+| AI Studio (světlý desktop) | <img src="assets/screenshots/v7-ai-studio-en-light.png" width="100%" alt="AI Studio světlé" /><br /><sub><strong>AI Studio záznamy (světlý desktop)</strong></sub> |
+
+</details>
+
+Volba jazyka a motivu se trvale ukládá. Veřejné stránky, přihlašovací formuláře a obrazovky účtu mají kompletní české i anglické texty. Viz [tříkolová vizuální revize](docs/design/FINAL-VISUAL-REVIEW.md), [veřejná referenční revize](docs/design/OPENROUTER-REFERENCE-REVIEW.md) a [pravidla značky](BRANDING.md).
+
+## Správa a integrace AI modelů
+
+Nastavte `OPENAI_BASE_URL`, `OPENAI_MODEL` a privátní `OPENAI_API_KEY` v `.env.local` nebo `.env.selfhost`. Adaptér akceptuje endpointy kompatibilní s OpenAI `/v1/chat/completions`. Konkurenční souběhy a limity útraty jsou atomicky chráněny přes `AiBudgetGuard` (`migrations/016_ai_budget_reservations.sql`). Pokud dojde k vyčerpání rozpočtu, volání bezpečně selže a vrátí deterministické vyhodnocení podle pravidel.
