@@ -15,7 +15,7 @@ npm ci
 npm run dev -- -p 3005
 ```
 
-Otevřete [http://127.0.0.1:3005](http://127.0.0.1:3005). Bez nastavení AI fungují pravidla. Volitelná integrace s OpenAI-kompatibilním API vyžaduje konfiguraci serveru a výslovný souhlas uživatele. Při nedostupnosti modelu se vrátí výsledek pravidel; aktuální stav je uveden ve výsledku. Omezené živé testy už proběhly, ale nejde o nezávislou reprezentativní evaluaci.
+Otevřete [http://127.0.0.1:3005](http://127.0.0.1:3005). Bez nastavení AI fungují pravidla. Produkční nasazení a veřejná dema standardně fungují v **Rules-only** režimu (deterministická pravidla); externí volání LLM podléhá bezpečnostnímu přepínači nasazení (`AI_LOCAL_ONLY`). Volitelná integrace s OpenAI-kompatibilním API vyžaduje konfiguraci serveru a výslovný souhlas uživatele. Při nedostupnosti modelu se vrátí výsledek pravidel; aktuální stav je uveden ve výsledku. Omezené živé testy už proběhly, ale nejde o nezávislou reprezentativní evaluaci.
 
 ### Self-Host provoz v Docker Compose
 

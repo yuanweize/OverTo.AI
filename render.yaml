@@ -1,0 +1,63 @@
+services:
+  - type: web
+    name: overto-ai-demo
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: BETTER_AUTH_URL
+        sync: false # Set to your public domain (e.g. https://demo.overto.ai) in Render Dashboard
+      - key: OVERTO_AUTH_LOCAL
+        value: 'true'
+      - key: OVERTO_SELF_HOST
+        value: 'true'
+      - key: OVERTO_AUTH_SECRET
+        generateValue: true
+      - key: OVERTO_CLIENT_IDENTITY_SALT
+        generateValue: true
+      - key: OVERTO_TRUST_PROXY
+        value: 'true'
+      # Public Demo Safety Invariant: Rules-only, disable paid AI and real Stripe
+      - key: AI_ENABLED
+        value: 'false'
+      - key: AI_LOCAL_ONLY
+        value: 'false'
+      - key: STRIPE_SECRET_KEY
+        value: ''
+      # Production Database connection from managed PostgreSQL
+      - key: DATABASE_URL
+        fromDatabase:
+          name: overto-db
+          property: connectionString
+      - key: OVERTO_DATABASE_URL
+        fromDatabase:
+          name: overto-db
+          property: connectionString
+      # Production SMTP (set in Render Dashboard, never committed to Git)
+      - key: OVERTO_SMTP_HOST
+        sync: false
+      - key: OVERTO_SMTP_PORT
+        value: '587'
+      - key: OVERTO_SMTP_USER
+        sync: false
+      - key: OVERTO_SMTP_PASSWORD
+        sync: false
+      - key: OVERTO_SMTP_FROM
+        sync: false
+
+databases:
+  - name: overto-db
+    databaseName: overto
+    user: overto
+    plan: starter
+    region: frankfurt
+    ipAllowList: [] # internal connections only

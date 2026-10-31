@@ -83,8 +83,15 @@ export class AiBudgetGuard {
       const outputPrice = Number(pricingRes.rows[0].output_per_million_usd) / 1_000_000;
       const modelMax = Number(pricingRes.rows[0].max_request_cost_usd);
 
-      const maxIn = params.maxInputTokens ?? 3000;
-      const maxOut = params.maxOutputTokens ?? 1000;
+      // Conservative strategy: validate pricing validity
+      if (isNaN(inputPrice) || isNaN(outputPrice) || inputPrice < 0 || outputPrice < 0 || isNaN(modelMax) || modelMax <= 0) {
+        await client.query('ROLLBACK');
+        return { allowed: false, reason: 'unknown_model_pricing' };
+      }
+
+      // Constrain input and output token bounds before reservation
+      const maxIn = Math.max(0, Math.min(params.maxInputTokens ?? 3000, 10000));
+      const maxOut = Math.max(0, Math.min(params.maxOutputTokens ?? 1000, 4000));
       const calculatedMax = Math.round((maxIn * inputPrice + maxOut * outputPrice) * 1_000_000) / 1_000_000;
 
       // Fail-closed ceiling validation: potential request cost cannot exceed model ceiling or request budget cap.
@@ -150,12 +157,21 @@ export class AiBudgetGuard {
 
   /**
    * Settle an active reservation with actual token usage.
-   * If token count is missing, settles conservatively at the reserved ceiling.
+   * If token count is missing or pricing unavailable, settles conservatively at the reserved ceiling.
+   * Separately records reserved amount, actual cost, and overage anomalies.
+   * Does NOT truncate real costs to hide overages.
    */
   async settle(
     reservationId: string,
     usage: { inputTokens?: number; outputTokens?: number }
-  ): Promise<{ settledCost: number }> {
+  ): Promise<{
+    settledCost: number;
+    actualCost: number;
+    reservedCost: number;
+    isOverage: boolean;
+    overageAmount: number;
+    overageReason?: string | null;
+  }> {
     if (!this.pool) throw new Error('BUDGET_POOL_UNAVAILABLE');
 
     const client = await this.pool.connect();
@@ -168,12 +184,19 @@ export class AiBudgetGuard {
 
       if (!res.rowCount) {
         await client.query('ROLLBACK');
-        return { settledCost: 0 };
+        return {
+          settledCost: 0,
+          actualCost: 0,
+          reservedCost: 0,
+          isOverage: false,
+          overageAmount: 0,
+        };
       }
 
       const { model, reserved_amount_usd } = res.rows[0];
       const reservedCeiling = Number(reserved_amount_usd);
       let actualCost = reservedCeiling;
+      let hasAccurateTokens = false;
 
       if (
         typeof usage.inputTokens === 'number' &&
@@ -189,19 +212,46 @@ export class AiBudgetGuard {
         if (pricingRes.rowCount) {
           const inPrice = Number(pricingRes.rows[0].input_per_million_usd) / 1_000_000;
           const outPrice = Number(pricingRes.rows[0].output_per_million_usd) / 1_000_000;
-          const computed = usage.inputTokens * inPrice + usage.outputTokens * outPrice;
-          const roundedComputed = Math.round(computed * 1_000_000) / 1_000_000;
-          // Invariant: Settled amount must NEVER exceed the reserved ceiling
-          actualCost = Math.min(roundedComputed, reservedCeiling);
+          if (!isNaN(inPrice) && !isNaN(outPrice) && inPrice >= 0 && outPrice >= 0) {
+            const computed = usage.inputTokens * inPrice + usage.outputTokens * outPrice;
+            actualCost = Math.round(computed * 1_000_000) / 1_000_000;
+            hasAccurateTokens = true;
+          }
         }
       }
 
+      // Check for overage anomaly: true cost exceeded what was pre-approved
+      const isOverage = hasAccurateTokens && actualCost > reservedCeiling;
+      const overageAmount = isOverage ? Math.round((actualCost - reservedCeiling) * 1_000_000) / 1_000_000 : 0;
+      const overageReason = isOverage
+        ? 'usage_exceeded_reservation'
+        : (!hasAccurateTokens ? 'conservative_fallback_reserved_ceiling' : null);
+
+      // Invariant: settled_amount_usd records the true actual cost so that budget spend aggregations
+      // do not under-report spend. It is NEVER truncated via Math.min to fabricate lower expenditure.
+      const settledCost = actualCost;
+
       await client.query(
-        "UPDATE ai_budget_reservations SET status = 'SETTLED', settled_amount_usd = $1, settled_at = now() WHERE id = $2",
-        [actualCost, reservationId]
+        `UPDATE ai_budget_reservations
+         SET status = 'SETTLED',
+             settled_amount_usd = $1,
+             actual_amount_usd = $2,
+             is_overage = $3,
+             overage_amount_usd = $4,
+             overage_reason = $5,
+             settled_at = now()
+         WHERE id = $6`,
+        [settledCost, actualCost, isOverage, overageAmount, overageReason, reservationId]
       );
       await client.query('COMMIT');
-      return { settledCost: actualCost };
+      return {
+        settledCost,
+        actualCost,
+        reservedCost: reservedCeiling,
+        isOverage,
+        overageAmount,
+        overageReason,
+      };
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {});
       throw err;
