@@ -85,21 +85,31 @@ export class AiBudgetGuard {
 
       const maxIn = params.maxInputTokens ?? 3000;
       const maxOut = params.maxOutputTokens ?? 1000;
-      const calculatedMax = maxIn * inputPrice + maxOut * outputPrice;
-      const reservedCost = Math.round(Math.min(modelMax, calculatedMax) * 1_000_000) / 1_000_000;
+      const calculatedMax = Math.round((maxIn * inputPrice + maxOut * outputPrice) * 1_000_000) / 1_000_000;
 
-      if (reservedCost > maxRequestLimit) {
+      // Fail-closed ceiling validation: potential request cost cannot exceed model ceiling or request budget cap.
+      // Never artificially depress the reservation below its potential cost via Math.min.
+      if (modelMax > 0 && calculatedMax > modelMax) {
         await client.query('ROLLBACK');
         return { allowed: false, reason: 'max_request_budget_exceeded' };
       }
 
-      // Query aggregate active reservations and settled spend
+      if (calculatedMax > maxRequestLimit) {
+        await client.query('ROLLBACK');
+        return { allowed: false, reason: 'max_request_budget_exceeded' };
+      }
+
+      const reservedCost = calculatedMax;
+
+      // Query aggregate active reservations and settled spend.
+      // Invariant: EXPIRED reservations reflect potential external charges (e.g. app crashed during upstream call)
+      // and must remain counted until audited/reconciled, preventing budget overspend across restarts.
       const spendRes = await client.query<{ daily_spend: string; monthly_spend: string }>(`
         SELECT
           COALESCE(SUM(COALESCE(settled_amount_usd, reserved_amount_usd))
-            FILTER (WHERE created_at >= date_trunc('day', now()) AND status IN ('RESERVED', 'SETTLED')), 0)::numeric AS daily_spend,
+            FILTER (WHERE created_at >= date_trunc('day', now()) AND status IN ('RESERVED', 'SETTLED', 'EXPIRED')), 0)::numeric AS daily_spend,
           COALESCE(SUM(COALESCE(settled_amount_usd, reserved_amount_usd))
-            FILTER (WHERE created_at >= date_trunc('month', now()) AND status IN ('RESERVED', 'SETTLED')), 0)::numeric AS monthly_spend
+            FILTER (WHERE created_at >= date_trunc('month', now()) AND status IN ('RESERVED', 'SETTLED', 'EXPIRED')), 0)::numeric AS monthly_spend
         FROM ai_budget_reservations
       `);
 
@@ -162,7 +172,8 @@ export class AiBudgetGuard {
       }
 
       const { model, reserved_amount_usd } = res.rows[0];
-      let actualCost = Number(reserved_amount_usd);
+      const reservedCeiling = Number(reserved_amount_usd);
+      let actualCost = reservedCeiling;
 
       if (
         typeof usage.inputTokens === 'number' &&
@@ -179,7 +190,9 @@ export class AiBudgetGuard {
           const inPrice = Number(pricingRes.rows[0].input_per_million_usd) / 1_000_000;
           const outPrice = Number(pricingRes.rows[0].output_per_million_usd) / 1_000_000;
           const computed = usage.inputTokens * inPrice + usage.outputTokens * outPrice;
-          actualCost = Math.round(computed * 1_000_000) / 1_000_000;
+          const roundedComputed = Math.round(computed * 1_000_000) / 1_000_000;
+          // Invariant: Settled amount must NEVER exceed the reserved ceiling
+          actualCost = Math.min(roundedComputed, reservedCeiling);
         }
       }
 
@@ -247,9 +260,9 @@ export class AiBudgetGuard {
       const result = await this.pool.query<{ daily_spend: string; monthly_spend: string }>(`
         SELECT
           COALESCE(SUM(COALESCE(settled_amount_usd, reserved_amount_usd))
-            FILTER (WHERE created_at >= date_trunc('day', now()) AND status IN ('RESERVED', 'SETTLED')), 0)::numeric AS daily_spend,
+            FILTER (WHERE created_at >= date_trunc('day', now()) AND status IN ('RESERVED', 'SETTLED', 'EXPIRED')), 0)::numeric AS daily_spend,
           COALESCE(SUM(COALESCE(settled_amount_usd, reserved_amount_usd))
-            FILTER (WHERE created_at >= date_trunc('month', now()) AND status IN ('RESERVED', 'SETTLED')), 0)::numeric AS monthly_spend
+            FILTER (WHERE created_at >= date_trunc('month', now()) AND status IN ('RESERVED', 'SETTLED', 'EXPIRED')), 0)::numeric AS monthly_spend
         FROM ai_budget_reservations
       `);
 

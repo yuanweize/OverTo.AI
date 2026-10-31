@@ -8,11 +8,11 @@ import { SharedRateLimiter } from '../shared-rate-limit';
 import { NextRequest } from 'next/server';
 
 const testDbUrl =
-  process.env.DATABASE_URL ||
+  process.env.TEST_DATABASE_URL ||
   process.env.SITE_CONFIG_TEST_DATABASE_URL ||
-  'postgresql://overto:Wa-tzj_YYF6SA4aCML1uN3_M8pzNuTY17unmIhqyyEtabTdg@127.0.0.1:5432/overto';
+  process.env.DATABASE_URL;
 
-describe('HTTP Header spoofing resistance & multi-instance shared rate limiting', () => {
+describe.skipIf(!testDbUrl)('HTTP Header spoofing resistance & multi-instance shared rate limiting', () => {
   let control: Pool;
   let pool: Pool;
   const schema = `identity_http_${randomUUID().replaceAll('-', '')}`;
@@ -101,5 +101,35 @@ describe('HTTP Header spoofing resistance & multi-instance shared rate limiting'
 
     expect(allowed.length).toBe(limit);
     expect(blocked.length).toBe(5);
+  });
+
+  it('proves that rotating X-Forwarded-For cannot bypass limits even when OVERTO_TRUST_PROXY=true if peer IP is unverifiable', async () => {
+    vi.stubEnv('OVERTO_TRUST_PROXY', 'true');
+    vi.stubEnv('OVERTO_RATE_LIMIT_SALT', 'security-hardening-salt-701');
+
+    const limiter = new SharedRateLimiter(pool);
+    const limit = 2;
+    const bucketPrefix = `unverifiable-proxy-test-${randomUUID()}`;
+
+    const makeDirectRequest = async (headers: Record<string, string>) => {
+      // Direct request with spoofed headers but without peer socket IP
+      const req = new NextRequest('http://localhost:3000/api/analyze', {
+        headers: new Headers(headers),
+      });
+      const clientId = extractClientIdentifier(req);
+      return limiter.consume([
+        { bucket: `${bucketPrefix}:${clientId}`, limit, windowSeconds: 60 },
+      ]);
+    };
+
+    // Requests 1 & 2 pass
+    const res1 = await makeDirectRequest({ 'x-forwarded-for': '1.2.3.4' });
+    const res2 = await makeDirectRequest({ 'x-forwarded-for': '5.6.7.8' });
+    expect(res1.allowed).toBe(true);
+    expect(res2.allowed).toBe(true);
+
+    // Request 3 with yet another fake IP — MUST BE BLOCKED!
+    const res3 = await makeDirectRequest({ 'x-forwarded-for': '9.10.11.12' });
+    expect(res3.allowed).toBe(false);
   });
 });

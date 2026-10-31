@@ -1,6 +1,6 @@
 {
   "name": "overto-ai",
-  "version": "7.0.1",
+  "version": "7.0.2",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1",
@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "migrate:local": "tsx scripts/migrate-auth.ts",
     "stripe:check": "tsx scripts/check-stripe-test.ts",
-    "docs:check": "tsx scripts/check-doc-links.ts"
+    "docs:check": "tsx scripts/check-doc-links.ts",
+    "secrets:check": "tsx scripts/scan-secrets.ts"
   },
   "dependencies": {
     "better-auth": "^1.7.14",

@@ -2,6 +2,16 @@
 
 All notable changes to OvěřTo.AI are documented in this file.
 
+## [7.0.2] - 2026-10-31
+
+### Security & Hardening
+- **Credential Rotation & Secret Exposure Eradication**: Fully rotated self-hosted PostgreSQL database credentials. Eradicated all hardcoded test connection strings across the codebase; integration tests now require dedicated, isolated test databases (`overto_test`) with strict identity checks and explicit failure modes.
+- **Automated Repository Secret Scanning**: Added `scripts/scan-secrets.ts` and integrated `npm run secrets:check` into GitHub Actions CI to continuously block commits containing hardcoded credentials or private keys.
+- **AI Budget Settlement Ceiling Invariant**: Fixed defect in `src/server/ai/budgets.ts` where potential costs exceeding model caps could cause budget overrun. Enforced strict request-level cost validation, full worst-case cost reservations, and invariant settlement ceiling (`actualCost <= reserved_amount_usd`). Expired/crashed reservations are preserved in spend calculations to prevent budget overruns during unexpected crashes.
+- **Trusted Proxy Trust Boundary Hardening**: Hardened `extractClientIdentifier` in `src/server/security/client-identity.ts` so that when `OVERTO_TRUST_PROXY=true` is enabled, unverifiable direct requests without socket peer IP or `OVERTO_TRUSTED_PROXY_SECRET` are never assumed to be trusted. All unverified requests safely map to a conservative shared bucket (`direct-untrusted-client`), preventing rate-limit evasion via header rotation.
+- **Account Export Browser Compatibility & Completeness**: Fixed bug where same-origin browser `fetch` calls to `/api/account/export` were blocked due to absent Origin headers on standard GET requests. Removed arbitrary `LIMIT 500` caps to provide complete data exports across projects, keys, ledger transactions, and usage events.
+- **Stripe Refund Mapping & Proportional Clawback**: Enhanced `src/app/api/local/stripe/webhook/route.ts` to reliably resolve invoice IDs on `charge.refunded` events via PaymentIntent and customer invoice lookups when not expanded on the charge object. Added proportional credit grant clawback for partial refunds.
+
 ## [7.0.1] - 2026-10-30
 
 ### Security & Hardening

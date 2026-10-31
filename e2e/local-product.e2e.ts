@@ -224,6 +224,30 @@ test('web analysis records usage against the selected project', async ({ page })
   const disabledWebhook = await page.request.post('/api/local/stripe/webhook', { data: '{}' }); expect(disabledWebhook.status()).toBe(503);
   await page.goto('/dashboard/settings'); await page.getByLabel('Jméno').fill('Nové jméno'); await page.getByRole('button', { name: 'Uložit profil' }).click();
   await expect(page.getByRole('status')).toContainText('Profil je uložen.'); await page.goto('/dashboard'); await expect(page.getByRole('heading', { name: 'Vítejte, Nové jméno.' })).toBeVisible();
+
+  // Real browser account export and deletion test
+  await page.goto('/dashboard/settings');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportovat data účtu' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^overto-account-export-.*\.json$/);
+
+  // Attempt account deletion with incorrect password
+  await page.getByPlaceholder(email).fill(email);
+  await page.getByPlaceholder('••••••••••••').fill('wrong-password-999');
+  await page.getByRole('button', { name: 'Trvale smazat účet' }).click();
+  await expect(page.getByRole('alert')).toContainText('Zadané heslo pro potvrzení smazání účtu není správné.');
+
+  // Delete account with correct password
+  await page.getByPlaceholder('••••••••••••').fill('project-test-password-42');
+  await page.getByRole('button', { name: 'Trvale smazat účet' }).click();
+  await expect(page).toHaveURL(/\/login/);
+
+  // Verify deleted user cannot log in
+  await page.getByLabel('E-mail').fill(email);
+  await page.getByLabel('Heslo').fill('project-test-password-42');
+  await page.getByRole('button', { name: 'Přihlásit se' }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
 });
 
 test('password reset invalidates existing session and old password', async ({ browser }) => {

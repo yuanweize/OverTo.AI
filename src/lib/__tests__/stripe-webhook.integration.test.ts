@@ -103,6 +103,41 @@ describe.skipIf(!connectionString)('Stripe test webhook with PostgreSQL and a si
     expect((await pool.query('SELECT count(*)::int AS n FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${invoice.id}`])).rows[0].n).toBe(0);
   });
 
+  it('handles partial refund and resolves invoice via fallback when charge.invoice is missing', async () => {
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
+
+    // Grant 10 credits under a new test invoice
+    const partialInvId = 'in_partial_refund_test';
+    await pool.query(
+      "INSERT INTO credit_grants (account_id, idempotency_key, category, amount, created_at) VALUES ($1, $2, 'SUBSCRIPTION', 10, now())",
+      [workspace, `stripe-test-invoice:${partialInvId}`]
+    );
+
+    // Mock customer invoices list fallback
+    (provider.invoices as unknown as { list: unknown }).list = vi.fn(async () => ({
+      data: [{ id: partialInvId, charge: 'ch_partial_1', customer }],
+    }));
+
+    // Send 50% partial refund without explicit invoice field on charge object
+    const res = await POST(request('evt_partial_refund', false, true, 'charge.refunded', {
+      object: {
+        id: 'ch_partial_1',
+        customer,
+        amount: 2000,
+        amount_refunded: 1000, // 50%
+      },
+    }));
+
+    expect(res.status).toBe(200);
+    const grantRow = await pool.query<{ amount: number }>(
+      'SELECT amount FROM credit_grants WHERE idempotency_key=$1',
+      [`stripe-test-invoice:${partialInvId}`]
+    );
+    expect(grantRow.rowCount).toBe(1);
+    // 10 credits - 50% (5 credits) = 5 credits remaining
+    expect(grantRow.rows[0].amount).toBe(5);
+  });
+
   it('ensures atomic rollback: no credits or events are committed if transaction fails midway', async () => {
     state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
     provider.subscriptions.retrieve = vi.fn(async () => ({ id: subscription, customer, livemode: false, status: 'active', cancel_at_period_end: false }));

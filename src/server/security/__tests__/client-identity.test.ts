@@ -106,11 +106,50 @@ describe('client identity & trusted proxy protection', () => {
       expect(id1).toBe(id2);
     });
 
-    it('accepts CF-Connecting-IP when peer is trusted proxy', () => {
+    it('rejects spoofed headers when OVERTO_TRUST_PROXY=true but peer IP is missing/unverifiable', () => {
       vi.stubEnv('OVERTO_TRUST_PROXY', 'true');
       vi.stubEnv('OVERTO_RATE_LIMIT_SALT', 'test-salt-secret-123');
 
-      const req = createMockRequest({ 'cf-connecting-ip': '198.51.100.77' });
+      // Attacker sends direct request with forged headers without verifiable peer socket
+      const req1 = createMockRequest({ 'x-forwarded-for': '198.51.100.1' });
+      const req2 = createMockRequest({ 'x-forwarded-for': '198.51.100.2' });
+      const reqCf = createMockRequest({ 'cf-connecting-ip': '203.0.113.5' });
+
+      const id1 = extractClientIdentifier(req1);
+      const id2 = extractClientIdentifier(req2);
+      const idCf = extractClientIdentifier(reqCf);
+
+      // Without a verified socket IP or proxy secret, all unauthenticated direct requests receive the same identity hash
+      expect(id1).toBe(id2);
+      expect(id1).toBe(idCf);
+    });
+
+    it('accepts proxy headers when authenticated via OVERTO_TRUSTED_PROXY_SECRET', () => {
+      vi.stubEnv('OVERTO_TRUST_PROXY', 'true');
+      vi.stubEnv('OVERTO_TRUSTED_PROXY_SECRET', 'proxy-secret-token-32bytes-long');
+      vi.stubEnv('OVERTO_RATE_LIMIT_SALT', 'test-salt-secret-123');
+
+      const req1 = createMockRequest({
+        'x-overto-proxy-secret': 'proxy-secret-token-32bytes-long',
+        'x-forwarded-for': '198.51.100.10',
+      });
+      const req2 = createMockRequest({
+        'x-overto-proxy-secret': 'proxy-secret-token-32bytes-long',
+        'x-forwarded-for': '198.51.100.20',
+      });
+
+      const id1 = extractClientIdentifier(req1);
+      const id2 = extractClientIdentifier(req2);
+
+      expect(id1).not.toBe(id2);
+    });
+
+    it('accepts CF-Connecting-IP when peer socket is trusted proxy', () => {
+      vi.stubEnv('OVERTO_TRUST_PROXY', 'true');
+      vi.stubEnv('OVERTO_TRUSTED_PROXIES', '127.0.0.1,loopback');
+      vi.stubEnv('OVERTO_RATE_LIMIT_SALT', 'test-salt-secret-123');
+
+      const req = createMockRequest({ 'cf-connecting-ip': '198.51.100.77' }, '127.0.0.1');
       const id = extractClientIdentifier(req);
       expect(id).toHaveLength(32);
     });

@@ -8,6 +8,21 @@ import { readRequestBody } from '@/lib/read-request-body';
 
 const id = (value: string | { id: string } | null | undefined) => typeof value === 'string' ? value : value?.id;
 
+interface StripeInvoiceRecord {
+  id: string;
+  charge?: string | { id: string };
+  payment_intent?: string | { id: string };
+}
+
+interface StripeExtendedClient {
+  paymentIntents?: {
+    retrieve(id: string): Promise<{ invoice?: string | { id: string } }>;
+  };
+  invoices: Stripe['invoices'] & {
+    list?(params: { customer: string; limit?: number }): Promise<{ data: StripeInvoiceRecord[] }>;
+  };
+}
+
 /** Test-only endpoint. Raw messages and signature headers are never logged or stored. */
 export async function POST(request: NextRequest) {
   const config = stripeTestConfig();
@@ -59,6 +74,27 @@ export async function POST(request: NextRequest) {
       customerId = id(charge.customer);
       refundInvoiceId = id((charge as unknown as { invoice?: string | { id: string } }).invoice);
       if (!customerId) throw new Error('INVALID_CHARGE');
+
+      // Robust invoice mapping: resolve invoice via payment_intent or customer invoice history if not expanded on charge
+      const paymentIntentId = id((charge as unknown as { payment_intent?: string | { id: string } }).payment_intent);
+      const extendedStripe = config.stripe as unknown as StripeExtendedClient;
+      if (!refundInvoiceId && paymentIntentId && extendedStripe.paymentIntents?.retrieve) {
+        try {
+          const pi = await extendedStripe.paymentIntents.retrieve(paymentIntentId);
+          refundInvoiceId = id(pi?.invoice);
+        } catch {
+          // Ignored, proceed to invoices.list fallback
+        }
+      }
+      if (!refundInvoiceId && customerId && extendedStripe.invoices.list) {
+        try {
+          const invList = await extendedStripe.invoices.list({ customer: customerId, limit: 5 });
+          const matched = (invList?.data || []).find((inv: StripeInvoiceRecord) => id(inv.charge) === charge.id || (paymentIntentId && id(inv.payment_intent) === paymentIntentId));
+          if (matched) refundInvoiceId = matched.id;
+        } catch {
+          // Proceed with best-effort mapping
+        }
+      }
     }
 
     const mapping = await pool.query<{ workspace_id: string }>('SELECT workspace_id FROM local_stripe_customers WHERE stripe_customer_id=$1', [customerId]);
@@ -89,7 +125,18 @@ export async function POST(request: NextRequest) {
         if (shouldGrantCredits && invoice) {
           await ledger.grantInTransaction(client, workspaceId, `stripe-test-invoice:${invoice.id}`, config.credits, 'SUBSCRIPTION');
         } else if (event.type === 'charge.refunded' && refundInvoiceId) {
-          await ledger.revokeInTransaction(client, workspaceId, `stripe-test-invoice:${refundInvoiceId}`);
+          const charge = event.data.object as Stripe.Charge;
+          const isPartial = typeof charge.amount === 'number' && typeof charge.amount_refunded === 'number' && charge.amount_refunded < charge.amount && charge.amount_refunded > 0;
+          if (isPartial) {
+            const refundRatio = charge.amount_refunded / charge.amount;
+            const clawbackCredits = Math.max(1, Math.round(config.credits * refundRatio));
+            await client.query(
+              'UPDATE credit_grants SET amount = GREATEST(0, amount - $1) WHERE account_id = $2 AND idempotency_key = $3',
+              [clawbackCredits, workspaceId, `stripe-test-invoice:${refundInvoiceId}`]
+            );
+          } else {
+            await ledger.revokeInTransaction(client, workspaceId, `stripe-test-invoice:${refundInvoiceId}`);
+          }
         }
 
         await client.query('INSERT INTO local_stripe_events (event_id,event_type) VALUES ($1,$2)', [event.id, event.type]);
