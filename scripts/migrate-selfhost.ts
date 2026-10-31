@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import { accountDeployment } from '../src/auth/deployment';
 import { migrateSchema } from './migrate-schema';
 
-loadEnvConfig(process.cwd(), true);
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== 'production');
 
 async function main() {
   const deployment = accountDeployment(process.env);
@@ -15,4 +15,4 @@ async function main() {
   } finally { await pool.end(); }
 }
 
-main().catch(error => { console.error(error instanceof Error && error.message === 'SELFHOST_CONFIG_REQUIRED' ? error.message : 'SELFHOST_MIGRATION_FAILED'); process.exitCode = 1; });
+main().catch(error => { console.error(error instanceof Error && error.message === 'SELFHOST_CONFIG_REQUIRED' ? error.message : `SELFHOST_MIGRATION_FAILED: ${error instanceof Error ? error.message : String(error)}`); process.exitCode = 1; });

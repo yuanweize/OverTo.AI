@@ -12,7 +12,7 @@ The public demo configuration (`render.yaml`) enforces the following security bo
 - **Zero Real Billing**: Real Stripe checkout is disabled (`STRIPE_SECRET_KEY=""`), preventing unintended customer payments.
 - **Client Identity & Anti-Abuse**: `OVERTO_TRUST_PROXY=true` preserves client IP hashing behind Cloudflare and Render proxies, preventing rate-limit circumvention while protecting user privacy.
 - **High-Entropy Generated Secrets**: Critical secrets (`OVERTO_AUTH_SECRET`, `OVERTO_CLIENT_IDENTITY_SALT`) are generated dynamically by Render on initialization and never committed to version control.
-- **EU Data Residency**: Deployed in the Frankfurt region (`frankfurt`), ensuring GDPR compliance and low latency for Czech and EU users.
+- **EU Data Residency & Privacy Posture**: Deployed in the Frankfurt region (`frankfurt`) for low network latency and alignment with European data residency preferences. Note: Hosting within the European Union supports data residency goals but does not automatically constitute full GDPR compliance, which also requires appropriate operational Data Processing Agreements (DPAs), privacy disclosures, and administrative data management procedures.
 
 ---
 
@@ -22,7 +22,8 @@ The repository root contains `render.yaml`, an official Render Blueprint:
 
 - **Web Service (`overto-ai-demo`)**: Runs the production Docker image built from `./Dockerfile` (Next.js 16 standalone output).
 - **PostgreSQL Database (`overto-db`)**: Managed PostgreSQL instance in the Frankfurt region. Connection strings (`DATABASE_URL` and `OVERTO_DATABASE_URL`) are automatically injected by Render.
-- **Continuous Deployment**: `autoDeploy: true` automatically triggers deployment when commits pass GitHub Actions CI on the `main` branch.
+- **Continuous Deployment**: `autoDeployTrigger: checksPass` automatically triggers deployment only after commits pass GitHub Actions CI checks on the `main` branch.
+- **Database Migrations**: Executed automatically during the pre-deploy phase (`preDeployCommand: node scripts/migrate.cjs`) as well as upon container boot via `docker-entrypoint.sh`.
 - **Health Verification**: Periodically monitors `/api/v1/health` to confirm container readiness before swapping traffic.
 
 ---
@@ -44,11 +45,11 @@ Fill in the uncommitted environment variables (`sync: false`) in the Render Web 
 | Variable | Recommended Value / Description |
 | :--- | :--- |
 | `BETTER_AUTH_URL` | Your full HTTPS domain (e.g. `https://demo.overto.ai`) |
-| `OVERTO_SMTP_HOST` | Production SMTP host (e.g. `smtp.resend.com` or `smtp.eu.mailgun.org`) |
-| `OVERTO_SMTP_PORT` | `587` |
-| `OVERTO_SMTP_USER` | SMTP username provided by your email provider |
-| `OVERTO_SMTP_PASSWORD` | SMTP password / API token |
-| `OVERTO_SMTP_FROM` | Verified sender address (e.g. `OvěřTo.AI <noreply@overto.ai>`) |
+| `SMTP_HOST` | Production SMTP host (e.g. `smtp.resend.com` or `smtp.eu.mailgun.org`) |
+| `SMTP_PORT` | `587` |
+| `SMTP_USER` | SMTP username provided by your email provider |
+| `SMTP_PASSWORD` | SMTP password / API token |
+| `SMTP_FROM` | Verified sender address (e.g. `OvěřTo.AI <noreply@overto.ai>`) |
 
 *(Never commit real SMTP passwords or API tokens to the GitHub repository).*
 
@@ -71,12 +72,14 @@ To attach a custom domain (e.g., `demo.overto.ai`):
 
 Once the web service and database are active and migrations have run:
 
-1. In the Render Dashboard, open the `overto-ai-demo` service.
-2. Navigate to **Shell** or use **One-Off Job**:
+1. Register a normal account on your deployment (`https://demo.overto.ai/signup`) and verify your email.
+2. In the Render Dashboard, open the `overto-ai-demo` service.
+3. Navigate to **Shell** or use **One-Off Job**:
    ```sh
-   ./node_modules/.bin/tsx scripts/bootstrap-admin.ts admin@yourdomain.com
+   node scripts/bootstrap-admin.cjs admin@yourdomain.com
    ```
-3. Copy the generated one-time administrative activation token to sign in.
+4. Output will confirm: `First platform administrator initialized. Bootstrap is now closed.`
+5. You can now access `/admin/operations` and `/admin/ai-studio`.
 
 ---
 
@@ -84,7 +87,7 @@ Once the web service and database are active and migrations have run:
 
 After deployment completes:
 
-1. **System Health**: Visit `https://<your-subdomain>/api/v1/health` $\rightarrow$ must return `{"status":"ok","service":"overto","schemaVersion":"1.0"}` with HTTP 200.
+1. **System Health**: Visit `https://<your-subdomain>/api/v1/health` $\rightarrow$ must return `{"status":"ok","service":"overto","schemaVersion":"1.0","auth":"selfhost"}` with HTTP 200.
 2. **Site Configuration**: Visit `https://<your-subdomain>/api/site` $\rightarrow$ must return localized branding configuration.
 3. **Rules Engine Verification**: Submit a sample Czech message on the home page $\rightarrow$ must produce immediate deterministic risk evaluation with redacting preview.
 4. **Rate Limiting**: Rapid consecutive requests should receive HTTP 429 with `Retry-After` headers without application crashes.

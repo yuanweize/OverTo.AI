@@ -7,7 +7,8 @@ services:
     plan: starter
     region: frankfurt
     branch: main
-    autoDeploy: true
+    autoDeployTrigger: checksPass
+    preDeployCommand: node scripts/migrate.cjs
     healthCheckPath: /api/v1/health
     envVars:
       - key: NODE_ENV
@@ -17,8 +18,10 @@ services:
       - key: BETTER_AUTH_URL
         sync: false # Set to your public domain (e.g. https://demo.overto.ai) in Render Dashboard
       - key: OVERTO_AUTH_LOCAL
+        value: 'false'
+      - key: OVERTO_SELF_HOSTED
         value: 'true'
-      - key: OVERTO_SELF_HOST
+      - key: OVERTO_REQUIRE_AUTH
         value: 'true'
       - key: OVERTO_AUTH_SECRET
         generateValue: true
@@ -43,16 +46,20 @@ services:
           name: overto-db
           property: connectionString
       # Production SMTP (set in Render Dashboard, never committed to Git)
-      - key: OVERTO_SMTP_HOST
+      - key: SMTP_HOST
         sync: false
-      - key: OVERTO_SMTP_PORT
+      - key: SMTP_PORT
         value: '587'
-      - key: OVERTO_SMTP_USER
+      - key: SMTP_USER
         sync: false
-      - key: OVERTO_SMTP_PASSWORD
+      - key: SMTP_PASSWORD
         sync: false
-      - key: OVERTO_SMTP_FROM
+      - key: SMTP_FROM
         sync: false
+      - key: SMTP_SECURE
+        value: 'false'
+      - key: SMTP_REQUIRE_TLS
+        value: 'true'
 
 databases:
   - name: overto-db
