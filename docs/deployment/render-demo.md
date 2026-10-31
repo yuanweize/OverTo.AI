@@ -60,7 +60,7 @@ To attach a custom domain (e.g., `demo.overto.ai`):
 1. In Render, navigate to **Settings** $\rightarrow$ **Custom Domains** $\rightarrow$ **Add Custom Domain**.
 2. Enter your chosen subdomain: `demo.overto.ai`.
 3. Render will provide a target CNAME (e.g., `overto-ai-demo.onrender.com`).
-4. In your [Cloudflare Dashboard](https://dash.cloudflare.com/):
+4. In your [Cloudflare](https://www.cloudflare.com/) dashboard:
    - Navigate to **DNS** $\rightarrow$ **Records**.
    - Add a `CNAME` record:
      - **Name**: `demo`
