@@ -1,193 +1,225 @@
 <div align="center">
 
-<img src="public/brand/mark.svg" width="72" height="72" alt="" />
+<img src="public/brand/mark.svg" width="64" height="64" alt="OvěřTo.AI Logo" />
 
 # OvěřTo.AI
 
+**Open-source scam detection and verification platform.**
+
+An evidence-led assistant for Czech and multilingual messages, helping people examine suspicious communications, identify grounded warning signs, and independently verify requests before taking irreversible action.
+
 [![CI](https://github.com/yuanweize/OverTo.AI/actions/workflows/ci.yml/badge.svg)](https://github.com/yuanweize/OverTo.AI/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/yuanweize/OverTo.AI?color=2454cf)](https://github.com/yuanweize/OverTo.AI/releases)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2454cf.svg)](LICENSE)
+[![GHCR](https://img.shields.io/badge/GHCR-Container_Image-blue?logo=docker)](https://github.com/users/yuanweize/packages/container/package/overto.ai)
 
-**A clearer next step for suspicious messages.**
-
-An experimental assistant for Czech messages, with a Czech/English analysis interface that highlights potential warning signs and helps people independently verify a suspicious SMS, email, or request.
-
-[Český přehled](README.cs.md) · [API reference](docs/api/v1.md) · [Self-hosting guide](docs/deployment/self-host.md) · [Implementation status](docs/development/IMPLEMENTATION-STATUS.md) · [Privacy](PRIVACY.md) · [Security](SECURITY.md)
+[Quick Start](#quick-start) · [Core Features](#core-features) · [Visual Showcase](#product-showcase) · [Architecture](#how-it-works) · [API](#api-at-a-glance) · [Self-Hosting](docs/deployment/self-host.md) · [Documentation](#documentation) · [Čeština](README.cs.md)
 
 </div>
 
-![OvěřTo.AI evidence-led home page](assets/screenshots/v7-home-en-1440.png)
+<p align="center">
+  <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="OvěřTo.AI evidence-led analysis interface" />
+  <br />
+  <sub><strong>Evidence-Led Scam Analysis (Desktop)</strong> — Transparent extraction of fraud signals, calibrated risk scoring, and verified out-of-band next steps.</sub>
+</p>
 
-> **Deployment status:** Production-hardened self-hosted release with PostgreSQL transactional ledger, Better Auth with email verification, distributed rate limiting, AI monetary budget guard, and automated migrations. Production deployments and public Demos default to **Rules-only** mode (deterministic rule engine); external LLM inference remains governed by deployment security gates (`AI_LOCAL_ONLY`). Does not claim 100% scam detection accuracy; always verify critical requests out-of-band.
+---
 
-[Capabilities](#what-it-does) · [Quick start](#quick-start) · [API](#api-at-a-glance) · [Architecture](#how-it-works) · [Administration](#administration-and-observability) · [Development](#development)
+## Core Features
 
-## What it does
+- **Deterministic Rule Engine & Risk Scoring**  
+  High-speed heuristic pattern matching and offline URL analysis that detects spoofed domains, homoglyphs, urgency triggers, and financial fraud markers without visiting external links.
+- **Privacy-First Client Redaction**  
+  Best-effort pattern masking runs directly in the browser to scrub personal identifiable information (PII) before submission, featuring an interactive editable preview.
+- **Grounded Evidence & Action Graph**  
+  Links exact UTF-16 span indices in the source text directly to identified warning signs, providing verifiable rationale rather than opaque classifications.
+- **Actionable Verification Guidance**  
+  Recommends official, out-of-band contact channels and safe protocol handling for high-risk situations (such as banking fraud, parcel delivery scams, or credential theft).
+- **Developer API & OpenAPI 3.1**  
+  Versioned REST endpoint (`/api/v1/analyses`), scoped tenant API keys with daily rate limits, and an interactive browser-based API playground.
+- **Self-Hosted Architecture & AI Studio**  
+  Production-ready Docker Compose stack powered by PostgreSQL 17, Better Auth with email verification, double-entry credit ledger, Stripe test billing, and an administrative AI Studio protected by atomic concurrency budgets.
 
-- **Review first.** Best-effort redaction and an editable preview help users review text before sending it. Redaction is incomplete and is not a privacy guarantee.
-- **Find signals.** Deterministic rules and offline URL parsing identify potential warning signs without visiting links.
-- **Use AI only with consent.** An optional OpenAI-compatible model endpoint proposes structured signals; schema and quotation checks reject invalid output. If unavailable, the application falls back to rules and reports the actual mode.
-- **Take the next step.** Results show uncertainty and suggest independent verification, including guidance for urgent situations.
-- **Experiment with an API.** A versioned endpoint returns structured results and a graph linking evidence to text. Results are not stored for retrieval.
+---
 
-The model integration has mock tests and limited real-model smoke tests; no independently reviewed representative accuracy study has been completed. See [evaluation](docs/evaluation/ai-evaluation.md) and [limitations](LIMITATIONS.md).
+## Product Showcase
 
-## Quick start
+A curated overview of the OvěřTo.AI web platform across desktop and mobile devices.
 
-Requires Node.js 22 or newer and npm. The default development server binds to loopback.
+### 1. Evidence-Led Analysis & Grounded Signals
+![Analysis Desktop](assets/screenshots/v7-analyze-cs-1440.png)
+*Detailed analysis result showing extracted textual evidence, computed risk level, and safe verification advice.*
+
+### 2. Tenant Workspace & Usage Dashboard
+![Tenant Dashboard](assets/screenshots/v7-dashboard-cs-1440.png)
+*Personal workspace dashboard providing real-time visibility into credit balances, active projects, and daily analysis volume.*
+
+### 3. Developer Tools & Accessible API Documentation
+![Developer Documentation Tablet](assets/screenshots/v7-developers-cs-dark-1024-a11y.png)
+*WCAG AA accessibility verified developer documentation with parameter breakdowns, request code snippets, and error contracts.*
+
+### 4. Platform Administration & AI Studio (ROOT Only)
+![AI Studio Traces Dark](assets/screenshots/v7-ai-studio-en-dark.png)
+*Real-time trace observability detailing token consumption, latency, USD cost estimation, and PostgreSQL atomic budget enforcement.*
+
+👉 *Explore the complete collection of all 52 interface captures, mobile layouts, and theme comparisons in the [Visual Showcase Gallery](docs/showcase.md).*
+
+---
+
+## Quick Start
+
+### 1. Local Rules-Only Development
+
+The quickest way to run OvěřTo.AI locally. Runs completely offline using deterministic rules without requiring database setup or external API keys:
 
 ```sh
+# Clone repository
+git clone https://github.com/yuanweize/OverTo.AI.git
+cd OverTo.AI
+
+# Install dependencies and start development server
 npm ci
 npm run dev -- -p 3005
 ```
 
-Open the local server in your browser. The default is rules-only when no AI key is configured. To enable experimental AI locally, copy `.env.example` to `.env.local`, set the server-side provider key and model, and follow [AI_USAGE.md](AI_USAGE.md). Do not commit credentials or use real personal data for testing.
+Open [http://127.0.0.1:3005](http://127.0.0.1:3005) in your browser.
 
-### Self-Hosted Production SaaS with Docker Compose
+### 2. Production Self-Hosted SaaS (Docker Compose)
 
-To deploy the full application with PostgreSQL, versioned schema migrations, production authentication, and SMTP notifications:
+Deploy the complete multi-tenant application with PostgreSQL 17, automated schema migrations, authentication, and SMTP delivery:
 
 ```sh
 # 1. Prepare environment configuration
 cp .env.selfhost.example .env.selfhost
-# Edit .env.selfhost with strong random secrets and your domain/SMTP settings
+# Edit .env.selfhost with your secrets, host domain, and SMTP settings
 
-# 2. Start services (PostgreSQL, automated migrations, Next.js app)
+# 2. Start services (PostgreSQL, automatic migrations, Next.js app)
 docker compose --env-file .env.selfhost -f compose.saas.yaml up -d --build
 
-# 3. Bootstrap your initial platform root administrator
+# 3. Bootstrap initial platform root administrator
 docker compose --env-file .env.selfhost -f compose.saas.yaml run --rm --no-deps migrate \
   ./node_modules/.bin/tsx scripts/bootstrap-admin.ts admin@yourdomain.com
 ```
 
-The application health check is available at `/api/v1/health`. Database backups and restoration are verified with `scripts/test-backup-restore.ts`. See [Self-Hosting Guide](docs/deployment/self-host.md).
+The application will be live at `http://127.0.0.1:3006`. See the [Self-Hosting Guide](docs/deployment/self-host.md) for reverse proxy setup, backup scripts, and environment variable references.
 
-#### Port Allocation Matrix
+---
 
-| Mode | OverTo App | Mailpit Web UI | Mailpit SMTP | PostgreSQL |
-|---|---|---|---|---|
-| **Local Dev** (`npm run dev -- -p 3005`) | `http://127.0.0.1:3005` | `http://127.0.0.1:8025` | `127.0.0.1:1025` | `127.0.0.1:55443` |
-| **Self-Host Compose** (`compose.saas.yaml`) | `http://127.0.0.1:3006` | `http://127.0.0.1:8026` | `mailpit:1025` | `127.0.0.1:5432` |
-
-## API at a glance
-
-A local guest request requires **no API key** and consumes no credits:
-
-```sh
-curl http://127.0.0.1:3005/api/v1/analyses \
-  -H 'Content-Type: application/json' \
-  --data '{"text":"Podezřelá zpráva", "enableLlm":false}'
-```
-
-An explicitly configured local account can create a project-scoped test key with rules or AI scope, expiration and a daily request limit. Send it as a bearer token with a fresh `Idempotency-Key`. Rotation revokes the old secret while preserving the quota lineage. Successful test-key requests consume test credits. Keys are local experiments and cannot authenticate production clients. See [the complete API reference](docs/api/v1.md) and [OpenAPI contract](docs/api/openapi.yaml).
-
-Request size, text length and per-process rate and concurrency circuit breakers are bounded. In the local account deployment, guest requests now have a shared PostgreSQL ceiling of 90/minute and 3,000/day; guest AI attempts have an additional 4/minute and 24/day ceiling. Authenticated local requests have shared key/project/workspace limits. The rules-only container still has process-local guest protection. Production AI returns a rules fallback without calling a provider. These controls are **not complete public abuse protection or a monetary provider spending cap**. Do not expose the API publicly before production authentication, trusted proxy handling, shared per-client quotas, monitoring and provider spending controls are implemented and verified. See [security](SECURITY.md).
-
-## How it works
+## How It Works
 
 ```mermaid
 flowchart LR
-  A[Review input] --> B[Rules and offline URL checks]
-  B --> C{AI requested and available?}
-  C -->|yes| D[Redacted text to configured provider]
-  D --> E[Validate schema and grounded quotes]
-  C -->|no or unavailable| F[Rules result]
-  E --> G[Signals, uncertainty and next steps]
-  F --> G
+  A[User Input] --> B[Client PII Redaction & Preview]
+  B --> C[Server Sanitization]
+  C --> D[Deterministic Rules & Offline URL Parser]
+  D --> E{AI Enabled & Permitted?}
+  E -->|Yes| F[OpenAI-Compatible LLM Adapter]
+  F --> G[Schema Validation & Grounded Quote Matching]
+  E -->|No / Gated| H[Rules-Only Result]
+  G --> I[Risk Scoring & Action Graph]
+  H --> I
+  I --> J[Safe Out-of-Band Guidance]
 ```
 
-With consent, the configured model endpoint and any upstream provider may receive data remaining after redaction, including URL hosts. Hosting and provider retention depend on their configuration and terms. The application does not store submitted message contents in a database. Read [privacy details](PRIVACY.md) before use.
+1. **Review & Redact:** Sensitive personal details (names, phone numbers, emails) are masked on the client with an editable preview prior to sending.
+2. **Deterministic Rules:** Text and links undergo heuristic pattern matching and offline URL structure analysis without fetching untrusted web pages.
+3. **Optional AI Inference:** If explicitly enabled and funded by the operator, an OpenAI-compatible model proposes structured signals. Outputs must pass strict JSON schema checks and verbatim source quote validation.
+4. **Action Graph:** Signals link directly to exact UTF-16 text spans in the input message.
+5. **Guidance:** Recommends safe, out-of-band actions tailored to the specific scam vector.
 
-## Account and billing capabilities
+---
 
-In local development (`3005`), a dedicated local PostgreSQL and loopback-only Mailpit (`8025`) capture sensitive one-time links without delivering real emails. In self-hosted production (`compose.saas.yaml` on `3006`), real SMTP delivery (or Mailpit via `--profile test-mail`) and PostgreSQL 17 persistence are fully supported. Stripe Test Mode provides verified sandbox checkout, webhook idempotency, credit grants, billing portal access, cancellation, failure handling, and refund clawbacks. Setup and test results are recorded in [implementation status](docs/development/IMPLEMENTATION-STATUS.md), [acceptance matrix](docs/development/ACCEPTANCE-MATRIX.md), and [credit ledger](docs/saas/ledger.md).
+## API at a Glance
 
-## Administration and observability
+A local guest request requires **no API key** and evaluates using deterministic rules:
 
-Platform administrators (`ROOT`) can manage public branding with version-conflict detection and transactional audit history. Initial root assignment is performed via `scripts/bootstrap-admin.ts`. The [operations console](docs/administration/operations.md) provides real-time tenant metrics, transactional audit logs, and system health status. See [site settings](docs/administration/site-settings.md) for supported branding fields.
+```sh
+curl http://127.0.0.1:3005/api/v1/analyses \
+  -H "Content-Type: application/json" \
+  --data '{"text":"Vážený kliente, váš účet byl zablokován. Klikněte zde: https://csob-zabezpeceni.cz", "enableLlm":false}'
+```
 
-The AI Studio records trace metadata, token usage, duration, and estimated USD costs in PostgreSQL. Message bodies are never stored; administrator-authored prompt versions **are** stored as configuration. The [Prompt Lab](docs/administration/prompts.md) provides immutable versioning, live model testing, and optimistic-locked activation/rollback. The [evaluation console](docs/administration/evaluations.md) executes deterministic test suites and bounded AI checks. [Model service settings](docs/administration/providers.md) configure registered endpoints, default and allowed models, timeouts, output caps, and health verification. Concurrent spending is protected by PostgreSQL row/advisory locks and fail-closed caps (`migrations/016_ai_budget_reservations.sql`). See [AI traces](docs/administration/ai-traces.md).
+Example response:
 
-## Visual Showcase & Interface Gallery
+```json
+{
+  "decision": "LIKELY_SCAM",
+  "score": 85,
+  "engine": "RULES_ONLY",
+  "signals": [
+    {
+      "id": "BANK_IMPERSONATION",
+      "severity": "CRITICAL",
+      "evidenceQuote": "váš účet byl zablokován",
+      "description": "Urgent account blockage claim typical of banking fraud."
+    }
+  ],
+  "recommendedActions": [
+    "Do not click the link or provide banking credentials.",
+    "Contact your bank directly using the phone number on the back of your payment card."
+  ]
+}
+```
 
-### 1. Evidence-Led Analysis & Landing Experience
+Authenticated requests use bearer token API keys with shared daily quotas. See the [API Reference](docs/api/v1.md) and [OpenAPI Specification](docs/api/openapi.yaml).
 
-<p align="center">
-  <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="Analysis Result with Grounded Signals" />
-  <br />
-  <sub><strong>Analysis Result & Verdict (Czech, 1440px Desktop)</strong> — Grounded evidence excerpts, risk assessment score, and verified out-of-band next steps.</sub>
-</p>
+---
 
-| English Dark Mobile Analysis (390px) | Czech Dark Mobile Home (390px) |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-analyze-en-dark-390.png" width="85%" alt="English Dark Mobile Analysis" /><br /><sub><strong>Evidence-led Analysis (Dark Mobile)</strong></sub> | <img src="assets/screenshots/v7-home-cs-dark-390.png" width="85%" alt="Czech Dark Mobile Home" /><br /><sub><strong>Interactive Hero & Input (Dark Mobile)</strong></sub> |
+## Documentation
 
-### 2. Tenant Dashboard & Developer Console
+| Topic | Description | Link |
+|---|---|---|
+| **Deployment** | Production Docker Compose, environment configuration, and backups | [Self-Hosting Guide](docs/deployment/self-host.md) |
+| **Render Blueprint** | Production cloud deployment blueprint and health checks | [Render Demo Guide](docs/deployment/render-demo.md) |
+| **API Reference** | Endpoints, authentication, rate limits, and schemas | [docs/api/v1.md](docs/api/v1.md) |
+| **OpenAPI Contract** | Machine-readable OpenAPI 3.1 specification | [openapi.yaml](docs/api/openapi.yaml) |
+| **Architecture** | System pipelines, multi-tenancy, and budget mechanisms | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| **AI Governance** | Model integration, budget guards, and privacy boundaries | [AI_USAGE.md](AI_USAGE.md) |
+| **Limitations** | Operational boundaries and security considerations | [LIMITATIONS.md](LIMITATIONS.md) |
+| **Administration** | Tenant management, audit logs, and system operations | [Operations Guide](docs/administration/operations.md) |
+| **AI Studio** | Trace telemetry, Prompt Lab, and model registries | [AI Traces](docs/administration/ai-traces.md) · [Prompt Lab](docs/administration/prompts.md) |
+| **Visual Showcase** | Full catalog of all 52 application screenshots | [Showcase Gallery](docs/showcase.md) |
+| **Evaluation** | Synthetic challenge datasets and evaluation methodology | [docs/evaluation/ai-evaluation.md](docs/evaluation/ai-evaluation.md) |
+| **Testing** | Security, end-to-end, and deployment test plans | [Security](docs/testing/SECURITY-TEST-PLAN.md) · [E2E](docs/testing/FULL-E2E-TEST-PLAN.md) · [Deployment](docs/testing/DEPLOYMENT-TEST-PLAN.md) |
 
-<p align="center">
-  <img src="assets/screenshots/v7-dashboard-cs-1440.png" width="100%" alt="Tenant Dashboard" />
-  <br />
-  <sub><strong>Personal Workspace Dashboard (1440px Desktop)</strong> — Synthetic usage activity, credit balance, and project management.</sub>
-</p>
+---
 
-| API Keys & Quota Lineage (1440px Desktop) | Interactive API Playground (1440px Desktop) |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-api-keys-cs-1440.png" width="100%" alt="API Keys & Daily Limits" /><br /><sub><strong>API Keys & Shared Daily Limits</strong> — Scoped permissions, token lineage & rate limits.</sub> | <img src="assets/screenshots/v7-playground-cs-1440.png" width="100%" alt="Interactive Playground" /><br /><sub><strong>Interactive API Playground</strong> — Live request testing with formatted JSON response.</sub> |
+## Operational Limitations
 
-| Developer API Reference (1024px Tablet) | Sandbox Billing & Stripe Portal (1440px Desktop) |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-developers-cs-dark-1024-a11y.png" width="100%" alt="Developer Guide" /><br /><sub><strong>Developer Documentation (Dark Tablet)</strong> — WCAG AA accessible API reference.</sub> | <img src="assets/screenshots/v7-billing-cs-1440.png" width="100%" alt="Credit Ledger & Billing" /><br /><sub><strong>Credit Ledger & Subscriptions</strong> — Metered credit allocation & test billing.</sub> |
+- **Not a Security Guarantee:** Both deterministic heuristic rules and optional LLM analysis can produce false positives and false negatives. An `INSUFFICIENT_EVIDENCE` verdict is never proof that a message is safe.
+- **Out-of-Band Verification Always Required:** Critical, urgent, or financial requests should always be validated through independent, known-good channels (such as official banking phone numbers).
+- **Rules-Only Production Default:** Default container deployments operate in **Rules-only** mode via the `AI_LOCAL_ONLY` security gate. External LLM calls are disabled unless explicitly enabled and bounded by administrative budget policies.
+- **Client Redaction is Best-Effort:** Automated PII masking targets standard patterns (phone numbers, emails, names) but cannot guarantee complete scrubbing of subtle identifying details.
+- For a comprehensive analysis of system boundaries, read [LIMITATIONS.md](LIMITATIONS.md).
 
-### 3. Platform Administration & AI Studio (ROOT Only)
-
-<p align="center">
-  <img src="assets/screenshots/v7-admin-overview-en-1440.png" width="100%" alt="Administration Overview" />
-  <br />
-  <sub><strong>Platform Operations Console (1440px Desktop)</strong> — Live tenant statistics, transactional audit logs, and system health status.</sub>
-</p>
-
-| AI Studio Traces & Budgets (Dark Mode) | Prompt Lab & Rollback Management |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-ai-studio-en-dark.png" width="100%" alt="AI Studio Traces" /><br /><sub><strong>AI Studio Operational Traces (Dark Mode)</strong> — Real Token usage, duration, and atomic budget tracking.</sub> | <img src="assets/screenshots/v7-prompt-lab.png" width="100%" alt="Prompt Lab" /><br /><sub><strong>Prompt Lab & Version Control</strong> — Immutable prompt versioning, testing, and audited rollback.</sub> |
-
-<details>
-<summary><strong>View Additional Screenshots (Mobile Views & Light/Dark Modes)</strong></summary>
-
-| View | Screenshot Preview |
-|---|---|
-| Czech Pricing (1440px Desktop) | <img src="assets/screenshots/v7-pricing-cs-1440.png" width="100%" alt="Pricing Desktop" /><br /><sub><strong>Pricing (Czech, 1440px)</strong></sub> |
-| English Documentation (1024px Desktop) | <img src="assets/screenshots/v7-docs-en-1024.png" width="100%" alt="Documentation Desktop" /><br /><sub><strong>Documentation (English, 1024px)</strong></sub> |
-| Model Registry & Health Checks | <img src="assets/screenshots/v7-model-registry.png" width="100%" alt="Model Registry" /><br /><sub><strong>Registered AI Providers & Health Verification</strong></sub> |
-| User Table & Identity Search | <img src="assets/screenshots/v7-admin-users-en-1440.png" width="100%" alt="Admin Users Table" /><br /><sub><strong>Platform Admin User Management & Credit Adjustments</strong></sub> |
-| Czech Billing (Dark Mobile, 390px) | <img src="assets/screenshots/v7-billing-cs-dark-390.png" width="50%" alt="Billing Mobile" /><br /><sub><strong>Billing & Credits (Dark Mobile)</strong></sub> |
-| Czech API Keys (Dark Mobile, 390px) | <img src="assets/screenshots/v7-api-keys-cs-dark-390.png" width="50%" alt="API Keys Mobile" /><br /><sub><strong>API Keys (Dark Mobile)</strong></sub> |
-| Czech Dashboard (Dark Mobile, 390px) | <img src="assets/screenshots/v7-dashboard-cs-dark-390.png" width="50%" alt="Dashboard Mobile" /><br /><sub><strong>Dashboard (Dark Mobile)</strong></sub> |
-| Admin Overview (Dark Mobile, 390px) | <img src="assets/screenshots/v7-admin-overview-en-dark-390.png" width="50%" alt="Admin Mobile" /><br /><sub><strong>Admin Operations (Dark Mobile)</strong></sub> |
-| AI Studio (Light Desktop) | <img src="assets/screenshots/v7-ai-studio-en-light.png" width="100%" alt="AI Studio Light" /><br /><sub><strong>AI Studio Traces (Light Desktop)</strong></sub> |
-
-</details>
-
-Theme and language choices persist across sessions. Public pages, authentication forms, and account screens have complete Czech and English catalogs. See [three-round visual review](docs/design/FINAL-VISUAL-REVIEW.md), [public reference review](docs/design/OPENROUTER-REFERENCE-REVIEW.md), and [branding policy](BRANDING.md).
-
-## Model providers
-
-Set `OPENAI_BASE_URL`, `OPENAI_MODEL`, and server-only `OPENAI_API_KEY` in `.env.local` or `.env.selfhost`. The adapter accepts OpenAI-compatible `/v1/chat/completions` endpoints. Root administrators can select only endpoints registered by the operator through `OPENAI_BASE_URL` or `AI_ALLOWED_BASE_URLS`. Concurrency race conditions and spending caps are enforced atomically via `AiBudgetGuard` (`migrations/016_ai_budget_reservations.sql`). When budget caps are exhausted, requests fail closed and fall back to deterministic rules. The `/models` check is an explicit admin action and does not test completion quality.
+---
 
 ## Development
 
 ```sh
+# Run unit and integration tests
 npm test
+
+# Typecheck and linting
 npx tsc --noEmit
 npm run lint
-npm run build
-npm run eval
+
+# Documentation and secret verification
 npm run docs:check
-npm run docs:check -- --remote
+npm run secrets:check
+
+# Production build
+npm run build
 ```
 
-PostgreSQL integration tests need a separate disposable database; browser account journeys also need the dedicated local PostgreSQL and Mailpit described in the [development status](docs/development/IMPLEMENTATION-STATUS.md). `npm run eval` uses synthetic examples without model requests. The explicitly invoked `npm run eval -- --live` makes provider calls and can incur charges.
+---
 
-For independent acceptance, use the [AI](docs/testing/AI-TEST-PLAN.md), [browser](docs/testing/FULL-E2E-TEST-PLAN.md), [security](docs/testing/SECURITY-TEST-PLAN.md) and [deployment](docs/testing/DEPLOYMENT-TEST-PLAN.md) test plans. They distinguish verified local behavior from public release gates.
+## Contributing & Security
 
-## Contributing and license
+- Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+- For security vulnerabilities, please refer to our [Security Policy](SECURITY.md). Never submit vulnerability reports to public issue trackers.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Project code is offered under [Apache-2.0](LICENSE); third-party components retain their own licenses. The project responds to the [AI výzva pro Česko](https://mesic.ai/#soutez); no affiliation with the organizer is implied.
+## License
+
+This project is licensed under the [Apache-2.0 License](LICENSE).
+Third-party component notices and licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

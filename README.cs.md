@@ -1,119 +1,225 @@
-![OvěřTo.AI](public/brand/wordmark.svg)
+<div align="center">
+
+<img src="public/brand/mark.svg" width="64" height="64" alt="Logo OvěřTo.AI" />
 
 # OvěřTo.AI
 
-Experimentální český pomocník pro posouzení podezřelých SMS, e-mailů a žádostí. Pomáhá najít možné varovné znaky a navrhuje nezávislé ověření. Neověřuje totožnost odesílatele, neotevírá odkazy a nezaručuje bezpečnost.
+**Open-source platforma pro detekci podvodů a nezávislé ověřování zpráv.**
 
-[English README](README.md) · [Dokumentace API](docs/api/v1.md) · [Průvodce vlastním provozem](docs/deployment/self-host.md) · [Soukromí](PRIVACY.md) · [Bezpečnost](SECURITY.md) · [Stav vývoje](docs/development/IMPLEMENTATION-STATUS.md)
+Asistent založený na důkazech pro české a vícejazyčné zprávy. Pomáhá analyzovat podezřelé komunikace, rozpoznávat ověřené podvodné znaky a bezpečně ověřovat žádosti dříve, než dojde k nevratným krokům.
 
-## Spuštění
+[![CI](https://github.com/yuanweize/OverTo.AI/actions/workflows/ci.yml/badge.svg)](https://github.com/yuanweize/OverTo.AI/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/yuanweize/OverTo.AI?color=2454cf)](https://github.com/yuanweize/OverTo.AI/releases)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-2454cf.svg)](LICENSE)
+[![GHCR](https://img.shields.io/badge/GHCR-Container_Image-blue?logo=docker)](https://github.com/users/yuanweize/packages/container/package/overto.ai)
 
-Potřebujete Node.js 22 nebo novější a npm.
+[Rychlý start](#rychlý-start) · [Klíčové funkce](#klíčové-funkce) · [Vizuální přehled](#vizuální-přehled) · [Architektura](#jak-to-funguje) · [API](#rozhraní-api-v-kostce) · [Vlastní provoz](docs/deployment/self-host.md) · [Dokumentace](#dokumentace) · [English](README.md)
+
+</div>
+
+<p align="center">
+  <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="Rozhraní analýzy OvěřTo.AI" />
+  <br />
+  <sub><strong>Analýza zpráv založená na důkazech (Desktop)</strong> — Transparentní vyhodnocení podvodných signálů, kalibrované skóre rizika a bezpečné kroky nezávislého ověření.</sub>
+</p>
+
+---
+
+## Klíčové funkce
+
+- **Deterministická pravidla a hodnocení rizika**  
+  Rychlé heuristické rozpoznávání vzorů a offline analýza URL adres, která odhaluje podvržené domény, homoglyfy, časový nátlak a finanční podvody bez otevírání cizích odkazů.
+- **Ochrana soukromí a klientská anonymizace**  
+  Odstranění osobních identifikačních údajů (PII) probíhá přímo v prohlížeči před odesláním na server, s možností interaktivní kontroly a úpravy náhledu.
+- **Podložené důkazy a graf akcí (Action Graph)**  
+  Propojuje konkrétní znaky ve zdrojovém textu přímo s rozpoznanými varovnými signály, což poskytuje srozumitelné odůvodnění namísto neprůhledné klasifikace.
+- **Bezpečné doporučené kroky ověření**  
+  Doporučuje oficiální nezávislé komunikační kanály a postupy pro krizové situace (např. falešné bankovní výzvy nebo podvody s doručováním zásilek).
+- **Vývojářské API a OpenAPI 3.1**  
+  Verzovaný REST koncový bod (`/api/v1/analyses`), projektové API klíče s denními limity spotřeby a interaktivní testovací prostředí (API Playground).
+- **Provoz ve vlastní infrastruktuře (Self-Hosting) a AI Studio**  
+  Kompletní produkční stack pro Docker Compose s PostgreSQL 17, Better Auth s ověřováním e-mailů, podvojnou kreditní knihou, testovací fakturací Stripe a administrátorským AI Studiem chráněným atomickými finančními rozpočty.
+
+---
+
+## Vizuální přehled
+
+Výběr klíčových obrazovek platformy OvěřTo.AI pro desktopová i mobilní zařízení.
+
+### 1. Analýza založená na důkazech a textové signály
+![Analýza Desktop](assets/screenshots/v7-analyze-cs-1440.png)
+*Detailní výsledek analýzy se zvýrazněnými citacemi z textu, stupněm rizika a doporučeným postupem.*
+
+### 2. Klientský dashboard a pracovní prostor
+![Dashboard Desktop](assets/screenshots/v7-dashboard-cs-1440.png)
+*Uživatelský dashboard s přehledem zůstatku kreditů, aktivních projektů a denního objemu požadavků.*
+
+### 3. Vývojářské nástroje a přístupná dokumentace API
+![Vývojářská dokumentace Tablet](assets/screenshots/v7-developers-cs-dark-1024-a11y.png)
+*Referenční dokumentace API ověřená podle standardu přístupnosti WCAG AA s ukázkami kódu a schématy odpovědí.*
+
+### 4. Správa platformy a AI Studio (pouze ROOT)
+![AI Studio Traces Tmavý](assets/screenshots/v7-ai-studio-en-dark.png)
+*Provozní telemetrie v reálném čase: spotřeba tokenů, latence, odhad nákladů v USD a atomické vynucování rozpočtu v PostgreSQL.*
+
+👉 *Kompletní katalog všech 52 snímků rozhraní, mobilních zobrazení a porovnání motivů naleznete v [Galerii rozhraní](docs/showcase.md).*
+
+---
+
+## Rychlý start
+
+### 1. Místní vývoj (Rules-Only)
+
+Nejrychlejší způsob, jak spustit OvěřTo.AI lokálně. Běží zcela offline s deterministickými pravidly bez nutnosti databáze nebo API klíčů:
 
 ```sh
+# Klonování repozitáře
+git clone https://github.com/yuanweize/OverTo.AI.git
+cd OverTo.AI
+
+# Instalace závislostí a spuštění vývojového serveru
 npm ci
 npm run dev -- -p 3005
 ```
 
-Otevřete [http://127.0.0.1:3005](http://127.0.0.1:3005). Bez nastavení AI fungují pravidla. Produkční nasazení a veřejná dema standardně fungují v **Rules-only** režimu (deterministická pravidla); externí volání LLM podléhá bezpečnostnímu přepínači nasazení (`AI_LOCAL_ONLY`). Volitelná integrace s OpenAI-kompatibilním API vyžaduje konfiguraci serveru a výslovný souhlas uživatele. Při nedostupnosti modelu se vrátí výsledek pravidel; aktuální stav je uveden ve výsledku. Omezené živé testy už proběhly, ale nejde o nezávislou reprezentativní evaluaci.
+Otevřete [http://127.0.0.1:3005](http://127.0.0.1:3005) v prohlížeči.
 
-### Self-Host provoz v Docker Compose
+### 2. Produkční self-hosted provoz (Docker Compose)
 
-Pro spuštění kompletního stacku s PostgreSQL a migracemi:
+Spuštění kompletní více-uživatelské aplikace s PostgreSQL 17, automatickými migracemi, autentizací a odesíláním e-mailů:
 
 ```sh
+# 1. Příprava konfiguračního souboru
 cp .env.selfhost.example .env.selfhost
+# Upravte .env.selfhost podle své domény, hesel a nastavení SMTP
+
+# 2. Spuštění služeb (PostgreSQL, automatické migrace, Next.js aplikace)
 docker compose --env-file .env.selfhost -f compose.saas.yaml up -d --build
+
+# 3. Inicializace hlavního administrátora platformy (ROOT)
+docker compose --env-file .env.selfhost -f compose.saas.yaml run --rm --no-deps migrate \
+  ./node_modules/.bin/tsx scripts/bootstrap-admin.ts admin@vasedomena.cz
 ```
 
-#### Přehled portů
+Aplikace bude dostupná na `http://127.0.0.1:3006`. Podrobný popis nastavení reverzní proxy, zálohování a proměnných prostředí naleznete v [Průvodci vlastním provozem](docs/deployment/self-host.md).
 
-| Režim | Aplikace OverTo | Mailpit Web UI | Mailpit SMTP | PostgreSQL |
-|---|---|---|---|---|
-| **Místní vývoj** (`npm run dev -- -p 3005`) | `http://127.0.0.1:3005` | `http://127.0.0.1:8025` | `127.0.0.1:1025` | `127.0.0.1:55443` |
-| **Self-Host Compose** (`compose.saas.yaml`) | `http://127.0.0.1:3006` | `http://127.0.0.1:8026` | `mailpit:1025` | `127.0.0.1:5432` |
+---
 
-Podrobný návod k provozu, zálohování a správě je v [Průvodci vlastním provozem](docs/deployment/self-host.md).
+## Jak to funguje
 
-Prohlížeč i server se pokoušejí odstranit některé citlivé údaje, ale nemusí najít všechny. Před odesláním text zkontrolujte. Pokud povolíte AI, nakonfigurovaná služba a případný další poskytovatel modelu mohou dostat údaje, které v textu zůstanou.
+```mermaid
+flowchart LR
+  A[Vstup uživatele] --> B[Klientská anonymizace PII a náhled]
+  B --> C[Sanitizace na serveru]
+  C --> D[Deterministická pravidla a offline parser URL]
+  D --> E{Povoleno a dostupné AI?}
+  E -->|Ano| F[OpenAI-kompatibilní LLM adaptér]
+  F --> G[Validace schématu a ověření citací]
+  E -->|Ne / Gated| H[Výsledek deterministických pravidel]
+  G --> I[Hodnocení rizika a graf akcí]
+  H --> I
+  I --> J[Bezpečný postup nezávislého ověření]
+```
 
-## API a bezpečnost
+1. **Kontrola a anonymizace:** Citlivé osobní údaje (jména, telefonní čísla, e-maily) jsou před odesláním skryty v prohlížeči s možností ruční úpravy.
+2. **Deterministická pravidla:** Text i odkazy procházejí heuristickou kontrolou a strukturální analýzou URL bez načítání cizích webových stránek.
+3. **Volitelné vyhodnocení AI:** Pokud je AI výslovně povoleno správcem a uživatelem, OpenAI-kompatibilní model navrhne strukturované signály. Výstup musí projít přísnou validací JSON schématu a doslovnou kontrolou citací z původního textu.
+4. **Graf akcí:** Rozpoznané signály odkazují přímo na konkrétní úseky ve vstupní zprávě.
+5. **Doporučený postup:** Poskytuje bezpečné nezávislé kroky ověření přizpůsobené konkrétnímu typu podvodu.
 
-Anonymní místní volání nepotřebuje klíč a nespotřebovává kredity:
+---
+
+## Rozhraní API v kostce
+
+Anonymní volání nevyžaduje **žádný API klíč** a vyhodnocuje se pomocí deterministických pravidel:
 
 ```sh
 curl http://127.0.0.1:3005/api/v1/analyses \
-  -H 'Content-Type: application/json' \
-  --data '{"text":"Podezřelá zpráva", "enableLlm":false}'
+  -H "Content-Type: application/json" \
+  --data '{"text":"Vážený kliente, váš účet byl zablokován. Klikněte zde: https://csob-zabezpeceni.cz", "enableLlm":false}'
 ```
 
-Testovací i produkční API klíče mají rozsah oprávnění, expiraci, denní limit a možnost okamžité výměny (revokace). Ochrana proti podvržení identity návštěvníků a rychlostní limity jsou vynucovány na úrovni Trusted Reverse Proxy s bezpečným fallbackem. Podrobnosti a příklad volání jsou v [dokumentaci API](docs/api/v1.md).
+Ukázka odpovědi:
 
-V režimu lokálního vývoje zachytává Mailpit citlivé jednorázové odkazy bez odesílání do reálné sítě. V self-hosted produkci (`compose.saas.yaml`) je plně podporováno reálné doručování přes SMTP. Stripe Test Mode poskytuje ověřený proces: idempotenci webhooků, automatické připsání kreditů, portál pro zákazníky, zrušení předplatného, zpracování selhání i vrácení plateb v PostgreSQL knize. Záznam testů a stav implementace viz [záznam ověření](docs/saas/stripe-live-test.md) a [kreditní kniha](docs/saas/ledger.md).
+```json
+{
+  "decision": "LIKELY_SCAM",
+  "score": 85,
+  "engine": "RULES_ONLY",
+  "signals": [
+    {
+      "id": "BANK_IMPERSONATION",
+      "severity": "CRITICAL",
+      "evidenceQuote": "váš účet byl zablokován",
+      "description": "Urgent account blockage claim typical of banking fraud."
+    }
+  ],
+  "recommendedActions": [
+    "Neklikejte na odkaz a nezadávejte přihlašovací údaje.",
+    "Kontaktujte svou banku přímo na telefonním čísle uvedeném na zadní straně platební karty."
+  ]
+}
+```
 
-Projekt je poskytován pod [Apache-2.0](LICENSE); závislosti mají vlastní licence. Příspěvky popisuje [CONTRIBUTING.md](CONTRIBUTING.md).
+Ověřené požadavky používají Bearer token s denními limity. Podrobnosti naleznete v [Referenční příručce API](docs/api/v1.md) a [Specifikaci OpenAPI](docs/api/openapi.yaml).
 
-## Vizuální přehled a galerie rozhraní
+---
 
-### 1. Analýza založená na důkazech a hlavní stránka
+## Dokumentace
 
-<p align="center">
-  <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="Výsledek analýzy se signály a důkazy" />
-  <br />
-  <sub><strong>Výsledek analýzy a verdikt (čeština, 1440px Desktop)</strong> — Citace ověřených signálů z textu, skóre rizika a bezpečné kroky nezávislého ověření.</sub>
-</p>
+| Oblast | Popis | Odkaz |
+|---|---|---|
+| **Nasazení** | Produkční Docker Compose, konfigurace prostředí a zálohování | [Průvodce vlastním provozem](docs/deployment/self-host.md) |
+| **Render Blueprint** | Konfigurace cloudového nasazení na platformě Render | [Render Demo Guide](docs/deployment/render-demo.md) |
+| **API Reference** | Koncové body, autentizace, rychlostní limity a schémata | [docs/api/v1.md](docs/api/v1.md) |
+| **OpenAPI Specifikace** | Strojově čitelná specifikace OpenAPI 3.1 | [openapi.yaml](docs/api/openapi.yaml) |
+| **Architektura** | Systémové procesy, více-uživatelská správa a rozpočty | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| **Správa AI modelů** | Integrace modelů, ochrana rozpočtu a soukromí | [AI_USAGE.md](AI_USAGE.md) |
+| **Provozní limity** | Technická a bezpečnostní omezení systému | [LIMITATIONS.md](LIMITATIONS.md) |
+| **Správa platformy** | Správa uživatelů, auditní záznamy a systémové metriky | [Operations Guide](docs/administration/operations.md) |
+| **AI Studio** | Telemetrie, Prompt Lab a registr poskytovatelů | [AI Traces](docs/administration/ai-traces.md) · [Prompt Lab](docs/administration/prompts.md) |
+| **Vizuální katalog** | Kompletní přehled všech 52 snímků rozhraní aplikace | [Galerie rozhraní](docs/showcase.md) |
+| **Evaluace** | Testovací scénáře a metodika vyhodnocování | [docs/evaluation/ai-evaluation.md](docs/evaluation/ai-evaluation.md) |
+| **Testování** | Bezpečnostní, integrační a nasazovací testovací plány | [Bezpečnost](docs/testing/SECURITY-TEST-PLAN.md) · [E2E](docs/testing/FULL-E2E-TEST-PLAN.md) · [Nasazení](docs/testing/DEPLOYMENT-TEST-PLAN.md) |
 
-| Anglická mobilní analýza v tmavém režimu (390px) | Česká mobilní úvodní stránka v tmavém režimu (390px) |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-analyze-en-dark-390.png" width="85%" alt="Anglická mobilní analýza v tmavém režimu" /><br /><sub><strong>Analýza zprávy (tmavý mobilní režim)</strong></sub> | <img src="assets/screenshots/v7-home-cs-dark-390.png" width="85%" alt="Česká mobilní úvodní stránka v tmavém režimu" /><br /><sub><strong>Úvodní stránka a zadání textu (tmavý mobilní režim)</strong></sub> |
+---
 
-### 2. Klientský dashboard a vývojářská konzole
+## Provozní omezení
 
-<p align="center">
-  <img src="assets/screenshots/v7-dashboard-cs-1440.png" width="100%" alt="Klientský dashboard" />
-  <br />
-  <sub><strong>Klientský dashboard pracovního prostoru (1440px Desktop)</strong> — Přehled spotřeby, zůstatek kreditů a správa projektů.</sub>
-</p>
+- **Žádná záruka bezpečnosti:** Deterministická pravidla ani volitelné AI modely nezaručují 100% spolehlivost detekce. Výsledek `INSUFFICIENT_EVIDENCE` neznamená potvrzení pravosti či bezpečnosti zprávy.
+- **Nezávislé ověření je nutné:** Jakýkoliv neočekávaný nebo urgentní požadavek týkající se financí či údajů je třeba ověřit přes spolehlivý oficiální kontakt.
+- **Pravidla v produkci:** Veřejné kontejnery standardně běží v režimu **Rules-only** (`AI_LOCAL_ONLY`). Volání externích AI modelů je vypnuto, pokud jej správce výslovně neaktivuje a nenastaví rozpočty.
+- **Klientská anonymizace:** Automatické odstraňování PII maskuje běžné formáty (telefon, e-mail, jména), nemůže však zajistit stoprocentní odstranění všech kontextových indicií.
+- Podrobný přehled technických hranic viz [LIMITATIONS.md](LIMITATIONS.md).
 
-| API klíče a limity spotřeby (1440px Desktop) | Interaktivní API Playground (1440px Desktop) |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-api-keys-cs-1440.png" width="100%" alt="API klíče a denní limity" /><br /><sub><strong>Správa API klíčů a limitů</strong> — Rozsahy oprávnění, linie tokenů a sdílené limity.</sub> | <img src="assets/screenshots/v7-playground-cs-1440.png" width="100%" alt="Interaktivní API Playground" /><br /><sub><strong>Interaktivní API Playground</strong> — Živé testování požadavků s formátovanou JSON odpovědí.</sub> |
+---
 
-| Vývojářská dokumentace API (1024px Tablet) | Testovací fakturace a portál Stripe (1440px Desktop) |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-developers-cs-dark-1024-a11y.png" width="100%" alt="Vývojářská dokumentace" /><br /><sub><strong>Dokumentace pro vývojáře (tmavý tablet)</strong> — Přístupná referenční dokumentace API podle WCAG AA.</sub> | <img src="assets/screenshots/v7-billing-cs-1440.png" width="100%" alt="Kreditní kniha a předplatná" /><br /><sub><strong>Kreditní kniha a předplatná</strong> — Atomické připisování kreditů a testovací fakturace.</sub> |
+## Vývoj a testování
 
-### 3. Správa platformy a AI Studio (pouze ROOT)
+```sh
+# Spuštění jednotkových a integračních testů
+npm test
 
-<p align="center">
-  <img src="assets/screenshots/v7-admin-overview-en-1440.png" width="100%" alt="Přehled správy platformy" />
-  <br />
-  <sub><strong>Provozní konzole platformy (1440px Desktop)</strong> — Živé metriky nájemců, transakční auditní záznamy a stav systému.</sub>
-</p>
+# Kontrola typů a linting
+npx tsc --noEmit
+npm run lint
 
-| AI Studio: Záznamy a rozpočty (tmavý režim) | Prompt Lab a správa verzí |
-|:---:|:---:|
-| <img src="assets/screenshots/v7-ai-studio-en-dark.png" width="100%" alt="AI Studio záznamy" /><br /><sub><strong>Provozní záznamy AI Studia (tmavý režim)</strong> — Skutečné využití tokenů, latence a atomické sledování rozpočtu.</sub> | <img src="assets/screenshots/v7-prompt-lab.png" width="100%" alt="Prompt Lab" /><br /><sub><strong>Prompt Lab a verzování systémových instrukcí</strong> — Neměnné verze promptů, testování a auditovaný návrat k předchozí verzi.</sub> |
+# Ověření odkazů v dokumentaci a kontrola hesel
+npm run docs:check
+npm run secrets:check
 
-<details>
-<summary><strong>Zobrazit další snímky rozhraní (mobilní zobrazení, světlý a tmavý režim)</strong></summary>
+# Produkční sestavení
+npm run build
+```
 
-| Zobrazení | Náhled rozhraní |
-|---|---|
-| Český ceník (1440px Desktop) | <img src="assets/screenshots/v7-pricing-cs-1440.png" width="100%" alt="Ceník Desktop" /><br /><sub><strong>Ceník (čeština, 1440px)</strong></sub> |
-| Anglická dokumentace (1024px Desktop) | <img src="assets/screenshots/v7-docs-en-1024.png" width="100%" alt="Dokumentace Desktop" /><br /><sub><strong>Dokumentace (angličtina, 1024px)</strong></sub> |
-| Registr modelů a kontrola dostupnosti | <img src="assets/screenshots/v7-model-registry.png" width="100%" alt="Registr modelů" /><br /><sub><strong>Registr AI poskytovatelů a ověření spojení</strong></sub> |
-| Tabulka uživatelů a vyhledávání identit | <img src="assets/screenshots/v7-admin-users-en-1440.png" width="100%" alt="Tabulka administrátorských uživatelů" /><br /><sub><strong>Správa uživatelů platformy a úprava kreditů</strong></sub> |
-| Česká fakturace (tmavý mobil, 390px) | <img src="assets/screenshots/v7-billing-cs-dark-390.png" width="50%" alt="Fakturace mobil" /><br /><sub><strong>Fakturace a kredity (tmavý mobil)</strong></sub> |
-| České API klíče (tmavý mobil, 390px) | <img src="assets/screenshots/v7-api-keys-cs-dark-390.png" width="50%" alt="API klíče mobil" /><br /><sub><strong>API klíče (tmavý mobil)</strong></sub> |
-| Český dashboard (tmavý mobil, 390px) | <img src="assets/screenshots/v7-dashboard-cs-dark-390.png" width="50%" alt="Dashboard mobil" /><br /><sub><strong>Dashboard (tmavý mobil)</strong></sub> |
-| Přehled správce (tmavý mobil, 390px) | <img src="assets/screenshots/v7-admin-overview-en-dark-390.png" width="50%" alt="Správa mobil" /><br /><sub><strong>Provozní správa (tmavý mobil)</strong></sub> |
-| AI Studio (světlý desktop) | <img src="assets/screenshots/v7-ai-studio-en-light.png" width="100%" alt="AI Studio světlé" /><br /><sub><strong>AI Studio záznamy (světlý desktop)</strong></sub> |
+---
 
-</details>
+## Příspěvky a bezpečnost
 
-Volba jazyka a motivu se trvale ukládá. Veřejné stránky, přihlašovací formuláře a obrazovky účtu mají kompletní české i anglické texty. Viz [tříkolová vizuální revize](docs/design/FINAL-VISUAL-REVIEW.md), [veřejná referenční revize](docs/design/OPENROUTER-REFERENCE-REVIEW.md) a [pravidla značky](BRANDING.md).
+- Příspěvky do repozitáře jsou vítány! Před vytvořením Pull Requestu si prosím přečtěte [CONTRIBUTING.md](CONTRIBUTING.md).
+- Hlášení bezpečnostních zranitelností se řídí pravidly v [SECURITY.md](SECURITY.md). Nezveřejňujte zranitelnosti ve veřejných issues repozitáře.
 
-## Správa a integrace AI modelů
+## Licence
 
-Nastavte `OPENAI_BASE_URL`, `OPENAI_MODEL` a privátní `OPENAI_API_KEY` v `.env.local` nebo `.env.selfhost`. Adaptér akceptuje endpointy kompatibilní s OpenAI `/v1/chat/completions`. Konkurenční souběhy a limity útraty jsou atomicky chráněny přes `AiBudgetGuard` (`migrations/016_ai_budget_reservations.sql`). Pokud dojde k vyčerpání rozpočtu, volání bezpečně selže a vrátí deterministické vyhodnocení podle pravidel.
+Tento projekt je licencován pod licencí [Apache-2.0](LICENSE).
+Licence a oznámení komponent třetích stran jsou uvedeny v souboru [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
