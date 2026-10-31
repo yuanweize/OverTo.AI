@@ -18,8 +18,13 @@ All notable changes to OvěřTo.AI are documented in this file.
 - **Security & Historical Credentials Disclosure**:
   - Formally documented that historical git commits in previous tags/releases (`v7.0.0` / `v7.0.1`) previously contained compromised test credentials. The compromised credentials were fully rotated and invalidated on the running database, failing authentication on any connection attempt. Current repository files are continuously verified clean via CI automated secret scanning (`npm run secrets:check`).
   - Explicitly documented that production deployments and public Demos operate strictly under the deployment security gate (`AI_LOCAL_ONLY=false`), defaulting to Rules-only mode with zero external billable risk.
-- **Render Demo Deployment Blueprint**:
-  - Added `render.yaml` Infrastructure-as-Code Blueprint and comprehensive setup guide (`docs/deployment/render-demo.md`) for automated GitHub main deployments with managed PostgreSQL, Cloudflare custom subdomains, and zero secrets committed to Git.
+- **Render Demo Deployment Hardening & Production Runner**:
+  - Fixed `render.yaml` environment variables: corrected `OVERTO_SELF_HOST` to canonical `OVERTO_SELF_HOSTED`, set `OVERTO_AUTH_LOCAL: 'false'`, and aligned SMTP variables with `SMTP_*` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`).
+  - Added standalone compiled migration (`scripts/migrate.cjs`) and administrative bootstrap (`scripts/bootstrap-admin.cjs`) utilities into the Docker production `runner` image, orchestrated via `docker-entrypoint.sh` for zero-touch automatic database migration on startup.
+  - Upgraded Render Blueprint with `autoDeployTrigger: checksPass` (deploying only after GitHub CI completes green) and `preDeployCommand: node scripts/migrate.cjs`.
+  - Hardened `/api/v1/health` to eliminate false-positive HTTP 200 responses when authentication is disabled or misconfigured, returning HTTP 503 with informative diagnostic error codes.
+  - Revised documentation to clarify that EU data residency in Frankfurt does not automatically constitute comprehensive GDPR compliance without appropriate administrative privacy agreements.
+  - Added automated test suite `src/auth/__tests__/deployment-config.test.ts` verifying Blueprint syntax, environment variable validation, and health check anti-false-positive boundaries.
 
 ## [7.0.2] - 2026-10-31
 

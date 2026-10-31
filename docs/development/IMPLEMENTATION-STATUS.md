@@ -14,20 +14,21 @@ Updated 2026-10-31. This worktree contains the verified v7.0.3 patch release for
 - **Account Lifecycle (Export & Deletion)**: Browser-compatible JSON account data export (`/api/account/export`) supporting standard same-origin fetch without Origin headers, exporting complete usage and credit history without arbitrary truncations, and safe tenant-bounded account deletion (`/api/account/delete`) with re-authenticated password verification.
 - **Admin Console & Operations**: Root-only operations overview (`/admin/operations`), literal user search, audit log query across platform settings and AI operations, system diagnostics, and transactional user credit adjustments (`/api/admin/users/credits`) with audit recording.
 - **AI Studio & Prompt Lab**: Immutable prompt versioning, provider testing, optimistic-locked activation, trace metadata recording, and verified runtime rollback.
-- **Self-Hosted Deployment (Docker Compose)**: Complete `compose.saas.yaml` stack deploying Next.js standalone application, PostgreSQL 17, automated idempotent schema migrator (`scripts/migrate-selfhost.ts`), and SMTP configuration with health check (`/api/v1/health`).
+- **Self-Hosted Deployment & Render Blueprint**: Turnkey deployment supporting Docker Compose (`compose.saas.yaml`) and Render (`render.yaml`). Includes Next.js standalone container, PostgreSQL 17, standalone compiled database migrator (`scripts/migrate.cjs`), native administrative bootstrap (`scripts/bootstrap-admin.cjs`), `docker-entrypoint.sh` startup hooks, `autoDeployTrigger: checksPass`, and anti-false-positive health checking (`/api/v1/health`).
 - **Backup & Restore**: Automated database backup and restore verification (`scripts/test-backup-restore.ts`) proving synthetic data preservation, table parity, and schema readiness.
 
 ## Verification Proof
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Unit & Integration Tests | **180 passed, 0 failed, 0 skipped** across 38 test files | `npm test` against isolated `overto_test` database |
-| Secret Scanning | **0 exposed credentials** across 340 files | `npm run secrets:check` exited with code 0 |
+| Unit & Integration Tests | **189 passed, 0 failed, 0 skipped** across 39 test files | `npm test` against isolated `overto_test` database |
+| Secret Scanning | **0 exposed credentials** across 344 files | `npm run secrets:check` exited with code 0 |
 | TypeScript Compilation | **0 errors** | `npx tsc --noEmit` exited with code 0 |
 | ESLint Code Quality | **0 errors, 0 warnings** | `npm run lint` exited with code 0 |
-| Documentation Links | **40 Markdown files, 157 targets, 20 remote URLs, 0 failures** | `npm run docs:check -- --remote` exited with code 0 |
+| Documentation Links | **41 Markdown files, 157 targets, 6 anchors, 0 failures** | `npm run docs:check` exited with code 0 |
 | Production Build | **55 static & dynamic routes compiled** | `npm run build` exited with code 0 |
-| Self-Host Docker E2E | **1 passed** | `e2e/selfhost.e2e.ts` on live Docker Compose container at `127.0.0.1:3006` |
+| Self-Host Docker E2E | **1 passed (4.7s)** | `e2e/selfhost.e2e.ts` on live Docker Compose container at `127.0.0.1:3006` |
+| Render Blueprint & Health Integrity | **9 passed, 0 failed** | `src/auth/__tests__/deployment-config.test.ts` passed |
 | Backup & Restore | **100% table parity & record recovery verified** | `npx tsx scripts/test-backup-restore.ts` exited with code 0 |
 | Prompt Activation Chain | **Verified end-to-end with real mock server** | `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed |
 | Migration Idempotency | **Verified initial & rerun** | `scripts/__tests__/migrate-schema.integration.test.ts` passed |

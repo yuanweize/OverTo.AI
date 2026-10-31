@@ -21,6 +21,7 @@
 
 # production
 /build
+/dist-scripts/
 
 # misc
 .DS_Store

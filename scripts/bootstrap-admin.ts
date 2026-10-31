@@ -2,7 +2,7 @@
 import { loadEnvConfig } from '@next/env';
 import { Pool } from 'pg';
 import { accountDeployment } from '../src/auth/deployment';
-loadEnvConfig(process.cwd(), true);
+loadEnvConfig(process.cwd(), process.env.NODE_ENV !== 'production');
 async function main() {
   const email = process.argv[2]?.trim();
   if (!email) throw new Error('USAGE');
