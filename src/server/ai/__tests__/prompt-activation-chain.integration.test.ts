@@ -13,11 +13,11 @@ import { analyzeSuspiciousMessage } from '@/lib/decision-engine';
 import { runLlmAnalysisIfConfigured } from '@/lib/llm-adapter';
 
 const testDbUrl =
-  process.env.DATABASE_URL ||
+  process.env.TEST_DATABASE_URL ||
   process.env.SITE_CONFIG_TEST_DATABASE_URL ||
-  'postgresql://overto:Wa-tzj_YYF6SA4aCML1uN3_M8pzNuTY17unmIhqyyEtabTdg@127.0.0.1:5432/overto';
+  process.env.DATABASE_URL;
 
-describe('runtime prompt activation, testing, execution, traces, and rollback with real mock server', () => {
+describe.skipIf(!testDbUrl)('runtime prompt activation, testing, execution, traces, and rollback with real mock server', () => {
   const schema = `prompt_runtime_${randomUUID().replaceAll('-', '')}`;
   let control: Pool;
   let pool: Pool;

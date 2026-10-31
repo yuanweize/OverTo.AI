@@ -1,16 +1,16 @@
-# Implementation status — verified release candidate build
+# Implementation status — verified v7.0.2 release candidate
 
-Updated 2026-10-30. This worktree contains the verified release candidate for OvěřTo.AI. All release gates have been implemented, tested, and verified against reproducible automated suites.
+Updated 2026-10-31. This worktree contains the verified v7.0.2 patch release for OvěřTo.AI. All security hardening, budget settlement ceiling guarantees, proxy trust boundaries, account export browser compatibility, and secret scanning checks have been implemented and verified against reproducible automated suites.
 
 ## Verified Functionality
 
 - **Public Website & Branding**: Bilingual Czech/English home, analysis, pricing, developer API, documentation, features, process, security, privacy and terms pages. Language detection with Czech priority, Light/Dark/System persistent theme. Focusable developer code blocks with WCAG AA compliance.
 - **Rules & Fraud Engine**: Deterministic scam pattern detection, PII redaction preview with explicit confirmation, offline URL threat analysis, evidence grounding, and action graph generation.
-- **Provider-Agnostic AI**: OpenAI-compatible adapter with server-side API key protection, endpoint allowlisting, model registry, structured output schema enforcement, and quotation grounding.
-- **AI Budget Guard & Emergency Kill Switch**: Fail-closed monetary budget control (`AiBudgetGuard`) checking daily and monthly USD spend against `ai_traces`. Instant emergency kill switch via `AI_EMERGENCY_DISABLE=true`. Trace metadata recording with estimated cost calculations.
-- **Distributed Rate Limiting & Client Identity**: Salted privacy-preserving client identity extractor (`extractClientIdentifier`) supporting trusted reverse proxies (`x-forwarded-for`, `cf-connecting-ip`). Shared PostgreSQL fixed-window rate limiter enforcing per-client and global admission ceilings.
+- **Provider-Agnostic AI**: OpenAI-compatible adapter with server-side API key protection, endpoint allowlisting, model registry, structured output schema enforcement, and quotation grounding. In production, public model calls remain gated (`deployment_gate`) to prevent unbudgeted external spend until distributed admission is confirmed.
+- **AI Budget Guard & Emergency Kill Switch**: Fail-closed monetary budget control (`AiBudgetGuard`) with atomic advisory locking (`pg_advisory_xact_lock`). Enforces full worst-case cost reservations, model cost ceilings, daily/monthly spend limits, and strict settlement ceilings (`actualCost <= reserved_amount_usd`). Expired/crashed reservations are preserved in spend calculations to prevent budget overruns across restarts.
+- **Distributed Rate Limiting & Client Identity**: Salted privacy-preserving client identity extractor (`extractClientIdentifier`) with verified socket peer and proxy-secret trust boundaries. Spoofed headers from unverifiable or untrusted peers fall back to a shared conservative bucket (`direct-untrusted-client`), preventing rate-limit bypass by rotating headers.
 - **Authentication & SaaS Account System**: Better Auth integration supporting email verification, password reset with session revocation, personal workspaces, projects, expiring and rotatable API keys with shared daily quota lineage, and transactional credit ledger.
-- **Account Lifecycle (Export & Deletion)**: GDPR-ready JSON account data export (`/api/account/export`) and safe tenant-bounded account deletion (`/api/account/delete`) with verified session confirmation.
+- **Account Lifecycle (Export & Deletion)**: Browser-compatible JSON account data export (`/api/account/export`) supporting standard same-origin fetch without Origin headers, exporting complete usage and credit history without arbitrary truncations, and safe tenant-bounded account deletion (`/api/account/delete`) with re-authenticated password verification.
 - **Admin Console & Operations**: Root-only operations overview (`/admin/operations`), literal user search, audit log query across platform settings and AI operations, system diagnostics, and transactional user credit adjustments (`/api/admin/users/credits`) with audit recording.
 - **AI Studio & Prompt Lab**: Immutable prompt versioning, provider testing, optimistic-locked activation, trace metadata recording, and verified runtime rollback.
 - **Self-Hosted Deployment (Docker Compose)**: Complete `compose.saas.yaml` stack deploying Next.js standalone application, PostgreSQL 17, automated idempotent schema migrator (`scripts/migrate-selfhost.ts`), and SMTP configuration with health check (`/api/v1/health`).
@@ -20,33 +20,34 @@ Updated 2026-10-30. This worktree contains the verified release candidate for Ov
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| Unit & Integration Tests | **147 passed, 0 failed, 0 skipped** across 35 test files | `npm test` against disposable `overto_test` database |
+| Unit & Integration Tests | **179 passed, 0 failed, 0 skipped** across 38 test files | `npm test` against isolated `overto_test` database |
+| Secret Scanning | **0 exposed credentials** across 339 files | `npm run secrets:check` exited with code 0 |
 | TypeScript Compilation | **0 errors** | `npx tsc --noEmit` exited with code 0 |
 | ESLint Code Quality | **0 errors, 0 warnings** | `npm run lint` exited with code 0 |
-| Documentation Links | **40 Markdown files, 153 links, 0 failures** | `npm run docs:check` exited with code 0 |
+| Documentation Links | **40 Markdown files, 158 targets, 20 remote URLs, 0 failures** | `npm run docs:check -- --remote` exited with code 0 |
 | Production Build | **54 static & dynamic routes compiled** | `npm run build` exited with code 0 |
-| Self-Host Docker E2E | **1 passed in 4.8s** | `e2e/selfhost.e2e.ts` on live Docker Compose container at `127.0.0.1:3006` |
+| Self-Host Docker E2E | **1 passed** | `e2e/selfhost.e2e.ts` on live Docker Compose container at `127.0.0.1:3006` |
 | Backup & Restore | **100% table parity & record recovery verified** | `npx tsx scripts/test-backup-restore.ts` exited with code 0 |
-| Prompt Activation Chain | **Verified end-to-end** | `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed |
+| Prompt Activation Chain | **Verified end-to-end with real mock server** | `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed |
 | Migration Idempotency | **Verified initial & rerun** | `scripts/__tests__/migrate-schema.integration.test.ts` passed |
 
 ## Local & Self-Hosted Verification Commands
 
 ```sh
-# 1. Run unit & integration tests
-SITE_CONFIG_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55446/overto_test" \
-LEDGER_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:55446/overto_test" \
+# 1. Secret scan
+npm run secrets:check
+
+# 2. Run unit & integration tests against dedicated test database
+TEST_DATABASE_URL="postgresql://<user>:<password>@127.0.0.1:55443/overto_test" \
+SITE_CONFIG_TEST_DATABASE_URL="postgresql://<user>:<password>@127.0.0.1:55443/overto_test" \
+LEDGER_TEST_DATABASE_URL="postgresql://<user>:<password>@127.0.0.1:55443/overto_test" \
 npm test
 
-# 2. Run TypeScript and ESLint
+# 3. Run TypeScript and ESLint
 npx tsc --noEmit && npm run lint
 
-# 3. Test backup and restoration
-npx tsx scripts/test-backup-restore.ts
-
-# 4. Verify Docker Compose deployment
-PLAYWRIGHT_CHROMIUM_EXECUTABLE="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-OVERTO_SELFHOST_E2E=true npx playwright test e2e/selfhost.e2e.ts
+# 4. Check all documentation and remote links
+npm run docs:check -- --remote
 
 # 5. Production build
 npm run build

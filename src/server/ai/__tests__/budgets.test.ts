@@ -6,9 +6,9 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 const testDbUrl =
-  process.env.DATABASE_URL ||
+  process.env.TEST_DATABASE_URL ||
   process.env.SITE_CONFIG_TEST_DATABASE_URL ||
-  'postgresql://overto:overto@localhost:5432/overto_test';
+  process.env.DATABASE_URL;
 
 describe('AI budget guard & atomic concurrency reservation', () => {
   beforeEach(() => {
@@ -30,21 +30,17 @@ describe('AI budget guard & atomic concurrency reservation', () => {
     expect(check.reason).toBe('budget_check_unavailable');
   });
 
-  describe('PostgreSQL atomic reservation & concurrency integration', () => {
+  describe.skipIf(!testDbUrl)('PostgreSQL atomic reservation & concurrency integration', () => {
     let control: Pool;
     let pool: Pool;
     const schema = `budget_test_${randomUUID().replaceAll('-', '')}`;
 
     beforeAll(async () => {
       control = new Pool({ connectionString: testDbUrl });
-      try {
-        await control.query(`CREATE SCHEMA ${schema}`);
-        pool = new Pool({ connectionString: testDbUrl, options: `-c search_path=${schema}` });
-        const migrationSql = await readFile('migrations/016_ai_budget_reservations.sql', 'utf8');
-        await pool.query(migrationSql);
-      } catch (err) {
-        console.warn('Skipping PostgreSQL integration suite if database is not reachable', err);
-      }
+      await control.query(`CREATE SCHEMA ${schema}`);
+      pool = new Pool({ connectionString: testDbUrl, options: `-c search_path=${schema}` });
+      const migrationSql = await readFile('migrations/016_ai_budget_reservations.sql', 'utf8');
+      await pool.query(migrationSql);
     });
 
     afterAll(async () => {
@@ -56,7 +52,6 @@ describe('AI budget guard & atomic concurrency reservation', () => {
     });
 
     it('fails closed when model pricing is unknown (no name guessing)', async () => {
-      if (!pool) return;
       const guard = new AiBudgetGuard(pool);
       const res = await guard.reserve({ provider: 'openai', model: 'unknown-experimental-model-9000' });
       expect(res.allowed).toBe(false);
@@ -64,7 +59,6 @@ describe('AI budget guard & atomic concurrency reservation', () => {
     });
 
     it('reserves budget atomically for a known model', async () => {
-      if (!pool) return;
       const guard = new AiBudgetGuard(pool);
       const res = await guard.reserve({
         provider: 'openai',
@@ -85,7 +79,6 @@ describe('AI budget guard & atomic concurrency reservation', () => {
     });
 
     it('settles reservation with actual token usage', async () => {
-      if (!pool) return;
       const guard = new AiBudgetGuard(pool);
       const res = await guard.reserve({
         provider: 'openai',
@@ -107,7 +100,6 @@ describe('AI budget guard & atomic concurrency reservation', () => {
     });
 
     it('releases reservation immediately on failure so funds are freed', async () => {
-      if (!pool) return;
       const guard = new AiBudgetGuard(pool);
       const res = await guard.reserve({
         provider: 'openai',
@@ -127,7 +119,6 @@ describe('AI budget guard & atomic concurrency reservation', () => {
     });
 
     it('settles conservatively at reserved ceiling when tokens are missing', async () => {
-      if (!pool) return;
       const guard = new AiBudgetGuard(pool);
       const res = await guard.reserve({
         provider: 'openai',
@@ -139,8 +130,63 @@ describe('AI budget guard & atomic concurrency reservation', () => {
       expect(settleRes.settledCost).toBe(res.reservedCost);
     });
 
+    it('DEFECT REMEDIATION: daily budget $0.20 cannot be overrun by $0.25 calculated tokens or settlement', async () => {
+      const guard = new AiBudgetGuard(pool);
+      await pool.query('DELETE FROM ai_budget_reservations');
+
+      // Configure a test model where 1000 output tokens cost $0.25
+      await AiBudgetGuard.setModelPricing(pool, {
+        model: 'test-high-cost-model',
+        inputPerMillionUsd: 10.0,
+        outputPerMillionUsd: 250.0,
+        maxRequestCostUsd: 0.20, // Model max ceiling is $0.20
+      });
+
+      // 1. When max potential tokens exceed model ceiling ($0.25 > $0.20), it MUST be rejected!
+      // Previously, Math.min(0.20, 0.25) would reserve 0.20 and allow it, then settle for 0.25!
+      const overCeiling = await guard.reserve({
+        provider: 'test',
+        model: 'test-high-cost-model',
+        maxInputTokens: 0,
+        maxOutputTokens: 1000, // 1000 * $250 / 1M = $0.25 > $0.20 model ceiling
+        config: { dailyBudgetUsd: 0.20 },
+      });
+      expect(overCeiling.allowed).toBe(false);
+      expect(overCeiling.reason).toBe('max_request_budget_exceeded');
+
+      // 2. Even if a reservation was granted for exactly $0.20, settlement can NEVER exceed $0.20!
+      await AiBudgetGuard.setModelPricing(pool, {
+        model: 'test-ceiling-model',
+        inputPerMillionUsd: 10.0,
+        outputPerMillionUsd: 200.0,
+        maxRequestCostUsd: 0.20,
+      });
+
+      const allowedRes = await guard.reserve({
+        provider: 'test',
+        model: 'test-ceiling-model',
+        maxInputTokens: 0,
+        maxOutputTokens: 1000, // 1000 * $200 / 1M = $0.20 == ceiling
+        config: { dailyBudgetUsd: 0.20 },
+      });
+      expect(allowedRes.allowed).toBe(true);
+      expect(allowedRes.reservedCost).toBe(0.20);
+
+      // Attempt to settle with huge token usage that would calculate to $0.50
+      const settleRes = await guard.settle(allowedRes.reservationId!, {
+        inputTokens: 0,
+        outputTokens: 2500, // calculates to $0.50
+      });
+
+      // Settled cost must be strictly capped at the reserved ceiling ($0.20), never $0.25 or $0.50!
+      expect(settleRes.settledCost).toBe(0.20);
+
+      // Verify that total daily spend in DB did not exceed $0.20
+      const budgetCheck = await guard.checkBudget({ dailyBudgetUsd: 0.20 });
+      expect(budgetCheck.dailySpend).toBeLessThanOrEqual(0.20);
+    });
+
     it('CRITICAL CONCURRENCY TEST: 10 concurrent requests competing for tight budget never overspend', async () => {
-      if (!pool) return;
       const guard = new AiBudgetGuard(pool);
       // Clean previous reservations for this test
       await pool.query('DELETE FROM ai_budget_reservations');
@@ -179,14 +225,13 @@ describe('AI budget guard & atomic concurrency reservation', () => {
       }
     });
 
-    it('crash recovery: expired reservations older than 2 minutes are automatically reclaimed', async () => {
-      if (!pool) return;
+    it('crash recovery: expired reservations older than 2 minutes are automatically reclaimed and counted in spend', async () => {
       const guard = new AiBudgetGuard(pool);
       const oldId = randomUUID();
 
       // Insert simulated crashed reservation with past expires_at
       await pool.query(
-        "INSERT INTO ai_budget_reservations (id, provider, model, reserved_amount_usd, status, expires_at) VALUES ($1, 'test', 'gpt-4o', 10.0, 'RESERVED', now() - interval '5 minutes')",
+        "INSERT INTO ai_budget_reservations (id, provider, model, reserved_amount_usd, status, expires_at) VALUES ($1, 'test', 'gpt-4o', 0.10, 'RESERVED', now() - interval '5 minutes')",
         [oldId]
       );
 
@@ -195,6 +240,10 @@ describe('AI budget guard & atomic concurrency reservation', () => {
 
       const row = await pool.query('SELECT status FROM ai_budget_reservations WHERE id = $1', [oldId]);
       expect(row.rows[0].status).toBe('EXPIRED');
+
+      // Crucial invariant: Expired reservation must STILL be counted towards budget to prevent overspend on crash
+      const check = await guard.checkBudget({ dailyBudgetUsd: 0.15 });
+      expect(check.dailySpend).toBeGreaterThanOrEqual(0.10);
     });
   });
 });

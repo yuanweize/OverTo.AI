@@ -105,10 +105,12 @@ export async function POST(request: NextRequest) {
     let budgetGuard: AiBudgetGuard | null = null;
     if (body.enableLlm === true && !publicAiUnavailable && deployment && admissionPool) {
       budgetGuard = new AiBudgetGuard(admissionPool);
+      // Realistic upper-bound token calculation based on prompt instructions and message length
+      const estimatedInputTokens = Math.max(500, Math.ceil(((prompt.instructions?.length || 1500) + body.text.length) / 3));
       const reservation = await budgetGuard.reserve({
         provider: settings.providerName,
         model: settings.model,
-        maxInputTokens: 3000,
+        maxInputTokens: Math.min(4000, estimatedInputTokens),
         maxOutputTokens: settings.maxCompletionTokens,
       });
 

@@ -7,9 +7,9 @@ import { hashPassword } from 'better-auth/crypto';
 import { NextRequest } from 'next/server';
 
 const testDbUrl =
-  process.env.DATABASE_URL ||
+  process.env.TEST_DATABASE_URL ||
   process.env.SITE_CONFIG_TEST_DATABASE_URL ||
-  'postgresql://overto:Wa-tzj_YYF6SA4aCML1uN3_M8pzNuTY17unmIhqyyEtabTdg@127.0.0.1:5432/overto';
+  process.env.DATABASE_URL;
 
 const testUserId = randomUUID();
 const testEmail = `user-${randomUUID()}@example.com`;
@@ -26,7 +26,7 @@ vi.mock('@/auth/server', () => ({
   },
 }));
 
-describe('account lifecycle: re-authentication, GDPR export, and cascading deletion', () => {
+describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, and cascading deletion', () => {
   const schema = `account_life_${randomUUID().replaceAll('-', '')}`;
   let control: Pool;
   let pool: Pool;
@@ -202,12 +202,10 @@ describe('account lifecycle: re-authentication, GDPR export, and cascading delet
     expect(res.status).toBe(403);
   });
 
-  it('successfully exports complete account data with usage and GDPR statutory notice', async () => {
+  it('successfully exports complete account data without Origin header (standard browser fetch)', async () => {
+    // Real browsers do not send Origin on same-origin GET
     const req = new NextRequest('http://127.0.0.1:3000/api/account/export', {
       method: 'GET',
-      headers: {
-        Origin: 'http://127.0.0.1:3000',
-      },
     });
 
     const res = await exportRoute(req);
@@ -218,9 +216,25 @@ describe('account lifecycle: re-authentication, GDPR export, and cascading delet
     expect(exportJson.workspace.id).toBe(workspaceId);
     expect(exportJson.projects.length).toBeGreaterThanOrEqual(1);
     expect(exportJson.apiKeys).toHaveLength(1);
-    expect(exportJson.recentUsageEvents).toHaveLength(1);
+    expect(exportJson.usageEvents).toHaveLength(1);
     expect(exportJson.credits.available).toBeGreaterThanOrEqual(50);
-    expect(exportJson.legalAndGdprNotice.regulation).toContain('GDPR');
+    expect(exportJson.dataRetentionNotice.scope).toContain('Complete export');
+  });
+
+  it('rejects cross-site export attempts with 403', async () => {
+    const maliciousOriginReq = new NextRequest('http://127.0.0.1:3000/api/account/export', {
+      method: 'GET',
+      headers: { Origin: 'http://malicious-attacker.com' },
+    });
+    const resOrigin = await exportRoute(maliciousOriginReq);
+    expect(resOrigin.status).toBe(403);
+
+    const crossSiteReq = new NextRequest('http://127.0.0.1:3000/api/account/export', {
+      method: 'GET',
+      headers: { 'Sec-Fetch-Site': 'cross-site' },
+    });
+    const resSec = await exportRoute(crossSiteReq);
+    expect(resSec.status).toBe(403);
   });
 
   it('successfully deletes account upon correct re-authentication, revokes keys, and anonymizes financial customer records', async () => {

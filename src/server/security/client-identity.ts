@@ -83,15 +83,19 @@ export function extractClientIdentifier(
 
   // Next.js provides peer socket IP via request.ip or options.peerIp
   const socketIp = options?.peerIp || ('ip' in request && typeof request.ip === 'string' ? request.ip : '');
+  const proxySecret = process.env.OVERTO_TRUSTED_PROXY_SECRET?.trim();
+  const hasValidProxySecret = Boolean(proxySecret && request.headers.get('x-overto-proxy-secret') === proxySecret);
 
   let candidateIp = '';
 
   if (trustProxy) {
-    // Check if immediate peer is trusted (or if trustProxy is explicitly forced)
-    const peerIsTrusted = socketIp ? isTrustedProxy(socketIp, trustedProxies) : true;
+    // A peer is trusted ONLY when its socket IP matches the trusted proxies whitelist,
+    // OR when a cryptographically verified upstream proxy secret is presented.
+    // If socket IP is missing/unverifiable and no secret is provided, the peer is NEVER trusted.
+    const peerIsTrusted = (socketIp ? isTrustedProxy(socketIp, trustedProxies) : false) || hasValidProxySecret;
 
     if (peerIsTrusted) {
-      // 1. Cloudflare Connecting IP (if enabled/trusted)
+      // 1. Cloudflare Connecting IP (if behind trusted Cloudflare boundary)
       const cfIp = request.headers.get('cf-connecting-ip')?.trim();
       if (cfIp && isValidIp(cfIp)) {
         candidateIp = cfIp;
@@ -105,13 +109,12 @@ export function extractClientIdentifier(
         }
       }
 
-      // 3. X-Forwarded-For: traverse chain from right to find leftmost untrusted client
+      // 3. X-Forwarded-For: leftmost client IP from sanitized proxy chain
       if (!candidateIp) {
         const forwardedFor = request.headers.get('x-forwarded-for');
         if (forwardedFor) {
           const parts = forwardedFor.split(',').map(s => s.trim()).filter(isValidIp);
           if (parts.length > 0) {
-            // First entry is client IP according to RFC 7239
             candidateIp = parts[0];
           }
         }
