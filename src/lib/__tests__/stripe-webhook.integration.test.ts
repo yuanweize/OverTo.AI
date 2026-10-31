@@ -138,6 +138,99 @@ describe.skipIf(!connectionString)('Stripe test webhook with PostgreSQL and a si
     expect(grantRow.rows[0].amount).toBe(5);
   });
 
+  it('comprehensive partial refund lifecycle: multiple refunds, duplicate states, out-of-order, and full refund', async () => {
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
+    const multiInvId = 'in_multi_refund_test';
+    const chargeId = 'ch_multi_test';
+
+    // 1. Initial grant of 10 credits for $100 (10000 cents) charge
+    await pool.query(
+      "INSERT INTO credit_grants (account_id, idempotency_key, category, amount, created_at) VALUES ($1, $2, 'SUBSCRIPTION', 10, now())",
+      [workspace, `stripe-test-invoice:${multiInvId}`]
+    );
+
+    // 2. First partial refund: 20% ($20 / 2000 cents)
+    const res1 = await POST(request('evt_refund_step_1', false, true, 'charge.refunded', {
+      object: {
+        id: chargeId,
+        customer,
+        invoice: multiInvId,
+        amount: 10000,
+        amount_refunded: 2000,
+      },
+    }));
+    expect(res1.status).toBe(200);
+
+    let grant = await pool.query<{ amount: number }>('SELECT amount FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${multiInvId}`]);
+    expect(grant.rows[0].amount).toBe(8); // 10 - 2 = 8 credits
+
+    // 3. Duplicate delivery of first partial refund (same event ID)
+    const res1Dup = await POST(request('evt_refund_step_1', false, true, 'charge.refunded', {
+      object: { id: chargeId, customer, invoice: multiInvId, amount: 10000, amount_refunded: 2000 },
+    }));
+    expect(res1Dup.status).toBe(200);
+    grant = await pool.query<{ amount: number }>('SELECT amount FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${multiInvId}`]);
+    expect(grant.rows[0].amount).toBe(8); // No double deduction
+
+    // 4. Different event ID with the SAME refund state (amount_refunded = 2000)
+    const res1DiffEvt = await POST(request('evt_refund_step_1_diff_id', false, true, 'charge.refunded', {
+      object: { id: chargeId, customer, invoice: multiInvId, amount: 10000, amount_refunded: 2000 },
+    }));
+    expect(res1DiffEvt.status).toBe(200);
+    grant = await pool.query<{ amount: number }>('SELECT amount FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${multiInvId}`]);
+    expect(grant.rows[0].amount).toBe(8); // Still 8 credits! Zero extra deduction!
+
+    // 5. Second partial refund: cumulative 50% ($50 / 5000 cents total refunded)
+    const res2 = await POST(request('evt_refund_step_2', false, true, 'charge.refunded', {
+      object: {
+        id: chargeId,
+        customer,
+        invoice: multiInvId,
+        amount: 10000,
+        amount_refunded: 5000,
+      },
+    }));
+    expect(res2.status).toBe(200);
+    grant = await pool.query<{ amount: number }>('SELECT amount FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${multiInvId}`]);
+    expect(grant.rows[0].amount).toBe(5); // 10 - 5 = 5 credits (retracted exactly 3 delta, not 5 again!)
+
+    // 6. Out-of-order event: older refund event (amount_refunded = 3000) arrives late
+    const resOutOfOrder = await POST(request('evt_refund_out_of_order', false, true, 'charge.refunded', {
+      object: {
+        id: chargeId,
+        customer,
+        invoice: multiInvId,
+        amount: 10000,
+        amount_refunded: 3000, // < 5000 already accounted for
+      },
+    }));
+    expect(resOutOfOrder.status).toBe(200);
+    grant = await pool.query<{ amount: number }>('SELECT amount FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${multiInvId}`]);
+    expect(grant.rows[0].amount).toBe(5); // Remains 5 credits! Out of order event safely ignored!
+
+    // 7. Full refund: final 100% refund ($100 / 10000 cents)
+    const res3 = await POST(request('evt_refund_step_3_full', false, true, 'charge.refunded', {
+      object: {
+        id: chargeId,
+        customer,
+        invoice: multiInvId,
+        amount: 10000,
+        amount_refunded: 10000,
+      },
+    }));
+    expect(res3.status).toBe(200);
+    const grantAfterFull = await pool.query('SELECT count(*)::int AS n FROM credit_grants WHERE idempotency_key=$1', [`stripe-test-invoice:${multiInvId}`]);
+    expect(grantAfterFull.rows[0].n).toBe(0); // Grant completely revoked!
+
+    // Verify refund tracking record reflects final state
+    const tracking = await pool.query<{ cumulative_amount_refunded: number; cumulative_retracted_credits: number }>(
+      'SELECT cumulative_amount_refunded, cumulative_retracted_credits FROM local_stripe_refund_tracking WHERE workspace_id=$1 AND invoice_id=$2',
+      [workspace, multiInvId]
+    );
+    expect(tracking.rows[0].cumulative_amount_refunded).toBe(10000);
+    expect(tracking.rows[0].cumulative_retracted_credits).toBe(10);
+  });
+
   it('ensures atomic rollback: no credits or events are committed if transaction fails midway', async () => {
     state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
     provider.subscriptions.retrieve = vi.fn(async () => ({ id: subscription, customer, livemode: false, status: 'active', cancel_at_period_end: false }));

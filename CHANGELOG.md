@@ -2,6 +2,25 @@
 
 All notable changes to OvěřTo.AI are documented in this file.
 
+## [7.0.3] - 2026-10-31
+
+### Security & Hardening
+- **AI Budget Accounting & Overage Anomaly Tracking**:
+  - Removed artificial truncation via `Math.min(roundedComputed, reservedCeiling)`, preventing under-reporting of actual LLM costs while strictly preserving atomic PostgreSQL row/advisory reservations.
+  - Separately records pre-approved reserved amount (`reserved_amount_usd`), honest actual token cost (`actual_amount_usd`), settled ledger charge (`settled_amount_usd`), overage boolean flag (`is_overage`), overage amount (`overage_amount_usd`), and overage reason (`overage_reason`) via `migrations/017_ai_budget_accounting.sql`.
+  - Enforced pre-call token limits on input text and output completions to prevent unbudgeted token consumption.
+  - Applied conservative fallback strategies settling at reserved ceiling when tokens or pricing are missing or invalid.
+- **Accurate Stripe Cumulative Refund & Retraction Accounting**:
+  - Added `migrations/018_stripe_refund_tracking.sql` providing persistent `local_stripe_refund_tracking` by workspace and invoice.
+  - Accurately tracks cumulative refunded amounts (`cumulative_amount_refunded`) and cumulative retracted credits (`cumulative_retracted_credits`).
+  - Eliminates duplicate credit deductions across multiple partial refunds by deducting only the incremental delta of credits.
+  - Verified against first partial refund, multiple partial refunds, cumulative partial refunds followed by full refund, duplicate webhooks, identical refund states under new event IDs, out-of-order events, and transactional rollback.
+- **Security & Historical Credentials Disclosure**:
+  - Formally documented that historical git commits in previous tags/releases (`v7.0.0` / `v7.0.1`) previously contained compromised test credentials. The compromised credentials were fully rotated and invalidated on the running database, failing authentication on any connection attempt. Current repository files are continuously verified clean via CI automated secret scanning (`npm run secrets:check`).
+  - Explicitly documented that production deployments and public Demos operate strictly under the deployment security gate (`AI_LOCAL_ONLY=false`), defaulting to Rules-only mode with zero external billable risk.
+- **Render Demo Deployment Blueprint**:
+  - Added `render.yaml` Infrastructure-as-Code Blueprint and comprehensive setup guide (`docs/deployment/render-demo.md`) for automated GitHub main deployments with managed PostgreSQL, Cloudflare custom subdomains, and zero secrets committed to Git.
+
 ## [7.0.2] - 2026-10-31
 
 ### Security & Hardening

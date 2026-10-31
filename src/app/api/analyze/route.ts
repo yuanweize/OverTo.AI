@@ -107,11 +107,14 @@ export async function POST(request: NextRequest) {
       budgetGuard = new AiBudgetGuard(admissionPool);
       // Realistic upper-bound token calculation based on prompt instructions and message length
       const estimatedInputTokens = Math.max(500, Math.ceil(((prompt.instructions?.length || 1500) + body.text.length) / 3));
+      const maxInputTokens = Math.min(4000, estimatedInputTokens);
+      const maxOutputTokens = Math.min(settings.maxCompletionTokens || 900, 2000);
+
       const reservation = await budgetGuard.reserve({
         provider: settings.providerName,
         model: settings.model,
-        maxInputTokens: Math.min(4000, estimatedInputTokens),
-        maxOutputTokens: settings.maxCompletionTokens,
+        maxInputTokens,
+        maxOutputTokens,
       });
 
       if (!reservation.allowed) {
@@ -133,11 +136,14 @@ export async function POST(request: NextRequest) {
       if (budgetGuard && reservationId) {
         if (result.metadata.aiStatus === 'SUCCESS') {
           try {
-            const { settledCost } = await budgetGuard.settle(reservationId, {
+            const { settledCost, isOverage, overageAmount } = await budgetGuard.settle(reservationId, {
               inputTokens: result.metadata.inputTokens,
               outputTokens: result.metadata.outputTokens,
             });
             finalCost = settledCost;
+            if (isOverage) {
+              console.warn(`[AI Budget Overage] Reservation ${reservationId} exceeded ceiling by $${overageAmount} (settled at $${settledCost})`);
+            }
           } catch {
             finalCost = null;
           }

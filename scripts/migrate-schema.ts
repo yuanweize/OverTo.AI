@@ -18,6 +18,7 @@ export async function migrateSchema(pool: Pool, secret: string, distributedAuthR
     '009_shared_rate_limits.sql', '010_ai_prompts.sql', '011_prompt_test_metrics.sql',
     '012_ai_evaluations.sql', '013_ai_provider_settings.sql', '014_key_permissions.sql',
     '015_provider_identity.sql', '016_ai_budget_reservations.sql',
+    '017_ai_budget_accounting.sql', '018_stripe_refund_tracking.sql',
   ];
   for (const file of files) await pool.query(await readFile(`migrations/${file}`, 'utf8'));
 }

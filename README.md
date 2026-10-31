@@ -17,7 +17,7 @@ An experimental assistant for Czech messages, with a Czech/English analysis inte
 
 ![OvěřTo.AI evidence-led home page](assets/screenshots/v7-home-en-1440.png)
 
-> **Deployment status:** Production-hardened self-hosted release with PostgreSQL transactional ledger, Better Auth with email verification, distributed rate limiting, AI monetary budget guard, and automated migrations. Does not claim 100% scam detection accuracy; always verify critical requests out-of-band.
+> **Deployment status:** Production-hardened self-hosted release with PostgreSQL transactional ledger, Better Auth with email verification, distributed rate limiting, AI monetary budget guard, and automated migrations. Production deployments and public Demos default to **Rules-only** mode (deterministic rule engine); external LLM inference remains governed by deployment security gates (`AI_LOCAL_ONLY`). Does not claim 100% scam detection accuracy; always verify critical requests out-of-band.
 
 [Capabilities](#what-it-does) · [Quick start](#quick-start) · [API](#api-at-a-glance) · [Architecture](#how-it-works) · [Administration](#administration-and-observability) · [Development](#development)
 

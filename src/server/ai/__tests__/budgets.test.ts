@@ -41,6 +41,8 @@ describe('AI budget guard & atomic concurrency reservation', () => {
       pool = new Pool({ connectionString: testDbUrl, options: `-c search_path=${schema}` });
       const migrationSql = await readFile('migrations/016_ai_budget_reservations.sql', 'utf8');
       await pool.query(migrationSql);
+      const migration17Sql = await readFile('migrations/017_ai_budget_accounting.sql', 'utf8');
+      await pool.query(migration17Sql);
     });
 
     afterAll(async () => {
@@ -130,7 +132,7 @@ describe('AI budget guard & atomic concurrency reservation', () => {
       expect(settleRes.settledCost).toBe(res.reservedCost);
     });
 
-    it('DEFECT REMEDIATION: daily budget $0.20 cannot be overrun by $0.25 calculated tokens or settlement', async () => {
+    it('separately records reserved amount, actual cost, and overage anomalies without truncation', async () => {
       const guard = new AiBudgetGuard(pool);
       await pool.query('DELETE FROM ai_budget_reservations');
 
@@ -142,8 +144,7 @@ describe('AI budget guard & atomic concurrency reservation', () => {
         maxRequestCostUsd: 0.20, // Model max ceiling is $0.20
       });
 
-      // 1. When max potential tokens exceed model ceiling ($0.25 > $0.20), it MUST be rejected!
-      // Previously, Math.min(0.20, 0.25) would reserve 0.20 and allow it, then settle for 0.25!
+      // 1. When max potential tokens exceed model ceiling ($0.25 > $0.20), reservation MUST be rejected fail-closed!
       const overCeiling = await guard.reserve({
         provider: 'test',
         model: 'test-high-cost-model',
@@ -154,7 +155,7 @@ describe('AI budget guard & atomic concurrency reservation', () => {
       expect(overCeiling.allowed).toBe(false);
       expect(overCeiling.reason).toBe('max_request_budget_exceeded');
 
-      // 2. Even if a reservation was granted for exactly $0.20, settlement can NEVER exceed $0.20!
+      // 2. Reservation approved for exactly $0.20
       await AiBudgetGuard.setModelPricing(pool, {
         model: 'test-ceiling-model',
         inputPerMillionUsd: 10.0,
@@ -172,18 +173,42 @@ describe('AI budget guard & atomic concurrency reservation', () => {
       expect(allowedRes.allowed).toBe(true);
       expect(allowedRes.reservedCost).toBe(0.20);
 
-      // Attempt to settle with huge token usage that would calculate to $0.50
+      // Attempt to settle with token usage that calculates to $0.50 (overage anomaly)
       const settleRes = await guard.settle(allowedRes.reservationId!, {
         inputTokens: 0,
-        outputTokens: 2500, // calculates to $0.50
+        outputTokens: 2500, // 2500 * $200 / 1M = $0.50
       });
 
-      // Settled cost must be strictly capped at the reserved ceiling ($0.20), never $0.25 or $0.50!
-      expect(settleRes.settledCost).toBe(0.20);
+      // Actual cost must NOT be truncated to $0.20 to fabricate lower spend!
+      expect(settleRes.actualCost).toBe(0.50);
+      expect(settleRes.settledCost).toBe(0.50);
+      expect(settleRes.reservedCost).toBe(0.20);
+      expect(settleRes.isOverage).toBe(true);
+      expect(settleRes.overageAmount).toBe(0.30);
+      expect(settleRes.overageReason).toBe('usage_exceeded_reservation');
 
-      // Verify that total daily spend in DB did not exceed $0.20
-      const budgetCheck = await guard.checkBudget({ dailyBudgetUsd: 0.20 });
-      expect(budgetCheck.dailySpend).toBeLessThanOrEqual(0.20);
+      // Verify row in database separately records reserved and actual amounts with overage flags
+      const row = await pool.query(
+        'SELECT reserved_amount_usd, actual_amount_usd, settled_amount_usd, is_overage, overage_amount_usd, overage_reason FROM ai_budget_reservations WHERE id = $1',
+        [allowedRes.reservationId]
+      );
+      expect(Number(row.rows[0].reserved_amount_usd)).toBe(0.20);
+      expect(Number(row.rows[0].actual_amount_usd)).toBe(0.50);
+      expect(Number(row.rows[0].settled_amount_usd)).toBe(0.50);
+      expect(row.rows[0].is_overage).toBe(true);
+      expect(Number(row.rows[0].overage_amount_usd)).toBe(0.30);
+      expect(row.rows[0].overage_reason).toBe('usage_exceeded_reservation');
+
+      // Verify that total daily spend in DB accurately reflects $0.50 and blocks subsequent calls
+      const nextRes = await guard.reserve({
+        provider: 'test',
+        model: 'test-ceiling-model',
+        maxInputTokens: 0,
+        maxOutputTokens: 100,
+        config: { dailyBudgetUsd: 0.20 },
+      });
+      expect(nextRes.allowed).toBe(false);
+      expect(nextRes.reason).toBe('daily_budget_exceeded');
     });
 
     it('CRITICAL CONCURRENCY TEST: 10 concurrent requests competing for tight budget never overspend', async () => {
