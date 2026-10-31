@@ -236,7 +236,7 @@ test('web analysis records usage against the selected project', async ({ page })
   await page.getByPlaceholder(email).fill(email);
   await page.getByPlaceholder('••••••••••••').fill('wrong-password-999');
   await page.getByRole('button', { name: 'Trvale smazat účet' }).click();
-  await expect(page.getByRole('alert')).toContainText('Zadané heslo pro potvrzení smazání účtu není správné.');
+  await expect(page.locator('p[role="alert"]')).toContainText('Zadané heslo pro potvrzení smazání účtu není správné.');
 
   // Delete account with correct password
   await page.getByPlaceholder('••••••••••••').fill('project-test-password-42');
@@ -247,7 +247,7 @@ test('web analysis records usage against the selected project', async ({ page })
   await page.getByLabel('E-mail').fill(email);
   await page.getByLabel('Heslo').fill('project-test-password-42');
   await page.getByRole('button', { name: 'Přihlásit se' }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('p[role="alert"]')).toBeVisible();
 });
 
 test('password reset invalidates existing session and old password', async ({ browser }) => {
