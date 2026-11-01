@@ -46,6 +46,9 @@ describe('Production & Render Deployment Configuration Integrity', () => {
       // 8. Generated secrets for session security and client identity
       expect(yamlContent).toMatch(/key:\s*OVERTO_AUTH_SECRET\s*\n\s*generateValue:\s*true/);
       expect(yamlContent).toMatch(/key:\s*OVERTO_CLIENT_IDENTITY_SALT\s*\n\s*generateValue:\s*true/);
+
+      // 9. Database plan must use valid modern plan (free or flexible), not legacy 'starter'
+      expect(yamlContent).not.toMatch(/databases:[\s\S]*?plan:\s*starter/);
     });
   });
 
