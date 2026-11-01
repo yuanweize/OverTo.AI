@@ -29,7 +29,7 @@ flowchart LR
 
 - **Identity Management:** Built on Better Auth with email verification, secure session cookies, password reset workflows, and role-based access control (`USER` and `ROOT`).
 - **Workspace & Project Isolation:** Users operate within isolated workspaces containing scoped projects, individual API key allocations, and credit balances.
-- **Transactional Credit Ledger:** A double-entry PostgreSQL ledger (`credit_ledger`) tracks allocations, usage deductions, Stripe checkout grants, and partial refund adjustments atomically.
+- **Transactional Credit Ledger:** A transactional PostgreSQL ledger (`credit_ledger`) tracks allocations, usage deductions, Stripe checkout grants, and partial refund adjustments atomically.
 
 ## Abuse Prevention & Rate Limiting
 

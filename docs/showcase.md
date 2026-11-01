@@ -8,7 +8,7 @@ All screenshots represent actual running software captured in Chromium environme
 
 ## 1. Evidence-Led Scam Analysis
 
-The core user experience centers on transparent, evidence-led inspection of suspicious Czech and English messages. Deterministic heuristic rules extract textual signals and calculate calibrated risk scores, accompanied by verified out-of-band next steps.
+The core user experience centers on transparent, evidence-led inspection of suspicious Czech and English messages. Deterministic heuristic rules extract textual signals and calculate heuristic risk scores, accompanied by recommended out-of-band next steps.
 
 ### Desktop Analysis & Grounded Evidence (Czech, 1440px)
 ![Czech Analysis and Grounded Evidence](../assets/screenshots/v7-analyze-cs-1440.png)
@@ -90,7 +90,7 @@ The developer suite includes comprehensive OpenAPI-compliant documentation, scop
 | Developer API Reference (Dark Tablet, 1024px) | English Developer API Documentation (1024px) |
 |:---:|:---:|
 | ![Developer Docs Dark Tablet](../assets/screenshots/v7-developers-cs-dark-1024-a11y.png) | ![Developer Docs English Tablet](../assets/screenshots/v7-developers-en-1024.png) |
-| *WCAG AA accessibility verified API reference* | *Comprehensive endpoint parameters and response schemas* |
+| *Accessible developer API reference designed with WCAG AA contrast guidelines* | *Comprehensive endpoint parameters and response schemas* |
 
 | Documentation Hub (English, 1024px) | SaaS Developer Guide |
 |:---:|:---:|
@@ -126,7 +126,7 @@ Powered by Better Auth, the platform provides email verification, password recov
 
 ## 6. Metered Billing, Credits & Stripe Sandbox
 
-Transactional credit accounting recorded in a double-entry PostgreSQL ledger, supporting one-time top-ups, recurring tiers, and Stripe checkout.
+Transactional credit accounting recorded in a transactional PostgreSQL ledger, supporting one-time top-ups, recurring tiers, and Stripe checkout.
 
 ### Billing Management & Credit Ledger (Czech, 1440px)
 ![Billing Desktop](../assets/screenshots/v7-billing-cs-1440.png)
