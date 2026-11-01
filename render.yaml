@@ -65,6 +65,6 @@ databases:
   - name: overto-db
     databaseName: overto
     user: overto
-    plan: starter
+    plan: free
     region: frankfurt
     ipAllowList: [] # internal connections only
