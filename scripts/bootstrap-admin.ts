@@ -2,13 +2,26 @@
 import { loadEnvConfig } from '@next/env';
 import { Pool } from 'pg';
 import { accountDeployment } from '../src/auth/deployment';
+
 loadEnvConfig(process.cwd(), process.env.NODE_ENV !== 'production');
+
 async function main() {
   const email = process.argv[2]?.trim();
   if (!email) throw new Error('USAGE');
-  const deployment = accountDeployment({ ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' });
-  if (!deployment) throw new Error('ACCOUNT_DEPLOYMENT_REQUIRED');
-  const pool = new Pool({ connectionString: deployment.databaseUrl });
+
+  let databaseUrl = '';
+  try {
+    const deployment = accountDeployment({ ...process.env, NODE_ENV: process.env.NODE_ENV || 'development' });
+    if (deployment) databaseUrl = deployment.databaseUrl;
+  } catch {
+    // If accountDeployment threw, fall back to direct database URL
+  }
+  if (!databaseUrl) {
+    databaseUrl = process.env.OVERTO_DATABASE_URL || process.env.DATABASE_URL || '';
+  }
+  if (!databaseUrl) throw new Error('ACCOUNT_DEPLOYMENT_REQUIRED');
+
+  const pool = new Pool({ connectionString: databaseUrl });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

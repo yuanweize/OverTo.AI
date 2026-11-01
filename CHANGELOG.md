@@ -5,6 +5,11 @@ All notable changes to OvěřTo.AI are documented in this file.
 ## [7.0.3] - 2026-10-31
 
 ### Security & Hardening
+- **Render Pre-Deploy Database Migration & Deployment Decoupling**:
+  - Decoupled standalone schema migrations (`scripts/migrate-selfhost.ts` / `dist-scripts/migrate.cjs`) from web runtime SMTP and base URL validation (`getMigrationCredentials`). Render `preDeployCommand` and automated container migrations now execute cleanly on PostgreSQL using injected database credentials and generated auth secret, without failing due to unconfigured user-space SMTP credentials.
+  - Added automatic fallback to `RENDER_EXTERNAL_URL` in `accountDeployment` when `BETTER_AUTH_URL` is omitted, eliminating manual URL setup for standard Render deployments.
+  - Hardened top-level module initialization in `src/auth/server.ts`, `/api/analyze`, and `/api/auth/[...all]` with safe fallback handling, preventing unhandled crash exceptions during server boot when optional environment variables are incomplete.
+  - Added test coverage in `src/auth/__tests__/deployment-config.test.ts` verifying pre-deploy migration credential extraction and origin fallbacks.
 - **AI Budget Accounting & Overage Anomaly Tracking**:
   - Removed artificial truncation via `Math.min(roundedComputed, reservedCeiling)`, preventing under-reporting of actual LLM costs while strictly preserving atomic PostgreSQL row/advisory reservations.
   - Separately records pre-approved reserved amount (`reserved_amount_usd`), honest actual token cost (`actual_amount_usd`), settled ledger charge (`settled_amount_usd`), overage boolean flag (`is_overage`), overage amount (`overage_amount_usd`), and overage reason (`overage_reason`) via `migrations/017_ai_budget_accounting.sql`.

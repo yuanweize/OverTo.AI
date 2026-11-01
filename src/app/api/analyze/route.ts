@@ -59,7 +59,8 @@ export async function POST(request: NextRequest) {
     }
     if (body.locale !== undefined && body.locale !== 'cs' && body.locale !== 'en') return NextResponse.json({ error: 'INVALID_LOCALE' }, { status: 400 });
     // Public AI is restricted to the dedicated local deployment or configured self-host with active budget.
-    const deployment = accountDeployment(process.env);
+    let deployment = null;
+    try { deployment = accountDeployment(process.env); } catch { deployment = null; }
     let publicAiUnavailable = body.enableLlm === true && deployment?.mode !== 'local' && deployment?.mode !== 'selfhost';
     let admissionPool = null;
 

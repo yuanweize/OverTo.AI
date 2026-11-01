@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { accountDeployment } from '../deployment';
+import { getMigrationCredentials } from '../../../scripts/migrate-selfhost';
 import { GET as healthGet } from '@/app/api/v1/health/route';
 
 describe('Production & Render Deployment Configuration Integrity', () => {
@@ -80,6 +81,15 @@ describe('Production & Render Deployment Configuration Integrity', () => {
       expect(deployment?.smtp.from).toBe('noreply@overto.ai');
     });
 
+    it('automatically uses RENDER_EXTERNAL_URL if BETTER_AUTH_URL is omitted', () => {
+      const withoutBetterAuthUrl = { ...validRenderEnv };
+      delete withoutBetterAuthUrl.BETTER_AUTH_URL;
+      withoutBetterAuthUrl.RENDER_EXTERNAL_URL = 'https://overto-ai-demo.onrender.com';
+
+      const deployment = accountDeployment(withoutBetterAuthUrl);
+      expect(deployment?.baseUrl).toBe('https://overto-ai-demo.onrender.com');
+    });
+
     it('rejects OVERTO_AUTH_LOCAL=true in production', () => {
       expect(() => {
         accountDeployment({ ...validRenderEnv, OVERTO_AUTH_LOCAL: 'true' });
@@ -104,6 +114,83 @@ describe('Production & Render Deployment Configuration Integrity', () => {
       expect(() => {
         accountDeployment({ ...validRenderEnv, OVERTO_DATABASE_URL: 'postgresql://overto@10.0.0.1:5432/overto' });
       }).toThrow('INVALID_SELFHOST_CONFIG');
+    });
+  });
+
+  describe('Pre-Deploy Migration Isolation (getMigrationCredentials)', () => {
+    it('successfully extracts database credentials during Render pre-deploy before SMTP is configured', () => {
+      // Exactly the environment present when Render initially provisions Blueprint
+      const renderPreDeployEnv: NodeJS.ProcessEnv = {
+        NODE_ENV: 'production',
+        OVERTO_SELF_HOSTED: 'true',
+        OVERTO_AUTH_LOCAL: 'false',
+        OVERTO_DATABASE_URL: 'postgresql://overto:test-password@10.0.0.1:5432/overto',
+        OVERTO_AUTH_SECRET: 'generated-render-secret-at-least-32-chars-long',
+        // SMTP and BETTER_AUTH_URL are NOT yet provided by user
+      };
+
+      const credentials = getMigrationCredentials(renderPreDeployEnv);
+      expect(credentials.databaseUrl).toBe('postgresql://overto:test-password@10.0.0.1:5432/overto');
+      expect(credentials.authSecret).toBe('generated-render-secret-at-least-32-chars-long');
+    });
+
+    it('accepts DATABASE_URL as fallback if OVERTO_DATABASE_URL is not set', () => {
+      const envWithDefaultDb: NodeJS.ProcessEnv = {
+        NODE_ENV: 'production',
+        OVERTO_SELF_HOSTED: 'true',
+        OVERTO_AUTH_LOCAL: 'false',
+        DATABASE_URL: 'postgresql://overto:secret@postgres.render.com:5432/overto',
+        OVERTO_AUTH_SECRET: 'generated-render-secret-at-least-32-chars-long',
+      };
+
+      const credentials = getMigrationCredentials(envWithDefaultDb);
+      expect(credentials.databaseUrl).toBe('postgresql://overto:secret@postgres.render.com:5432/overto');
+    });
+
+    it('rejects pre-deploy migration if not self-hosted or production', () => {
+      expect(() => {
+        getMigrationCredentials({
+          NODE_ENV: 'development',
+          OVERTO_SELF_HOSTED: 'false',
+          OVERTO_DATABASE_URL: 'postgresql://overto:pass@localhost:5432/overto',
+          OVERTO_AUTH_SECRET: 'secret-with-length-exceeding-thirty-two-chars',
+        });
+      }).toThrow('SELFHOST_CONFIG_REQUIRED');
+    });
+
+    it('rejects pre-deploy migration if OVERTO_AUTH_LOCAL=true in production', () => {
+      expect(() => {
+        getMigrationCredentials({
+          NODE_ENV: 'production',
+          OVERTO_SELF_HOSTED: 'true',
+          OVERTO_AUTH_LOCAL: 'true',
+          OVERTO_DATABASE_URL: 'postgresql://overto:pass@localhost:5432/overto',
+          OVERTO_AUTH_SECRET: 'secret-with-length-exceeding-thirty-two-chars',
+        });
+      }).toThrow('INVALID_SELFHOST_CONFIG');
+    });
+
+    it('rejects pre-deploy migration if database URL is missing', () => {
+      expect(() => {
+        getMigrationCredentials({
+          NODE_ENV: 'production',
+          OVERTO_SELF_HOSTED: 'true',
+          OVERTO_AUTH_LOCAL: 'false',
+          OVERTO_AUTH_SECRET: 'secret-with-length-exceeding-thirty-two-chars',
+        });
+      }).toThrow('DATABASE_URL_REQUIRED');
+    });
+
+    it('rejects pre-deploy migration if auth secret is shorter than 32 chars', () => {
+      expect(() => {
+        getMigrationCredentials({
+          NODE_ENV: 'production',
+          OVERTO_SELF_HOSTED: 'true',
+          OVERTO_AUTH_LOCAL: 'false',
+          OVERTO_DATABASE_URL: 'postgresql://overto:pass@localhost:5432/overto',
+          OVERTO_AUTH_SECRET: 'short',
+        });
+      }).toThrow('AUTH_SECRET_REQUIRED');
     });
   });
 

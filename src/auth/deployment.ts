@@ -16,9 +16,10 @@ export function accountDeployment(env: NodeJS.ProcessEnv): AccountDeployment | n
       smtp: { host: '127.0.0.1', port: 1025, secure: false, requireTLS: false, from: 'OvěřTo local <no-reply@example.test>' } };
   }
   if (env.OVERTO_SELF_HOSTED !== 'true') return null;
-  if (env.NODE_ENV !== 'production' || env.OVERTO_AUTH_LOCAL === 'true' || !env.OVERTO_DATABASE_URL || !env.OVERTO_AUTH_SECRET || !env.BETTER_AUTH_URL || !env.SMTP_HOST || !env.SMTP_FROM) throw new Error('INVALID_SELFHOST_CONFIG');
+  const baseUrl = env.BETTER_AUTH_URL || env.RENDER_EXTERNAL_URL;
+  if (env.NODE_ENV !== 'production' || env.OVERTO_AUTH_LOCAL === 'true' || !env.OVERTO_DATABASE_URL || !env.OVERTO_AUTH_SECRET || !baseUrl || !env.SMTP_HOST || !env.SMTP_FROM) throw new Error('INVALID_SELFHOST_CONFIG');
   const database = new URL(env.OVERTO_DATABASE_URL);
-  const origin = new URL(env.BETTER_AUTH_URL);
+  const origin = new URL(baseUrl);
   const port = Number(env.SMTP_PORT || '587');
   const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname);
   if (!['postgres:', 'postgresql:'].includes(database.protocol) || !database.hostname || !database.pathname || !database.username || !database.password ||

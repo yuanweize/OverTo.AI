@@ -5,7 +5,8 @@ import { accountDeployment } from '@/auth/deployment';
 
 function unavailable() { return Response.json({ error: 'Účty nejsou na tomto serveru dostupné.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } }); }
 function allowedHost(request: NextRequest) {
-  const deployment = accountDeployment(process.env);
+  let deployment = null;
+  try { deployment = accountDeployment(process.env); } catch { return false; }
   if (!deployment) return false;
   const host = request.headers.get('host');
   if (deployment.mode === 'local') return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(request.url).hostname);
