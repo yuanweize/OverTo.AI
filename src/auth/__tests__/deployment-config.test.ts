@@ -90,6 +90,12 @@ describe('Production & Render Deployment Configuration Integrity', () => {
       expect(deployment?.baseUrl).toBe('https://overto-ai-demo.onrender.com');
     });
 
+    it('accepts both RFC 5322 display name with angle brackets and plain email in SMTP_FROM', () => {
+      const withDisplayName = { ...validRenderEnv, SMTP_FROM: 'OvěřTo.AI <noreply@overto.ai>' };
+      const deployment = accountDeployment(withDisplayName);
+      expect(deployment?.smtp.from).toBe('OvěřTo.AI <noreply@overto.ai>');
+    });
+
     it('rejects OVERTO_AUTH_LOCAL=true in production', () => {
       expect(() => {
         accountDeployment({ ...validRenderEnv, OVERTO_AUTH_LOCAL: 'true' });

@@ -25,7 +25,7 @@ export function accountDeployment(env: NodeJS.ProcessEnv): AccountDeployment | n
   if (!['postgres:', 'postgresql:'].includes(database.protocol) || !database.hostname || !database.pathname || !database.username || !database.password ||
       (origin.protocol !== 'https:' && !(origin.protocol === 'http:' && loopback)) || origin.pathname !== '/' || origin.search || origin.hash || origin.username || origin.password ||
       !Number.isSafeInteger(port) || port < 1 || port > 65535 || env.OVERTO_AUTH_SECRET.length < 32 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(env.SMTP_FROM) || Boolean(env.SMTP_USER) !== Boolean(env.SMTP_PASSWORD)) throw new Error('INVALID_SELFHOST_CONFIG');
+      !/^([^<>\s]+@[^<>\s]+\.[^<>\s]+|[^<>\r\n]+<[^<>\s]+@[^<>\s]+\.[^<>\s]+>)$/.test(env.SMTP_FROM) || Boolean(env.SMTP_USER) !== Boolean(env.SMTP_PASSWORD)) throw new Error('INVALID_SELFHOST_CONFIG');
   return { mode: 'selfhost', databaseUrl: env.OVERTO_DATABASE_URL, authSecret: env.OVERTO_AUTH_SECRET,
     baseUrl: origin.origin,
     smtp: { host: env.SMTP_HOST, port, secure: env.SMTP_SECURE === 'true', requireTLS: env.SMTP_REQUIRE_TLS !== 'false',
