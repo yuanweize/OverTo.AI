@@ -21,6 +21,9 @@ export async function GET() {
   try {
     deployment = accountDeployment(process.env);
   } catch {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[OvěřTo Health] Self-hosted auth not ready. Ensure SMTP_HOST and SMTP_FROM are configured in environment variables.');
+    }
     return NextResponse.json(
       { status: 'unavailable', service: 'overto', schemaVersion: '1.0', error: 'INVALID_AUTH_CONFIG' },
       { status: 503, headers }

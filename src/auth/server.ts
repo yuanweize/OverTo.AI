@@ -2,9 +2,14 @@ import 'server-only';
 import { betterAuth } from 'better-auth';
 import { Pool } from 'pg';
 import nodemailer from 'nodemailer';
-import { accountDeployment } from './deployment';
+import { accountDeployment, type AccountDeployment } from './deployment';
 
-const deployment = accountDeployment(process.env);
+let deployment: AccountDeployment | null = null;
+try {
+  deployment = accountDeployment(process.env);
+} catch {
+  deployment = null;
+}
 export const pool = deployment ? new Pool({ connectionString: deployment.databaseUrl, max: 10 }) : null;
 const mail = deployment ? nodemailer.createTransport({
   host: deployment.smtp.host, port: deployment.smtp.port, secure: deployment.smtp.secure,

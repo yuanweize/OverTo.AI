@@ -44,7 +44,7 @@ Fill in the uncommitted environment variables (`sync: false`) in the Render Web 
 
 | Variable | Recommended Value / Description |
 | :--- | :--- |
-| `BETTER_AUTH_URL` | Your full HTTPS domain (e.g. `https://demo.overto.ai`) |
+| `BETTER_AUTH_URL` | *(Optional)* Custom HTTPS domain (e.g. `https://demo.overto.ai`). If omitted, automatically defaults to Render's internal `RENDER_EXTERNAL_URL` (`https://<service>.onrender.com`). |
 | `SMTP_HOST` | Production SMTP host (e.g. `smtp.resend.com` or `smtp.eu.mailgun.org`) |
 | `SMTP_PORT` | `587` |
 | `SMTP_USER` | SMTP username provided by your email provider |
