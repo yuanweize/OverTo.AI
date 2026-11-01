@@ -20,7 +20,7 @@ An evidence-led assistant for Czech and multilingual messages, helping people ex
 <p align="center">
   <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="OvěřTo.AI evidence-led analysis interface" />
   <br />
-  <sub><strong>Evidence-Led Scam Analysis (Desktop)</strong> — Transparent extraction of fraud signals, calibrated risk scoring, and verified out-of-band next steps.</sub>
+  <sub><strong>Evidence-Led Scam Analysis (Desktop)</strong> — Transparent extraction of fraud signals, heuristic risk scoring, and recommended out-of-band next steps.</sub>
 </p>
 
 ---
@@ -38,29 +38,29 @@ An evidence-led assistant for Czech and multilingual messages, helping people ex
 - **Developer API & OpenAPI 3.1**  
   Versioned REST endpoint (`/api/v1/analyses`), scoped tenant API keys with daily rate limits, and an interactive browser-based API playground.
 - **Self-Hosted Architecture & AI Studio**  
-  Production-ready Docker Compose stack powered by PostgreSQL 17, Better Auth with email verification, double-entry credit ledger, Stripe test billing, and an administrative AI Studio protected by atomic concurrency budgets.
+  Self-hosted Docker Compose deployment powered by PostgreSQL 17, Better Auth with email verification, transactional credit ledger, Stripe test billing, and an administrative AI Studio protected by atomic concurrency budgets.
 
 ---
 
 ## Product Showcase
 
-A curated overview of the OvěřTo.AI web platform across desktop and mobile devices.
+A curated overview of the OvěřTo.AI web platform across desktop, tablet, and mobile interfaces.
 
-### 1. Evidence-Led Analysis & Grounded Signals
-![Analysis Desktop](assets/screenshots/v7-analyze-cs-1440.png)
-*Detailed analysis result showing extracted textual evidence, computed risk level, and safe verification advice.*
-
-### 2. Tenant Workspace & Usage Dashboard
+### 1. Tenant Workspace & Usage Dashboard
 ![Tenant Dashboard](assets/screenshots/v7-dashboard-cs-1440.png)
 *Personal workspace dashboard providing real-time visibility into credit balances, active projects, and daily analysis volume.*
 
-### 3. Developer Tools & Accessible API Documentation
+### 2. Developer Tools & Accessible API Documentation
 ![Developer Documentation Tablet](assets/screenshots/v7-developers-cs-dark-1024-a11y.png)
-*WCAG AA accessibility verified developer documentation with parameter breakdowns, request code snippets, and error contracts.*
+*Developer documentation designed with WCAG AA contrast guidelines, featuring parameter breakdowns, request code snippets, and error schemas.*
 
-### 4. Platform Administration & AI Studio (ROOT Only)
+### 3. Platform Administration & AI Studio (ROOT Only)
 ![AI Studio Traces Dark](assets/screenshots/v7-ai-studio-en-dark.png)
 *Real-time trace observability detailing token consumption, latency, USD cost estimation, and PostgreSQL atomic budget enforcement.*
+
+### 4. Mobile Experience & Dark Mode Analysis
+![Mobile Analysis Dark](assets/screenshots/v7-analyze-en-dark-390.png)
+*Responsive mobile analysis interface in dark mode displaying identified warning signs and verification guidance.*
 
 👉 *Explore the complete collection of all 52 interface captures, mobile layouts, and theme comparisons in the [Visual Showcase Gallery](docs/showcase.md).*
 
@@ -143,21 +143,43 @@ Example response:
 
 ```json
 {
-  "decision": "LIKELY_SCAM",
-  "score": 85,
-  "engine": "RULES_ONLY",
+  "schemaVersion": "1.0",
+  "status": "COMPLETED",
+  "decision": "HIGH_RISK",
   "signals": [
     {
-      "id": "BANK_IMPERSONATION",
+      "id": "IMPERSONATION_CSOB",
+      "category": "IMPERSONATION",
       "severity": "CRITICAL",
-      "evidenceQuote": "váš účet byl zablokován",
-      "description": "Urgent account blockage claim typical of banking fraud."
+      "title": "Possible look-alike domain",
+      "description": "The hostname contains a known brand name but does not match the configured domain list.",
+      "matchedSnippet": "https://csob-zabezpeceni.cz/"
     }
   ],
   "recommendedActions": [
-    "Do not click the link or provide banking credentials.",
-    "Contact your bank directly using the phone number on the back of your payment card."
-  ]
+    {
+      "step": 1,
+      "action": "Avoid opening the message’s link until you verify it",
+      "rationale": "The address has warning signs. Use an independently known website or app to check the request.",
+      "isWarning": true
+    },
+    {
+      "step": 2,
+      "action": "Contact your bank using the number on your card or in its app",
+      "rationale": "Ask the bank to check the claim. Do not use a phone number supplied in the suspicious message.",
+      "isWarning": false
+    }
+  ],
+  "engine": {
+    "mode": "DETERMINISTIC_RULES",
+    "providerStatus": "NOT_REQUESTED",
+    "model": null
+  },
+  "metadata": {
+    "engineVersion": "0.1.0",
+    "rulesetVersion": "development",
+    "decisionPolicyVersion": "1"
+  }
 }
 ```
 
@@ -170,7 +192,7 @@ Authenticated requests use bearer token API keys with shared daily quotas. See t
 | Topic | Description | Link |
 |---|---|---|
 | **Deployment** | Production Docker Compose, environment configuration, and backups | [Self-Hosting Guide](docs/deployment/self-host.md) |
-| **Render Blueprint** | Production cloud deployment blueprint and health checks | [Render Demo Guide](docs/deployment/render-demo.md) |
+| **Render Blueprint** | Cloud deployment blueprint and health verification guide | [Render Demo Guide](docs/deployment/render-demo.md) |
 | **API Reference** | Endpoints, authentication, rate limits, and schemas | [docs/api/v1.md](docs/api/v1.md) |
 | **OpenAPI Contract** | Machine-readable OpenAPI 3.1 specification | [openapi.yaml](docs/api/openapi.yaml) |
 | **Architecture** | System pipelines, multi-tenancy, and budget mechanisms | [ARCHITECTURE.md](ARCHITECTURE.md) |

@@ -6,7 +6,7 @@
 
 **Open-source platforma pro detekci podvodů a nezávislé ověřování zpráv.**
 
-Asistent založený na důkazech pro české a vícejazyčné zprávy. Pomáhá analyzovat podezřelé komunikace, rozpoznávat ověřené podvodné znaky a bezpečně ověřovat žádosti dříve, než dojde k nevratným krokům.
+Asistent založený na důkazech pro české a vícejazyčné zprávy. Pomáhá analyzovat podezřelé komunikace, rozpoznávat podezřelé podvodné znaky a bezpečně ověřovat žádosti dříve, než dojde k nevratným krokům.
 
 [![CI](https://github.com/yuanweize/OverTo.AI/actions/workflows/ci.yml/badge.svg)](https://github.com/yuanweize/OverTo.AI/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuanweize/OverTo.AI?color=2454cf)](https://github.com/yuanweize/OverTo.AI/releases)
@@ -20,7 +20,7 @@ Asistent založený na důkazech pro české a vícejazyčné zprávy. Pomáhá 
 <p align="center">
   <img src="assets/screenshots/v7-analyze-cs-1440.png" width="100%" alt="Rozhraní analýzy OvěřTo.AI" />
   <br />
-  <sub><strong>Analýza zpráv založená na důkazech (Desktop)</strong> — Transparentní vyhodnocení podvodných signálů, kalibrované skóre rizika a bezpečné kroky nezávislého ověření.</sub>
+  <sub><strong>Analýza zpráv založená na důkazech (Desktop)</strong> — Transparentní vyhodnocení podvodných signálů, heuristické skóre rizika a doporučené kroky nezávislého ověření.</sub>
 </p>
 
 ---
@@ -38,29 +38,29 @@ Asistent založený na důkazech pro české a vícejazyčné zprávy. Pomáhá 
 - **Vývojářské API a OpenAPI 3.1**  
   Verzovaný REST koncový bod (`/api/v1/analyses`), projektové API klíče s denními limity spotřeby a interaktivní testovací prostředí (API Playground).
 - **Provoz ve vlastní infrastruktuře (Self-Hosting) a AI Studio**  
-  Kompletní produkční stack pro Docker Compose s PostgreSQL 17, Better Auth s ověřováním e-mailů, podvojnou kreditní knihou, testovací fakturací Stripe a administrátorským AI Studiem chráněným atomickými finančními rozpočty.
+  Nasazení v Docker Compose s PostgreSQL 17, Better Auth s ověřováním e-mailů, transakční kreditní knihou, testovací fakturací Stripe a administrátorským AI Studiem chráněným atomickými finančními rozpočty.
 
 ---
 
 ## Vizuální přehled
 
-Výběr klíčových obrazovek platformy OvěřTo.AI pro desktopová i mobilní zařízení.
+Výběr klíčových obrazovek platformy OvěřTo.AI pro desktopová, tabletová i mobilní zařízení.
 
-### 1. Analýza založená na důkazech a textové signály
-![Analýza Desktop](assets/screenshots/v7-analyze-cs-1440.png)
-*Detailní výsledek analýzy se zvýrazněnými citacemi z textu, stupněm rizika a doporučeným postupem.*
-
-### 2. Klientský dashboard a pracovní prostor
+### 1. Klientský dashboard a pracovní prostor
 ![Dashboard Desktop](assets/screenshots/v7-dashboard-cs-1440.png)
 *Uživatelský dashboard s přehledem zůstatku kreditů, aktivních projektů a denního objemu požadavků.*
 
-### 3. Vývojářské nástroje a přístupná dokumentace API
+### 2. Vývojářské nástroje a přístupná dokumentace API
 ![Vývojářská dokumentace Tablet](assets/screenshots/v7-developers-cs-dark-1024-a11y.png)
-*Referenční dokumentace API ověřená podle standardu přístupnosti WCAG AA s ukázkami kódu a schématy odpovědí.*
+*Dokumentace API navržená podle kontrastních doporučení WCAG AA s ukázkami kódu a schématy odpovědí.*
 
-### 4. Správa platformy a AI Studio (pouze ROOT)
+### 3. Správa platformy a AI Studio (pouze ROOT)
 ![AI Studio Traces Tmavý](assets/screenshots/v7-ai-studio-en-dark.png)
 *Provozní telemetrie v reálném čase: spotřeba tokenů, latence, odhad nákladů v USD a atomické vynucování rozpočtu v PostgreSQL.*
+
+### 4. Mobilní rozhraní a analýza v tmavém režimu
+![Mobilní analýza Tmavý](assets/screenshots/v7-analyze-en-dark-390.png)
+*Responzivní mobilní rozhraní analýzy v tmavém režimu se zobrazením nalezených varovných signálů a postupu ověření.*
 
 👉 *Kompletní katalog všech 52 snímků rozhraní, mobilních zobrazení a porovnání motivů naleznete v [Galerii rozhraní](docs/showcase.md).*
 
@@ -143,21 +143,43 @@ Ukázka odpovědi:
 
 ```json
 {
-  "decision": "LIKELY_SCAM",
-  "score": 85,
-  "engine": "RULES_ONLY",
+  "schemaVersion": "1.0",
+  "status": "COMPLETED",
+  "decision": "HIGH_RISK",
   "signals": [
     {
-      "id": "BANK_IMPERSONATION",
+      "id": "IMPERSONATION_CSOB",
+      "category": "IMPERSONATION",
       "severity": "CRITICAL",
-      "evidenceQuote": "váš účet byl zablokován",
-      "description": "Urgent account blockage claim typical of banking fraud."
+      "title": "Napodobení oficiální adresy (csob)",
+      "description": "Adresa obsahuje název 'csob', ale neodpovídá skutečné oficiální doméně (csob.cz).",
+      "matchedSnippet": "https://csob-zabezpeceni.cz/"
     }
   ],
   "recommendedActions": [
-    "Neklikejte na odkaz a nezadávejte přihlašovací údaje.",
-    "Kontaktujte svou banku přímo na telefonním čísle uvedeném na zadní straně platební karty."
-  ]
+    {
+      "step": 1,
+      "action": "V žádném případě na odkaz v této zprávě neklikejte",
+      "rationale": "Odkaz vykazuje znaky podvržené domény. Může vést na podvodnou platební bránu nebo instalaci škodlivého kódu.",
+      "isWarning": true
+    },
+    {
+      "step": 2,
+      "action": "Vezměte svou platební kartu a zavolejte na oficiální telefonní číslo na její zadní straně",
+      "rationale": "Požádejte banku o prověření tvrzení. Nepoužívejte číslo uvedené v podezřelé zprávě.",
+      "isWarning": false
+    }
+  ],
+  "engine": {
+    "mode": "DETERMINISTIC_RULES",
+    "providerStatus": "NOT_REQUESTED",
+    "model": null
+  },
+  "metadata": {
+    "engineVersion": "0.1.0",
+    "rulesetVersion": "development",
+    "decisionPolicyVersion": "1"
+  }
 }
 ```
 
@@ -170,7 +192,7 @@ Ověřené požadavky používají Bearer token s denními limity. Podrobnosti n
 | Oblast | Popis | Odkaz |
 |---|---|---|
 | **Nasazení** | Produkční Docker Compose, konfigurace prostředí a zálohování | [Průvodce vlastním provozem](docs/deployment/self-host.md) |
-| **Render Blueprint** | Konfigurace cloudového nasazení na platformě Render | [Render Demo Guide](docs/deployment/render-demo.md) |
+| **Render Blueprint** | Průvodce cloudovým nasazením a ověřením zdraví na platformě Render | [Render Demo Guide](docs/deployment/render-demo.md) |
 | **API Reference** | Koncové body, autentizace, rychlostní limity a schémata | [docs/api/v1.md](docs/api/v1.md) |
 | **OpenAPI Specifikace** | Strojově čitelná specifikace OpenAPI 3.1 | [openapi.yaml](docs/api/openapi.yaml) |
 | **Architektura** | Systémové procesy, více-uživatelská správa a rozpočty | [ARCHITECTURE.md](ARCHITECTURE.md) |
