@@ -1,10 +1,25 @@
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
+import { auth } from '@/auth/server';
 import { Header } from '@/components/Header';
 import { AuthForm } from './AuthForm';
 import { accountDeployment } from '@/auth/deployment';
 
 export async function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
+  if (auth) {
+    let session = null;
+    try {
+      session = await auth.api.getSession({ headers: await headers() });
+    } catch {
+      session = null;
+    }
+    if (session?.user?.emailVerified) {
+      redirect('/dashboard');
+    }
+  }
+
   const t = await getTranslations('Auth');
   let deployment = null;
   try {
