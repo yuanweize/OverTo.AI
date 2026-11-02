@@ -50,14 +50,19 @@ test.describe('Theme Matrix and Contrast Verification', () => {
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     await expect(page.locator('.home-hero-wrap')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(page.locator('.preferences')).toHaveAttribute('data-ready', 'true');
 
+    const darkPref = page.waitForResponse(res => res.url().includes('/api/preferences') && res.status() === 200);
     await page.getByLabel('Appearance').selectOption('dark');
+    await darkPref;
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await expect(page.locator('header.site-header')).toHaveCSS('background-color', 'rgb(23, 37, 54)');
     await expect(page.locator('.home-hero-wrap')).toHaveCSS('background-color', 'rgb(13, 23, 35)');
 
+    const lightPref = page.waitForResponse(res => res.url().includes('/api/preferences') && res.status() === 200);
     await page.getByLabel('Appearance').selectOption('light');
+    await lightPref;
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     await expect(page.locator('.home-hero-wrap')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
