@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'INVALID_PREFERENCE' }, { status: 400 });
     }
     const response = NextResponse.json({ saved: true }, { headers: { 'Cache-Control': 'no-store' } });
-    const options = { path: '/', sameSite: 'lax' as const, secure: origin.startsWith('https:'), httpOnly: true, maxAge: 31536000 };
+    const options = { path: '/', sameSite: 'lax' as const, secure: origin.startsWith('https:'), httpOnly: false, maxAge: 31536000 };
     if (body.locale === 'auto') response.cookies.delete('overto-locale');
     else if (body.locale) response.cookies.set('overto-locale', body.locale, options);
     if (body.theme) response.cookies.set('overto-theme', body.theme, options);

@@ -10,6 +10,7 @@ export function Preferences() {
   async function update(value: { locale?: string; theme?: string }) {
     setBusy(true); setError('');
     if (value.theme) {
+      document.cookie = `overto-theme=${encodeURIComponent(value.theme)}; path=/; max-age=31536000; SameSite=Lax`;
       document.documentElement.dataset.themePreference = value.theme;
       const effective = value.theme === 'system'
         ? (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
