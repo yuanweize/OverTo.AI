@@ -11,5 +11,5 @@ export default async function AdminLayout({children}: {children:React.ReactNode}
     const deployment = accountDeployment(process.env);
     if (deployment) mode = deployment.mode;
   } catch {}
-  return <WorkspaceShell name={user.name} email={user.email} admin mode={mode}>{children}</WorkspaceShell>;
+  return <WorkspaceShell name={user.name} email={user.email} admin canAdmin mode={mode}>{children}</WorkspaceShell>;
 }
