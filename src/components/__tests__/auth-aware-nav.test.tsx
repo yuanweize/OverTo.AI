@@ -67,7 +67,7 @@ describe('Authentication-Aware Navigation & Workspace Switching', () => {
         );
       });
 
-      const loadingPlaceholder = container.querySelector('[aria-busy="true"]');
+      const loadingPlaceholder = container.querySelector('[aria-hidden="true"].pointer-events-none');
       expect(loadingPlaceholder).toBeDefined();
       expect(container.textContent).not.toContain('Sign in');
       expect(container.textContent).not.toContain('Dashboard');

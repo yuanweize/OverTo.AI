@@ -34,8 +34,7 @@ export function Header() {
             {isPending ? (
               <span
                 className="button button-secondary pointer-events-none select-none opacity-60"
-                aria-busy="true"
-                aria-label={t('loading')}
+                aria-hidden="true"
               >
                 <span className="inline-block h-3.5 w-12 rounded bg-slate-300/60 dark:bg-slate-700 animate-pulse" />
               </span>
