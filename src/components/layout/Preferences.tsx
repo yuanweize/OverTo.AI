@@ -12,7 +12,14 @@ export function Preferences() {
     try {
       const response = await fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
       if (!response.ok) throw new Error();
-      if (value.theme) { document.documentElement.dataset.theme = value.theme; setTheme(value.theme); }
+      if (value.theme) {
+        document.documentElement.dataset.themePreference = value.theme;
+        const effective = value.theme === 'system'
+          ? (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : value.theme;
+        document.documentElement.dataset.theme = effective;
+        setTheme(value.theme);
+      }
       if (value.locale) window.location.reload();
     } catch { setError(t('saveError')); } finally { setBusy(false); }
   }
