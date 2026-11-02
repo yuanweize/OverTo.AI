@@ -13,6 +13,13 @@ export function Preferences() {
   }, []);
   async function update(value: { locale?: string; theme?: string }) {
     setBusy(true); setError('');
+    if (value.locale) {
+      if (value.locale === 'auto') {
+        document.cookie = 'overto-locale=; path=/; max-age=0; SameSite=Lax';
+      } else {
+        document.cookie = `overto-locale=${encodeURIComponent(value.locale)}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+    }
     if (value.theme) {
       document.cookie = `overto-theme=${encodeURIComponent(value.theme)}; path=/; max-age=31536000; SameSite=Lax`;
       document.documentElement.dataset.themePreference = value.theme;
