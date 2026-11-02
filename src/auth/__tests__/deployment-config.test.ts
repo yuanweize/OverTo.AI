@@ -90,6 +90,12 @@ describe('Production & Render Deployment Configuration Integrity', () => {
       expect(deployment?.baseUrl).toBe('https://overto-ai-demo.onrender.com');
     });
 
+    it('normalizes bare hostnames in BETTER_AUTH_URL with https:// prefix', () => {
+      const withBareDomain = { ...validRenderEnv, BETTER_AUTH_URL: 'overto.hktse.eu.org' };
+      const deployment = accountDeployment(withBareDomain);
+      expect(deployment?.baseUrl).toBe('https://overto.hktse.eu.org');
+    });
+
     it('accepts both RFC 5322 display name with angle brackets and plain email in SMTP_FROM', () => {
       const withDisplayName = { ...validRenderEnv, SMTP_FROM: 'OvěřTo.AI <noreply@overto.ai>' };
       const deployment = accountDeployment(withDisplayName);

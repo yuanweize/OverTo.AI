@@ -5,7 +5,11 @@ import { readFile } from 'node:fs/promises';
 
 /** Applies only additive/idempotent project migrations; caller selects the database. */
 export async function migrateSchema(pool: Pool, secret: string, distributedAuthRateLimit: boolean) {
-  const auth = betterAuth({ database: pool, secret, emailAndPassword: { enabled: true, minPasswordLength: 10 },
+  const auth = betterAuth({
+    database: pool,
+    secret,
+    baseURL: 'http://127.0.0.1:3000',
+    emailAndPassword: { enabled: true, minPasswordLength: 10 },
     ...(distributedAuthRateLimit ? { rateLimit: { enabled: true, storage: 'database' as const, window: 60, max: 60 } } : {}),
   });
   await (await getMigrations(auth.options)).runMigrations();

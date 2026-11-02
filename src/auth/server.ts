@@ -7,6 +7,9 @@ import { accountDeployment, type AccountDeployment } from './deployment';
 let deployment: AccountDeployment | null = null;
 try {
   deployment = accountDeployment(process.env);
+  if (deployment) {
+    process.env.BETTER_AUTH_URL = deployment.baseUrl;
+  }
 } catch {
   deployment = null;
 }

@@ -7,6 +7,14 @@ export type AccountDeployment = {
   smtp: { host: string; port: number; secure: boolean; requireTLS: boolean; from: string; user?: string; pass?: string };
 };
 
+export function normalizeBaseUrl(raw: string): string {
+  let trimmed = raw.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    trimmed = `https://${trimmed}`;
+  }
+  return trimmed;
+}
+
 export function accountDeployment(env: NodeJS.ProcessEnv): AccountDeployment | null {
   if (env.NODE_ENV === 'development' && env.OVERTO_AUTH_LOCAL === 'true' && env.OVERTO_LOCAL_VERIFY_EMAIL === 'true' && env.OVERTO_DEV_DATABASE_URL && env.OVERTO_AUTH_SECRET) {
     const url = new URL(env.OVERTO_DEV_DATABASE_URL);
@@ -16,9 +24,10 @@ export function accountDeployment(env: NodeJS.ProcessEnv): AccountDeployment | n
       smtp: { host: '127.0.0.1', port: 1025, secure: false, requireTLS: false, from: 'OvěřTo local <no-reply@example.test>' } };
   }
   if (env.OVERTO_SELF_HOSTED !== 'true') return null;
-  const baseUrl = env.BETTER_AUTH_URL || env.RENDER_EXTERNAL_URL;
-  if (env.NODE_ENV !== 'production' || env.OVERTO_AUTH_LOCAL === 'true' || !env.OVERTO_DATABASE_URL || !env.OVERTO_AUTH_SECRET || !baseUrl || !env.SMTP_HOST || !env.SMTP_FROM) throw new Error('INVALID_SELFHOST_CONFIG');
+  const rawBaseUrl = env.BETTER_AUTH_URL || env.RENDER_EXTERNAL_URL;
+  if (env.NODE_ENV !== 'production' || env.OVERTO_AUTH_LOCAL === 'true' || !env.OVERTO_DATABASE_URL || !env.OVERTO_AUTH_SECRET || !rawBaseUrl || !env.SMTP_HOST || !env.SMTP_FROM) throw new Error('INVALID_SELFHOST_CONFIG');
   const database = new URL(env.OVERTO_DATABASE_URL);
+  const baseUrl = normalizeBaseUrl(rawBaseUrl);
   const origin = new URL(baseUrl);
   const port = Number(env.SMTP_PORT || '587');
   const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname);
