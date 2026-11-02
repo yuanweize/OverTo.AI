@@ -17,7 +17,27 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const [locale, messages, { config }, cookieStore] = await Promise.all([getLocale(), getMessages(), getSiteSnapshot(), cookies()]);
   const preference = cookieStore.get('overto-theme')?.value;
   const theme = preference && ['light', 'dark', 'system'].includes(preference) ? preference : config.defaultTheme;
-  return <html lang={locale} data-theme={theme} data-scroll-behavior="smooth" className={`${inter.variable} h-full`} style={{ '--brand-action': config.brandColor } as React.CSSProperties}>
-    <body className="min-h-full antialiased font-sans"><NextIntlClientProvider locale={locale} messages={messages}><SiteProvider config={config} theme={theme}>{children}</SiteProvider></NextIntlClientProvider></body>
-  </html>;
+  const themeInitScript = `(function(){try{var p=document.documentElement.getAttribute('data-theme-preference')||document.documentElement.getAttribute('data-theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=p==='system'?(d?'dark':'light'):(p==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',t);if(window.matchMedia){window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',function(e){if((document.documentElement.getAttribute('data-theme-preference')||'system')==='system'){document.documentElement.setAttribute('data-theme',e.matches?'dark':'light');}});}}catch(e){}})();`;
+  return (
+    <html
+      lang={locale}
+      data-theme={theme}
+      data-theme-preference={theme}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+      className={`${inter.variable} h-full`}
+      style={{ '--brand-action': config.brandColor } as React.CSSProperties}
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="min-h-full antialiased font-sans">
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <SiteProvider config={config} theme={theme}>
+            {children}
+          </SiteProvider>
+        </NextIntlClientProvider>
+      </body>
+    </html>
+  );
 }
