@@ -9,17 +9,17 @@ export function Preferences() {
   const [theme, setTheme] = useState(initialTheme); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   async function update(value: { locale?: string; theme?: string }) {
     setBusy(true); setError('');
+    if (value.theme) {
+      document.documentElement.dataset.themePreference = value.theme;
+      const effective = value.theme === 'system'
+        ? (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : value.theme;
+      document.documentElement.dataset.theme = effective;
+      setTheme(value.theme);
+    }
     try {
       const response = await fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
       if (!response.ok) throw new Error();
-      if (value.theme) {
-        document.documentElement.dataset.themePreference = value.theme;
-        const effective = value.theme === 'system'
-          ? (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-          : value.theme;
-        document.documentElement.dataset.theme = effective;
-        setTheme(value.theme);
-      }
       if (value.locale) window.location.reload();
     } catch { setError(t('saveError')); } finally { setBusy(false); }
   }
