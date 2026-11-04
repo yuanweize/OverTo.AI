@@ -666,6 +666,7 @@
   },
   "Models": {
     "pricingTitle": "Ověřené ceny modelu",
+    "pricingModel": "Model pro stanovení ceny",
     "pricingNote": "Zadejte aktuální ceny poskytovatele v USD za milion tokenů. Staré příkladové ceny nejsou důvěryhodné. Potvrzení povolí rozpočtem omezené požadavky pro vybraný model.",
     "pricingVerified": "Cenu potvrdil správce. Při změně cen poskytovatele ji ověřte znovu.",
     "pricingUnverified": "Cena není potvrzena. Placená volání tohoto modelu jsou blokována.",

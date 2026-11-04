@@ -34,8 +34,8 @@ export function ModelPricingForm({ models, pricing }: { models: string[]; pricin
 
   return <form onSubmit={save} className="mt-8 max-w-3xl space-y-5 border-t border-slate-200 pt-8 dark:border-slate-700">
     <div><h2 className="text-xl font-semibold">{t('pricingTitle')}</h2><p className="muted mt-2 text-sm leading-6">{t('pricingNote')}</p></div>
-    <label className="block text-sm font-semibold">{t('modelId')}<select className="studio-input" value={model} onChange={event => { setModel(event.target.value); setInput(''); setOutput(''); setMaximum(''); setConfirmed(false); setMessage(''); }}>{models.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
-    <p role="status" className="text-sm">{selected?.verified ? t('pricingVerified') : t('pricingUnverified')}</p>
+    <label className="block text-sm font-semibold">{t('pricingModel')}<select className="studio-input" value={model} onChange={event => { setModel(event.target.value); setInput(''); setOutput(''); setMaximum(''); setConfirmed(false); setMessage(''); }}>{models.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+    <p className="text-sm">{selected?.verified ? t('pricingVerified') : t('pricingUnverified')}</p>
     <div className="grid gap-4 sm:grid-cols-3">
       <label className="block text-sm font-semibold">{t('inputPrice')}<input className="studio-input" type="number" min="0" max="1000" step="any" required value={input} onChange={event => setInput(event.target.value)}/></label>
       <label className="block text-sm font-semibold">{t('outputPrice')}<input className="studio-input" type="number" min="0" max="1000" step="any" required value={output} onChange={event => setOutput(event.target.value)}/></label>

@@ -666,6 +666,7 @@
   },
   "Models": {
     "pricingTitle": "Verified model pricing",
+    "pricingModel": "Model to price",
     "pricingNote": "Enter current prices from your provider in USD per million tokens. Historical example prices are not trusted. This confirmation permits budgeted requests for the selected model.",
     "pricingVerified": "Pricing confirmed by an operator. Verify again whenever the provider changes prices.",
     "pricingUnverified": "No confirmed price. Paid calls for this model are blocked.",
