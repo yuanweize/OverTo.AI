@@ -17,7 +17,8 @@ export interface SemanticAnalysis {
   contextualSummary: string;
   uncertainty: string[];
 }
-export type ProviderResult = { status: AiStatus; analysis?: SemanticAnalysis; model?: string; reason?: 'not_configured' | 'deployment_gate' | 'timeout' | 'rate_limit' | 'provider' | 'invalid_response'; rejectedEvidence?: number; inputTokens?: number; outputTokens?: number };
+export type ProviderResult = { status: AiStatus; analysis?: SemanticAnalysis; model?: string; reason?: 'not_configured' | 'deployment_gate' | 'emergency_disabled' | 'timeout' | 'rate_limit' | 'provider' | 'invalid_response'; rejectedEvidence?: number; inputTokens?: number; outputTokens?: number; requestDispatched?: boolean };
+export type ProviderCallPermit = { budgetReservationId: string };
 
 const signalDescriptions: Record<ScamCategory, string> = {
   IMPERSONATION: 'Model rozpoznal možné vydávání se za jinou osobu či instituci; totožnost není ověřena.',
@@ -89,40 +90,48 @@ const schema = {
   }, required: ['claimedIdentity', 'requestedActions', 'riskSignals', 'missingInformation', 'contextualSummary', 'uncertainty'],
 };
 
-export async function runLlmAnalysisIfConfigured(sanitizedText: string, prompt: RuntimePrompt = defaultPrompt, settings: ProviderSettings = defaultProviderSettings()): Promise<ProviderResult> {
+function providerPayload(sanitizedText: string, prompt: RuntimePrompt, settings: ProviderSettings) {
+  return { model: settings.model, store: false, max_completion_tokens: settings.maxCompletionTokens, temperature: 0,
+    messages: [{ role: 'system', content: prompt.instructions }, { role: 'user', content: sanitizedText }],
+    response_format: { type: 'json_schema', json_schema: { name: 'semantic_analysis', strict: true, schema } },
+  };
+}
+
+/** Includes prompt, JSON schema, request envelope and a conservative tokenizer margin. */
+export function providerInputTokenCeiling(sanitizedText: string, prompt: RuntimePrompt, settings: ProviderSettings): number {
+  return new TextEncoder().encode(JSON.stringify(providerPayload(sanitizedText, prompt, settings))).length * 2 + 1024;
+}
+
+export async function runLlmAnalysisIfConfigured(sanitizedText: string, prompt: RuntimePrompt = defaultPrompt, settings: ProviderSettings = defaultProviderSettings(), budgetPermit?: ProviderCallPermit): Promise<ProviderResult> {
   if (!process.env.OPENAI_API_KEY || process.env.AI_ENABLED !== 'true' || !settings.enabled) return { status: 'UNAVAILABLE', reason: 'not_configured' };
-  // Public paid calls stay closed until shared authorization and budgets are implemented.
+  if (process.env.AI_EMERGENCY_DISABLE === 'true') return { status: 'BLOCKED', reason: 'emergency_disabled' };
   const localDevelopment = (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') && process.env.AI_LOCAL_ONLY === 'true';
-  if (!localDevelopment) return { status: 'BLOCKED', reason: 'deployment_gate' };
+  const production = process.env.NODE_ENV === 'production' && process.env.AI_PRODUCTION_ENABLED === 'true' && !!budgetPermit?.budgetReservationId;
+  if (!localDevelopment && !production) return { status: 'BLOCKED', reason: 'deployment_gate' };
   const model = settings.model;
   const baseUrl = settings.baseUrl;
-  if (!isAllowedProviderBaseUrl(baseUrl)) return { status: 'BLOCKED', reason: 'deployment_gate' };
+  if (!settings.allowedModels.includes(model) || !isAllowedProviderBaseUrl(baseUrl)) return { status: 'BLOCKED', reason: 'deployment_gate' };
   const permit = providerLimiter.acquire();
   if ('retryAfter' in permit) return { status: 'FAILED', reason: 'rate_limit' };
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), settings.timeoutMs);
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST', signal: abort.signal,
+      method: 'POST', signal: abort.signal, redirect: 'error',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({ model, store: false, max_completion_tokens: settings.maxCompletionTokens, temperature: 0,
-        messages: [
-          { role: 'system', content: prompt.instructions },
-          { role: 'user', content: sanitizedText },
-        ], response_format: { type: 'json_schema', json_schema: { name: 'semantic_analysis', strict: true, schema } },
-      }),
+      body: JSON.stringify(providerPayload(sanitizedText, prompt, settings)),
     });
-    if (!response.ok) return { status: 'FAILED', reason: response.status === 429 ? 'rate_limit' : 'provider' };
+    if (!response.ok) return { status: 'FAILED', reason: response.status === 429 ? 'rate_limit' : 'provider', requestDispatched: true };
     const payload: unknown = await response.json();
-    if (!object(payload) || !Array.isArray(payload.choices) || !object(payload.choices[0]) || payload.choices[0].finish_reason !== 'stop' || !object(payload.choices[0].message) || typeof payload.choices[0].message.content !== 'string') return { status: 'FAILED', reason: 'invalid_response' };
+    if (!object(payload) || !Array.isArray(payload.choices) || !object(payload.choices[0]) || payload.choices[0].finish_reason !== 'stop' || !object(payload.choices[0].message) || typeof payload.choices[0].message.content !== 'string') return { status: 'FAILED', reason: 'invalid_response', requestDispatched: true };
     let parsed: unknown;
-    try { parsed = JSON.parse(payload.choices[0].message.content); } catch { return { status: 'FAILED', reason: 'invalid_response' }; }
+    try { parsed = JSON.parse(payload.choices[0].message.content); } catch { return { status: 'FAILED', reason: 'invalid_response', requestDispatched: true }; }
     const validated = validateSemanticOutput(parsed, sanitizedText);
-    if (!validated) return { status: 'FAILED', reason: 'invalid_response' };
+    if (!validated) return { status: 'FAILED', reason: 'invalid_response', requestDispatched: true };
     const usage = object(payload.usage) ? payload.usage : {};
     const tokenCount = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
-    return { status: 'SUCCESS', analysis: validated.analysis, rejectedEvidence: validated.rejectedEvidence, model, inputTokens: tokenCount(usage.prompt_tokens), outputTokens: tokenCount(usage.completion_tokens) };
+    return { status: 'SUCCESS', analysis: validated.analysis, rejectedEvidence: validated.rejectedEvidence, model, inputTokens: tokenCount(usage.prompt_tokens), outputTokens: tokenCount(usage.completion_tokens), requestDispatched: true };
   } catch {
-    return { status: 'FAILED', reason: abort.signal.aborted ? 'timeout' : 'provider' };
+    return { status: 'FAILED', reason: abort.signal.aborted ? 'timeout' : 'provider', requestDispatched: true };
   } finally { clearTimeout(timer); permit.release(); }
 }

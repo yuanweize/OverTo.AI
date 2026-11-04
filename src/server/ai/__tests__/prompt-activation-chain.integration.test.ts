@@ -127,6 +127,7 @@ describe.skipIf(!testDbUrl)('runtime prompt activation, testing, execution, trac
     await pool.query(await readFile('migrations/011_prompt_test_metrics.sql', 'utf8'));
     await pool.query(await readFile('migrations/013_ai_provider_settings.sql', 'utf8'));
     await pool.query(await readFile('migrations/016_ai_budget_reservations.sql', 'utf8'));
+    await pool.query(await readFile('migrations/019_verified_ai_pricing.sql', 'utf8'));
     await pool.query("INSERT INTO platform_admins (user_id, role) VALUES ($1, 'ROOT')", [rootId]);
 
     // Pre-configure model pricing

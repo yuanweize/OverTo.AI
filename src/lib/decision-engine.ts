@@ -10,11 +10,11 @@ import { AnalysisResult, RiskLevel, RiskEvidence, VerificationAction } from '@/t
 import { sanitizeInput } from './sanitizer';
 import { analyzeUrls } from './url-analyzer';
 import { evaluateDeterministicRules } from './rules-engine';
-import { runLlmAnalysisIfConfigured, type ProviderResult } from './llm-adapter';
+import { runLlmAnalysisIfConfigured, type ProviderResult, type ProviderCallPermit } from './llm-adapter';
 import { localizeAnalysis } from '@/i18n/analysis';
 import { decideRisk } from '@/fraud-engine/decision-policy';
 
-export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boolean = false, locale: 'cs' | 'en' = 'cs', prompt: RuntimePrompt = defaultPrompt, settings: ProviderSettings = defaultProviderSettings()): Promise<AnalysisResult> {
+export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boolean = false, locale: 'cs' | 'en' = 'cs', prompt: RuntimePrompt = defaultPrompt, settings: ProviderSettings = defaultProviderSettings(), permit?: ProviderCallPermit): Promise<AnalysisResult> {
   const startTime = Date.now();
 
   // 1. Ochrana soukromí - PII Sanitizace
@@ -59,7 +59,7 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
   let providerDurationMs: number | undefined;
   if (enableLlm) {
     const providerStart = Date.now();
-    aiResult = await runLlmAnalysisIfConfigured(sanitizedText, prompt, settings);
+    aiResult = await runLlmAnalysisIfConfigured(sanitizedText, prompt, settings, permit);
     providerDurationMs = Date.now() - providerStart;
     if (aiResult.status === 'SUCCESS' && aiResult.analysis) {
       engineType = 'HYBRID_RULES_AND_LLM';
@@ -146,6 +146,7 @@ export async function analyzeSuspiciousMessage(rawText: string, enableLlm: boole
       inputTokens: aiResult.inputTokens,
       outputTokens: aiResult.outputTokens,
       aiReason: aiResult.reason,
+      aiRequestDispatched: aiResult.requestDispatched,
       aiProvider: aiResult.status === 'SUCCESS' ? 'AI' : null,
       aiModel: aiResult.model,
       rejectedAiEvidence: aiResult.rejectedEvidence,

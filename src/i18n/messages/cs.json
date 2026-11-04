@@ -99,6 +99,7 @@
     "loadVersion": "Načíst verzi do formuláře"
   },
   "Analysis": {
+    "aiUnavailable": "AI analýza v tomto nasazení není dostupná. Analýza pravidly funguje dál.",
     "reviewAgain": "V upraveném textu byly nalezeny další údaje. Zkontrolujte novou podobu před odesláním.",
     "failed": "Analýza selhala. Zkuste to prosím znovu.",
     "unexpected": "Došlo k neočekávané chybě.",
@@ -664,6 +665,17 @@
     "datasetNote": "challenge-v1 obsahuje {count} autorských příkladů, včetně neškodných, nejednoznačných a rizikových situací. Sada je verzována v repozitáři; úpravy v prohlížeči zatím nejsou dostupné."
   },
   "Models": {
+    "pricingTitle": "Ověřené ceny modelu",
+    "pricingNote": "Zadejte aktuální ceny poskytovatele v USD za milion tokenů. Staré příkladové ceny nejsou důvěryhodné. Potvrzení povolí rozpočtem omezené požadavky pro vybraný model.",
+    "pricingVerified": "Cenu potvrdil správce. Při změně cen poskytovatele ji ověřte znovu.",
+    "pricingUnverified": "Cena není potvrzena. Placená volání tohoto modelu jsou blokována.",
+    "inputPrice": "Vstup USD / 1M tokenů",
+    "outputPrice": "Výstup USD / 1M tokenů",
+    "requestCeiling": "Maximum USD / požadavek",
+    "confirmPricing": "Ověřil(a) jsem ceny podle aktuálních podmínek poskytovatele a odpovídám za jejich správnost.",
+    "savePricing": "Potvrdit cenu",
+    "pricingSaved": "Cena je potvrzena a změna zapsána do auditu.",
+    "pricingError": "Cenu se nepodařilo potvrdit.",
     "title": "Modely v pracovním prostoru",
     "intro": "Vyberte ID modelů, které může nakonfigurovaný endpoint použít, a jeden výchozí model. Změny platí pro další analýzy a testy promptů; uložení model nevolá ani neověřuje.",
     "registered": "Povolená ID modelů",

@@ -45,6 +45,8 @@ export class AiBudgetGuard {
     maxOutputTokens?: number;
     customReservationId?: string;
     config?: Partial<BudgetConfig>;
+    workspaceId?: string;
+    projectId?: string;
   }): Promise<ReservationResult> {
     if (process.env.AI_EMERGENCY_DISABLE === 'true') {
       return { allowed: false, reason: 'emergency_disabled' };
@@ -57,8 +59,16 @@ export class AiBudgetGuard {
     const dailyLimit = params.config?.dailyBudgetUsd ?? Number(process.env.AI_DAILY_BUDGET_USD || '25.0');
     const monthlyLimit = params.config?.monthlyBudgetUsd ?? Number(process.env.AI_MONTHLY_BUDGET_USD || '250.0');
     const maxRequestLimit = params.config?.maxCostPerRequestUsd ?? Number(process.env.AI_MAX_REQUEST_BUDGET_USD || '0.50');
+    const maxIn = params.maxInputTokens ?? 3000;
+    const maxOut = params.maxOutputTokens ?? 1000;
+    if (![dailyLimit, monthlyLimit, maxRequestLimit].every(value => Number.isFinite(value) && value > 0) ||
+        !Number.isSafeInteger(maxIn) || maxIn < 0 || maxIn > 100000 ||
+        !Number.isSafeInteger(maxOut) || maxOut < 0 || maxOut > 4000) {
+      return { allowed: false, reason: 'max_request_budget_exceeded' };
+    }
 
-    const client = await this.pool.connect();
+    const client = await this.pool.connect().catch(() => null);
+    if (!client) return { allowed: false, reason: 'budget_check_unavailable' };
     try {
       await client.query('BEGIN');
       // Acquire transaction-scoped advisory lock for AI budget operations
@@ -72,7 +82,7 @@ export class AiBudgetGuard {
         input_per_million_usd: string;
         output_per_million_usd: string;
         max_request_cost_usd: string;
-      }>('SELECT input_per_million_usd, output_per_million_usd, max_request_cost_usd FROM ai_model_pricing WHERE model = $1', [params.model]);
+      }>('SELECT input_per_million_usd, output_per_million_usd, max_request_cost_usd FROM ai_model_pricing WHERE model = $1 AND verified_at IS NOT NULL', [params.model]);
 
       if (!pricingRes.rowCount) {
         await client.query('ROLLBACK');
@@ -84,15 +94,23 @@ export class AiBudgetGuard {
       const modelMax = Number(pricingRes.rows[0].max_request_cost_usd);
 
       // Conservative strategy: validate pricing validity
-      if (isNaN(inputPrice) || isNaN(outputPrice) || inputPrice < 0 || outputPrice < 0 || isNaN(modelMax) || modelMax <= 0) {
+      if (!Number.isFinite(inputPrice) || !Number.isFinite(outputPrice) || inputPrice < 0 || outputPrice < 0 || inputPrice + outputPrice <= 0 || !Number.isFinite(modelMax) || modelMax <= 0) {
         await client.query('ROLLBACK');
         return { allowed: false, reason: 'unknown_model_pricing' };
       }
 
       // Constrain input and output token bounds before reservation
-      const maxIn = Math.max(0, Math.min(params.maxInputTokens ?? 3000, 10000));
-      const maxOut = Math.max(0, Math.min(params.maxOutputTokens ?? 1000, 4000));
-      const calculatedMax = Math.round((maxIn * inputPrice + maxOut * outputPrice) * 1_000_000) / 1_000_000;
+      // PostgreSQL numeric keeps exact decimal arithmetic at the cost ceiling.
+      // JS floating point can turn an exact $0.20 into $0.200001 after ceil().
+      const calculation = await client.query<{ amount: string }>(
+        'SELECT CEIL($1::numeric * $2::numeric + $3::numeric * $4::numeric) / 1000000 AS amount',
+        [maxIn, pricingRes.rows[0].input_per_million_usd, maxOut, pricingRes.rows[0].output_per_million_usd]
+      );
+      const calculatedMax = Number(calculation.rows[0].amount);
+      if (!Number.isFinite(calculatedMax) || calculatedMax <= 0) {
+        await client.query('ROLLBACK');
+        return { allowed: false, reason: 'unknown_model_pricing' };
+      }
 
       // Fail-closed ceiling validation: potential request cost cannot exceed model ceiling or request budget cap.
       // Never artificially depress the reservation below its potential cost via Math.min.
@@ -135,9 +153,10 @@ export class AiBudgetGuard {
 
       const reservationId = params.customReservationId || randomUUID();
       await client.query(`
-        INSERT INTO ai_budget_reservations (id, provider, model, reserved_amount_usd, status, expires_at)
-        VALUES ($1, $2, $3, $4, 'RESERVED', now() + interval '2 minutes')
-      `, [reservationId, params.provider, params.model, reservedCost]);
+        INSERT INTO ai_budget_reservations (id, provider, model, reserved_amount_usd, status, expires_at, workspace_id, project_id, input_per_million_usd, output_per_million_usd)
+        VALUES ($1, $2, $3, $4, 'RESERVED', now() + interval '2 minutes', $5, $6, $7, $8)
+      `, [reservationId, params.provider, params.model, reservedCost, params.workspaceId ?? null, params.projectId ?? null,
+        pricingRes.rows[0].input_per_million_usd, pricingRes.rows[0].output_per_million_usd]);
 
       await client.query('COMMIT');
       return {
@@ -177,8 +196,8 @@ export class AiBudgetGuard {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const res = await client.query<{ model: string; reserved_amount_usd: string }>(
-        "SELECT model, reserved_amount_usd FROM ai_budget_reservations WHERE id = $1 AND status = 'RESERVED' FOR UPDATE",
+      const res = await client.query<{ reserved_amount_usd: string; input_per_million_usd: string | null; output_per_million_usd: string | null }>(
+        "SELECT reserved_amount_usd, input_per_million_usd, output_per_million_usd FROM ai_budget_reservations WHERE id = $1 AND status = 'RESERVED' FOR UPDATE",
         [reservationId]
       );
 
@@ -193,7 +212,7 @@ export class AiBudgetGuard {
         };
       }
 
-      const { model, reserved_amount_usd } = res.rows[0];
+      const { reserved_amount_usd } = res.rows[0];
       const reservedCeiling = Number(reserved_amount_usd);
       let actualCost = reservedCeiling;
       let hasAccurateTokens = false;
@@ -204,19 +223,13 @@ export class AiBudgetGuard {
         usage.inputTokens >= 0 &&
         usage.outputTokens >= 0
       ) {
-        const pricingRes = await client.query<{
-          input_per_million_usd: string;
-          output_per_million_usd: string;
-        }>('SELECT input_per_million_usd, output_per_million_usd FROM ai_model_pricing WHERE model = $1', [model]);
-
-        if (pricingRes.rowCount) {
-          const inPrice = Number(pricingRes.rows[0].input_per_million_usd) / 1_000_000;
-          const outPrice = Number(pricingRes.rows[0].output_per_million_usd) / 1_000_000;
-          if (!isNaN(inPrice) && !isNaN(outPrice) && inPrice >= 0 && outPrice >= 0) {
-            const computed = usage.inputTokens * inPrice + usage.outputTokens * outPrice;
-            actualCost = Math.round(computed * 1_000_000) / 1_000_000;
-            hasAccurateTokens = true;
-          }
+        const inPrice = Number(res.rows[0].input_per_million_usd);
+        const outPrice = Number(res.rows[0].output_per_million_usd);
+        if (res.rows[0].input_per_million_usd !== null && res.rows[0].output_per_million_usd !== null &&
+            Number.isFinite(inPrice) && Number.isFinite(outPrice) && inPrice >= 0 && outPrice >= 0) {
+          const computed = (usage.inputTokens * inPrice + usage.outputTokens * outPrice) / 1_000_000;
+          actualCost = Math.round(computed * 1_000_000) / 1_000_000;
+          hasAccurateTokens = true;
         }
       }
 
@@ -337,13 +350,13 @@ export class AiBudgetGuard {
     pricing: ModelPricing
   ): Promise<void> {
     await pool.query(
-      `INSERT INTO ai_model_pricing (model, input_per_million_usd, output_per_million_usd, max_request_cost_usd, updated_at)
-       VALUES ($1, $2, $3, $4, now())
+      `INSERT INTO ai_model_pricing (model, input_per_million_usd, output_per_million_usd, max_request_cost_usd, updated_at, verified_at)
+       VALUES ($1, $2, $3, $4, now(), now())
        ON CONFLICT (model) DO UPDATE SET
          input_per_million_usd = excluded.input_per_million_usd,
          output_per_million_usd = excluded.output_per_million_usd,
          max_request_cost_usd = excluded.max_request_cost_usd,
-         updated_at = now()`,
+         updated_at = now(), verified_at = now()`,
       [pricing.model, pricing.inputPerMillionUsd, pricing.outputPerMillionUsd, pricing.maxRequestCostUsd]
     );
   }

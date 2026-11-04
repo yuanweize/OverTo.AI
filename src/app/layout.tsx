@@ -5,6 +5,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getLocale, getMessages } from 'next-intl/server';
 import { getSiteSnapshot } from '@/server/config/site';
 import { SiteProvider } from '@/components/branding/SiteProvider';
+import { AnalyticsConsent } from '@/components/AnalyticsConsent';
 import './globals.css';
 const inter = Inter({ subsets: ['latin', 'latin-ext'], display: 'swap', variable: '--font-inter' });
 export async function generateMetadata(): Promise<Metadata> {
@@ -36,6 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SiteProvider config={config} theme={theme}>
             {children}
           </SiteProvider>
+          <AnalyticsConsent />
         </NextIntlClientProvider>
       </body>
     </html>

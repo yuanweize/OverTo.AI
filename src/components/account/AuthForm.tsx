@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authClient } from '@/auth/client';
+import { trackEvent } from '@/observability/client';
 
 export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const t = useTranslations('Auth');
@@ -14,6 +15,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     try {
       const result = mode === 'signup' ? await authClient.signUp.email({ email, password, name, callbackURL: '/login' }) : await authClient.signIn.email({ email, password });
       if (result.error) { setError(t('authError')); return; }
+      trackEvent({ event: mode === 'signup' ? 'overto.signup_completed' : 'overto.login_completed', properties: {} });
       router.push(mode === 'signup' ? '/verify-email' : '/dashboard'); router.refresh();
     } catch { setError(t('unavailable')); } finally { setBusy(false); }
   }

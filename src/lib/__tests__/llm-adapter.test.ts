@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runLlmAnalysisIfConfigured, validateSemanticOutput } from '../llm-adapter';
+import { providerInputTokenCeiling, runLlmAnalysisIfConfigured, validateSemanticOutput } from '../llm-adapter';
 import { defaultProviderSettings } from '@/ai/providers-config';
 import { analyzeSuspiciousMessage } from '../decision-engine';
 
@@ -57,6 +57,23 @@ describe('AI output validation', () => {
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
     expect((await runLlmAnalysisIfConfigured(input)).status).toBe('BLOCKED');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('requires both the production switch and a budget reservation before dispatch', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const fetchMock = vi.fn().mockResolvedValue(reply(semantic())); vi.stubGlobal('fetch', fetchMock);
+    expect((await runLlmAnalysisIfConfigured(input)).reason).toBe('deployment_gate');
+    vi.stubEnv('AI_PRODUCTION_ENABLED', 'true');
+    expect((await runLlmAnalysisIfConfigured(input)).reason).toBe('deployment_gate');
+    const result = await runLlmAnalysisIfConfigured(input, undefined, undefined, { budgetReservationId: 'synthetic-reservation' });
+    expect(result.status).toBe('SUCCESS');
+    expect(result.requestDispatched).toBe(true);
+    vi.stubEnv('AI_EMERGENCY_DISABLE', 'true');
+    expect((await runLlmAnalysisIfConfigured(input, undefined, undefined, { budgetReservationId: 'synthetic-reservation' })).reason).toBe('emergency_disabled');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it('counts the prompt, schema and request envelope in the reservation ceiling', () => {
+    const ceiling = providerInputTokenCeiling(input, { version: 'test', instructions: 'x'.repeat(4000) }, defaultProviderSettings());
+    expect(ceiling).toBeGreaterThan(2 * (4000 + new TextEncoder().encode(input).length));
   });
   it('allows explicitly local development but never bypasses production controls', async () => {
     vi.stubEnv('AI_EXTERNAL_RATE_LIMIT_CONFIRMED', 'false');

@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/auth/client';
+import { rotateAnalyticsIdentity } from '@/observability/client';
 
 export function ProfileSettings({ initialName, email }: { initialName: string; email: string }) {
   const t = useTranslations('Account');
@@ -79,6 +80,7 @@ export function ProfileSettings({ initialName, email }: { initialName: string; e
         return;
       }
       await authClient.signOut();
+      rotateAnalyticsIdentity();
       router.push('/login');
       router.refresh();
     } catch {

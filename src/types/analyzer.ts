@@ -76,7 +76,8 @@ export interface AnalysisResult {
     engine: 'HYBRID_RULES_AND_LLM' | 'DETERMINISTIC_RULES';
     aiStatus: AiStatus;
     aiProvider: 'AI' | null;
-    aiReason?: 'not_configured' | 'deployment_gate' | 'timeout' | 'rate_limit' | 'provider' | 'invalid_response';
+    aiReason?: 'not_configured' | 'deployment_gate' | 'emergency_disabled' | 'anonymous_disabled' | 'budget_exceeded' | 'unknown_model_pricing' | 'budget_check_unavailable' | 'daily_budget_exceeded' | 'monthly_budget_exceeded' | 'max_request_budget_exceeded' | 'timeout' | 'rate_limit' | 'provider' | 'invalid_response';
+    aiRequestDispatched?: boolean;
     aiModel?: string;
     rejectedAiEvidence?: number;
     processingTimeMs: number;

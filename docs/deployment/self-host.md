@@ -60,6 +60,9 @@ SMTP_FROM=no-reply@yourdomain.com
 SMTP_USER=smtp-user
 SMTP_PASSWORD=smtp-password
 AI_ENABLED=false
+AI_PRODUCTION_ENABLED=false
+AI_ANONYMOUS_ENABLED=false
+POSTHOG_ENABLED=false
 ```
 
 ### 2. Launch Services
@@ -71,6 +74,8 @@ docker compose --env-file .env.selfhost -f compose.saas.yaml up -d --build
 ```
 
 Compose automatically waits for PostgreSQL to become healthy, runs `scripts/migrate-selfhost.ts`, and launches the Next.js application.
+
+To enable optional AI, provide a private compatible API key, registered HTTPS base URL and model, set small positive request/daily/monthly USD budgets, confirm current model prices in ROOT → AI Studio → Models, test a synthetic prompt, then set `AI_ENABLED=true` and `AI_PRODUCTION_ENABLED=true` and restart. Anonymous paid AI stays off unless separately enabled. Keep `AI_EMERGENCY_DISABLE=true` available as an immediate restart-based shutdown. PostHog setup and privacy controls are documented in [Observability](../observability/posthog.md).
 
 ### 3. Verify Health Check
 

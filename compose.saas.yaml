@@ -21,7 +21,7 @@ services:
     build:
       context: .
       target: migrator
-    env_file: .env.selfhost
+    env_file: ${OVERTO_ENV_FILE:-.env.selfhost}
     environment:
       NODE_ENV: production
     depends_on:
@@ -31,7 +31,7 @@ services:
 
   app:
     build: .
-    env_file: .env.selfhost
+    env_file: ${OVERTO_ENV_FILE:-.env.selfhost}
     environment:
       NODE_ENV: production
     ports:

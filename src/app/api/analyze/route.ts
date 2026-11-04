@@ -13,7 +13,11 @@ import { readRequestBody } from '@/lib/read-request-body';
 import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
 import { accountDeployment } from '@/auth/deployment';
 import { extractClientIdentifier } from '@/server/security/client-identity';
-import { AiBudgetGuard } from '@/server/ai/budgets';
+import { AiBudgetGuard, type BudgetBlockReason } from '@/server/ai/budgets';
+import { accountAnalysis } from '@/server/ai/trusted-analysis';
+import { providerInputTokenCeiling } from '@/lib/llm-adapter';
+import { sanitizeInput } from '@/lib/sanitizer';
+import { captureServerEvent } from '@/observability/server';
 
 
 export async function POST(request: NextRequest) {
@@ -58,10 +62,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Pro analýzu pomocí AI je nutný souhlas s odesláním upraveného textu poskytovateli.' }, { status: 400 });
     }
     if (body.locale !== undefined && body.locale !== 'cs' && body.locale !== 'en') return NextResponse.json({ error: 'INVALID_LOCALE' }, { status: 400 });
-    // Public AI is restricted to the dedicated local deployment or configured self-host with active budget.
+    // Account requests carry an in-process marker after session/key and project verification.
+    const account = accountAnalysis(request);
     let deployment = null;
     try { deployment = accountDeployment(process.env); } catch { deployment = null; }
+    let unavailableReason: 'anonymous_disabled' | BudgetBlockReason | undefined;
     let publicAiUnavailable = body.enableLlm === true && deployment?.mode !== 'local' && deployment?.mode !== 'selfhost';
+    if (body.enableLlm === true && process.env.NODE_ENV === 'production' && !account && process.env.AI_ANONYMOUS_ENABLED !== 'true') {
+      publicAiUnavailable = true;
+      unavailableReason = 'anonymous_disabled';
+    }
     let admissionPool = null;
 
     if (deployment) {
@@ -69,8 +79,9 @@ export async function POST(request: NextRequest) {
         const { pool } = await import('@/auth/server');
         if (!pool) throw new Error('ADMISSION_DATABASE_UNAVAILABLE');
         admissionPool = pool;
-        const clientId = extractClientIdentifier(request);
-        const policies = [
+        if (!account) {
+          const clientId = extractClientIdentifier(request);
+          const policies = [
           { bucket: 'public-rules-minute', limit: 90, windowSeconds: 60 },
           { bucket: 'public-rules-day', limit: 3000, windowSeconds: 86400 },
           { bucket: `client-rules-minute:${clientId}`, limit: 20, windowSeconds: 60 },
@@ -81,9 +92,10 @@ export async function POST(request: NextRequest) {
             { bucket: `client-ai-minute:${clientId}`, limit: 2, windowSeconds: 60 },
             { bucket: `client-ai-day:${clientId}`, limit: 10, windowSeconds: 86400 },
           ] : []),
-        ];
-        const admission = await new SharedRateLimiter(pool).consume(policies);
-        if (!admission.allowed) return NextResponse.json({ error: 'Denní nebo krátkodobý limit veřejné analýzy byl vyčerpán.' }, { status: 429, headers: { 'Retry-After': String(admission.retryAfter), 'Cache-Control': 'no-store' } });
+          ];
+          const admission = await new SharedRateLimiter(pool).consume(policies);
+          if (!admission.allowed) return NextResponse.json({ error: 'Denní nebo krátkodobý limit veřejné analýzy byl vyčerpán.' }, { status: 429, headers: { 'Retry-After': String(admission.retryAfter), 'Cache-Control': 'no-store' } });
+        }
       } catch {
         return NextResponse.json({ error: 'Ochrana veřejného API není dostupná.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
       }
@@ -93,7 +105,7 @@ export async function POST(request: NextRequest) {
     let prompt = defaultPrompt;
     let settings = defaultProviderSettings();
     if (publicAiUnavailable) settings = { ...settings, enabled: false };
-    if (body.enableLlm === true && deployment && admissionPool) {
+    if (body.enableLlm === true && deployment && admissionPool && !publicAiUnavailable) {
       const { PromptRepository } = await import('@/ai/prompts/repository');
       prompt = await new PromptRepository(admissionPool).active();
       const { ProviderRepository } = await import('@/ai/providers/repository');
@@ -104,29 +116,36 @@ export async function POST(request: NextRequest) {
     // Atomic budget reservation before billable model invocation
     let reservationId: string | undefined;
     let budgetGuard: AiBudgetGuard | null = null;
-    if (body.enableLlm === true && !publicAiUnavailable && deployment && admissionPool) {
+    const canConfigurePaidCall = process.env.AI_ENABLED === 'true' && !!process.env.OPENAI_API_KEY && settings.enabled &&
+      (process.env.NODE_ENV === 'production' ? process.env.AI_PRODUCTION_ENABLED === 'true' : process.env.AI_LOCAL_ONLY === 'true');
+    if (body.enableLlm === true && !publicAiUnavailable && deployment && admissionPool && canConfigurePaidCall) {
       budgetGuard = new AiBudgetGuard(admissionPool);
-      // Realistic upper-bound token calculation based on prompt instructions and message length
-      const estimatedInputTokens = Math.max(500, Math.ceil(((prompt.instructions?.length || 1500) + body.text.length) / 3));
-      const maxInputTokens = Math.min(4000, estimatedInputTokens);
-      const maxOutputTokens = Math.min(settings.maxCompletionTokens || 900, 2000);
-
-      const reservation = await budgetGuard.reserve({
-        provider: settings.providerName,
-        model: settings.model,
-        maxInputTokens,
-        maxOutputTokens,
-      });
+      const maxInputTokens = providerInputTokenCeiling(sanitizeInput(body.text).sanitizedText, prompt, settings);
+      const reservation = maxInputTokens > 100000
+        ? { allowed: false, reason: 'max_request_budget_exceeded' as const }
+        : await budgetGuard.reserve({
+          provider: settings.providerName,
+          model: settings.model,
+          maxInputTokens,
+          maxOutputTokens: settings.maxCompletionTokens,
+          workspaceId: account?.workspaceId,
+          projectId: account?.projectId,
+        });
 
       if (!reservation.allowed) {
         publicAiUnavailable = true;
+        unavailableReason = reservation.reason;
         settings = { ...settings, enabled: false };
       } else {
         reservationId = reservation.reservationId;
       }
     }
 
-    const result = await analyzeSuspiciousMessage(body.text, body.enableLlm === true, locale, prompt, settings);
+    const result = await analyzeSuspiciousMessage(body.text, body.enableLlm === true, locale, prompt, settings, reservationId ? { budgetReservationId: reservationId } : undefined);
+    if (unavailableReason) {
+      result.metadata.aiStatus = 'BLOCKED';
+      result.metadata.aiReason = unavailableReason;
+    }
 
     if (result.metadata.aiStatus !== 'NOT_REQUESTED') {
       const traceId = crypto.randomUUID();
@@ -135,7 +154,7 @@ export async function POST(request: NextRequest) {
       // Settle or release budget reservation
       let finalCost: number | null = null;
       if (budgetGuard && reservationId) {
-        if (result.metadata.aiStatus === 'SUCCESS') {
+        if (result.metadata.aiRequestDispatched) {
           try {
             const { settledCost, isOverage, overageAmount } = await budgetGuard.settle(reservationId, {
               inputTokens: result.metadata.inputTokens,
@@ -152,6 +171,15 @@ export async function POST(request: NextRequest) {
           await budgetGuard.release(reservationId).catch(() => {});
         }
       }
+
+      if (result.metadata.aiRequestDispatched) captureServerEvent(request, { event: 'overto.ai_call_completed', properties: {
+        status: result.metadata.aiStatus === 'SUCCESS' ? 'SUCCESS' : 'FAILED',
+        reason: result.metadata.aiReason === 'timeout' ? 'timeout' : result.metadata.aiReason === 'rate_limit' ? 'rate_limit' : result.metadata.aiReason === 'invalid_response' ? 'invalid_response' : result.metadata.aiReason ? 'provider' : 'none',
+        duration_ms: result.metadata.providerDurationMs ?? 0,
+        input_tokens: result.metadata.inputTokens ?? 0,
+        output_tokens: result.metadata.outputTokens ?? 0,
+        estimated_cost_usd: finalCost ?? 0,
+      } });
 
       // Optional observability. A storage failure must not discard the user's result.
       if (deployment && admissionPool) {
@@ -187,6 +215,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch {
+    captureServerEvent(request, { event: '$exception', properties: { category: 'analysis_server' } });
     console.error('[ANALYZE_ERROR] Analysis failed');
     return NextResponse.json(
       { error: 'Při analýze zprávy došlo k neočekávané chybě. Zkuste to prosím znovu.' },
