@@ -12,7 +12,7 @@ OvěřTo.AI supports optional, privacy-conscious model inference via any OpenAI-
 
 ## Production Security & Budget Controls
 
-- **Rules-Only Production Default:** Public container images and demo blueprints default to **Rules-only** mode (`AI_LOCAL_ONLY`). External LLM calls are disabled by default to safeguard against unexpected API expenses and unauthorized external data transfer.
+- **Production Deployment Gate:** The current adapter blocks external inference in every production deployment with `deployment_gate`, even if `AI_ENABLED=true` and provider settings are configured. Public and self-hosted production instances run **Rules-only** analysis. Local development and tests can exercise bounded model calls.
 - **PostgreSQL Atomic Budget Guard:** When AI inference is enabled, `AiBudgetGuard` (`src/server/ai/budgets.ts`, `migrations/016_ai_budget_reservations.sql`) uses PostgreSQL advisory and row-level locks to enforce atomic spending caps:
   - Daily and monthly financial ceilings per workspace and platform.
   - Pre-allocation reservations prior to dispatching requests.

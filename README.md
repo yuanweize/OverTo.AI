@@ -86,7 +86,7 @@ Open [http://127.0.0.1:3005](http://127.0.0.1:3005) in your browser.
 
 ### 2. Production Self-Hosted SaaS (Docker Compose)
 
-Deploy the complete multi-tenant application with PostgreSQL 17, automated schema migrations, authentication, and SMTP delivery:
+Deploy the personal-workspace application with PostgreSQL 17, automated schema migrations, authentication, and SMTP delivery:
 
 ```sh
 # 1. Prepare environment configuration
@@ -210,7 +210,7 @@ Authenticated requests use bearer token API keys with shared daily quotas. See t
 
 - **Not a Security Guarantee:** Both deterministic heuristic rules and optional LLM analysis can produce false positives and false negatives. An `INSUFFICIENT_EVIDENCE` verdict is never proof that a message is safe.
 - **Out-of-Band Verification Always Required:** Critical, urgent, or financial requests should always be validated through independent, known-good channels (such as official banking phone numbers).
-- **Rules-Only Production Default:** Default container deployments operate in **Rules-only** mode via the `AI_LOCAL_ONLY` security gate. External LLM calls are disabled unless explicitly enabled and bounded by administrative budget policies.
+- **Production AI Gate:** The current production adapter returns `deployment_gate` for external model calls, even if provider settings are present. Public and self-hosted production deployments use **Rules-only** analysis. Bounded model calls are available only in isolated local development and tests.
 - **Client Redaction is Best-Effort:** Automated PII masking targets standard patterns (phone numbers, emails, names) but cannot guarantee complete scrubbing of subtle identifying details.
 - For a comprehensive analysis of system boundaries, read [LIMITATIONS.md](LIMITATIONS.md).
 

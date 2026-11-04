@@ -1,6 +1,6 @@
-# Acceptance matrix — 2026-10-30 verified release candidate
+# Acceptance matrix — v7.0.3 release scope
 
-Statuses reflect verified evidence across automated integration tests, Docker Compose runtime, and browser journeys. See [implementation status](IMPLEMENTATION-STATUS.md) for test execution details.
+Statuses describe the implemented v7.0.3 scope and historical verification. Production inference remains blocked by `deployment_gate`; organization membership and OCR are not implemented. Stripe is Test Mode only. See [implementation status](IMPLEMENTATION-STATUS.md) for test execution details.
 
 | Area | Routes / module | Verified evidence | Status |
 | --- | --- | --- | --- |

@@ -1,6 +1,8 @@
-# Implementation status — verified v7.0.3 release candidate
+# Implementation status — v7.0.3 release scope
 
-Updated 2026-10-31. This worktree contains the verified v7.0.3 patch release for OvěřTo.AI. All security hardening, budget settlement accounting, cumulative Stripe refund tracking, proxy trust boundaries, account export browser compatibility, and secret scanning checks have been implemented and verified against reproducible automated suites.
+Historical verification snapshot from 2026-10-31. The audited `main` baseline was `f4f9f5430d8e6b76d38acf13ca1f23bcb59450ee` (2026-11-04 audit). Latest published release remains `v7.0.3`. Test counts below are historical and must be rerun for any new release. The deployed public application is rules-only; production model inference is blocked by `deployment_gate`. Organization membership and OCR are outside the implemented release scope.
+
+The following features describe the v7.0.3 release scope; later maintenance commits may be ahead of that tag. All security hardening, budget settlement accounting, cumulative Stripe refund tracking, proxy trust boundaries, account export browser compatibility, and secret scanning checks have been implemented and verified against reproducible automated suites.
 
 ## Verified Functionality
 
