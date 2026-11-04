@@ -147,19 +147,8 @@ When deploying behind reverse proxies (Cloudflare, Nginx, Caddy, AWS ALB):
 Pre-built production multi-arch images (`linux/amd64`, `linux/arm64`) are published to GHCR:
 
 ```sh
-docker pull ghcr.io/yuanweize/overto.ai:7.0.1
+docker pull ghcr.io/yuanweize/overto.ai:7.0.3
 docker pull ghcr.io/yuanweize/overto.ai:latest
 ```
 
-To build and push manually using a GitHub Personal Access Token (classic):
-1. Ensure the token has `write:packages` and `read:packages` permissions.
-2. Log in:
-   ```sh
-   echo "$GITHUB_PAT" | docker login ghcr.io -u <YOUR_GITHUB_USERNAME> --password-stdin
-   ```
-3. Build and push:
-   ```sh
-   docker buildx build --platform linux/amd64,linux/arm64 \
-     -t ghcr.io/yuanweize/overto.ai:7.0.1 \
-     -t ghcr.io/yuanweize/overto.ai:latest --push .
-   ```
+Release tags are published by `.github/workflows/docker-release.yml`. For a local build from your checkout, use `docker build -t overto-ai:local .`. Do not overwrite the published `7.0.3` tag with an unreviewed local image.

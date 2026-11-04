@@ -210,7 +210,7 @@ Ověřené požadavky používají Bearer token s denními limity. Podrobnosti n
 
 - **Žádná záruka bezpečnosti:** Deterministická pravidla ani volitelné AI modely nezaručují 100% spolehlivost detekce. Výsledek `INSUFFICIENT_EVIDENCE` neznamená potvrzení pravosti či bezpečnosti zprávy.
 - **Nezávislé ověření je nutné:** Jakýkoliv neočekávaný nebo urgentní požadavek týkající se financí či údajů je třeba ověřit přes spolehlivý oficiální kontakt.
-- **Pravidla v produkci:** Veřejné kontejnery standardně běží v režimu **Rules-only** (`AI_LOCAL_ONLY`). Volání externích AI modelů je vypnuto, pokud jej správce výslovně neaktivuje a nenastaví rozpočty.
+- **AI v produkci:** Aktuální produkční adaptér blokuje externí volání modelů (`deployment_gate`) i při nastaveném poskytovateli. Veřejné i vlastní produkční nasazení analyzuje pouze pravidly. Omezená volání modelu lze testovat jen v izolovaném místním vývojovém prostředí.
 - **Klientská anonymizace:** Automatické odstraňování PII maskuje běžné formáty (telefon, e-mail, jména), nemůže však zajistit stoprocentní odstranění všech kontextových indicií.
 - Podrobný přehled technických hranic viz [LIMITATIONS.md](LIMITATIONS.md).
 

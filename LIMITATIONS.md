@@ -12,7 +12,7 @@ OvěřTo.AI is an evidence-led assistance tool, not an infallible security oracl
 - **URL Host Visibility:** Domain names extracted from URLs are analyzed for spoofing and homoglyphs. In AI-enabled mode, domain names remaining in reviewed text are transmitted to the configured model provider.
 
 ## 3. Production AI Gating & Local Defaults
-- **Rules-Only Production Default:** Public container images and production deployment blueprints default to deterministic **Rules-only** mode (`AI_LOCAL_ONLY`). External LLM calls are disabled by default to prevent unexpected API costs or external data transit.
+- **Production Deployment Gate:** The current adapter blocks external model calls in production (`deployment_gate`) regardless of provider configuration. Production deployments run deterministic **Rules-only** analysis; bounded inference is available for isolated local development and tests.
 - **Provider Autonomy:** When external AI is enabled, inference quality, uptime, and retention policies depend on the operator's chosen OpenAI-compatible provider. The platform enforces schema conformance and verbatim quotation checks, but cannot guarantee the semantic correctness of model-generated text.
 
 ## 4. Offline URL Analysis

@@ -1,9 +1,20 @@
 import { expect, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 
-const origin = 'http://127.0.0.1:3006';
-const inbox = 'http://127.0.0.1:8026';
+const origin = process.env.OVERTO_SELFHOST_ORIGIN || 'http://127.0.0.1:3006';
+const inbox = process.env.OVERTO_MAILPIT_URL || 'http://127.0.0.1:8026';
+const composeProject = process.env.OVERTO_COMPOSE_PROJECT;
+const composeArgs = ['compose', ...(composeProject ? ['-p', composeProject] : []), '--env-file', '.env.selfhost', '-f', 'compose.saas.yaml'];
+const captureDir = process.env.OVERTO_UI_CAPTURE_DIR;
+
+async function capture(page: import('@playwright/test').Page, name: string) {
+  if (!captureDir) return;
+  await mkdir(captureDir, { recursive: true });
+  await page.screenshot({ path: join(captureDir, name), fullPage: true });
+}
 
 async function verificationLink(email: string) {
   for (let attempt = 0; attempt < 40; attempt++) {
@@ -12,7 +23,7 @@ async function verificationLink(email: string) {
       item.Subject === 'Ověření e-mailu — OvěřTo.AI' && item.To.some(to => to.Address === email));
     if (match) {
       const message = await (await fetch(`${inbox}/api/v1/message/${match.ID}`)).json();
-      const url = String(message.Text).match(/http:\/\/127\.0\.0\.1:3006\/[^\s]+/)?.[0];
+      const url = String(message.Text).match(/https?:\/\/[^\s]+/g)?.find(candidate => candidate.startsWith(`${origin}/`));
       if (url) return url;
     }
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -42,6 +53,7 @@ test('fresh self-hosted install supports verified account, metered rules and roo
     await page.getByLabel('Heslo').fill(password);
     await page.getByRole('button', { name: 'Přihlásit se' }).click();
     await expect(page.getByRole('heading', { name: 'Vítejte, Self-host test.' })).toBeVisible();
+    await capture(page, 'dashboard-cs-light-desktop.png');
     await page.goto(`${origin}/dashboard/analyze`);
     await page.getByLabel('Vložte podezřelou zprávu').fill('Ahoj mami, mám nové číslo. Pošli mi ihned peníze.');
     await page.getByRole('button', { name: 'Pokračovat ke kontrole textu' }).click();
@@ -55,12 +67,25 @@ test('fresh self-hosted install supports verified account, metered rules and roo
     const analysis = await page.request.post(`${origin}/api/v1/analyses`, { headers: { Authorization: `Bearer ${key}`, 'Idempotency-Key': randomUUID() }, data: { text: 'Podezřelá zpráva', enableLlm: false } });
     expect(analysis.status()).toBe(200);
     expect((await analysis.json()).metadata.testCreditsCharged).toBe(1);
-    execFileSync('docker', ['compose', '--env-file', '.env.selfhost', '-f', 'compose.saas.yaml', 'run', '--rm', '--no-deps', 'migrate', './node_modules/.bin/tsx', 'scripts/bootstrap-admin.ts', email], { cwd: process.cwd(), stdio: 'pipe' });
+    execFileSync('docker', [...composeArgs, 'run', '--rm', '--no-deps', 'migrate', './node_modules/.bin/tsx', 'scripts/bootstrap-admin.ts', email], { cwd: process.cwd(), stdio: 'pipe' });
     rootAssigned = true;
     await page.goto(`${origin}/admin/operations`);
     await expect(page.getByRole('heading', { name: 'Přehled provozu' })).toBeVisible();
+    await capture(page, 'admin-cs-light-desktop.png');
     await page.goto(`${origin}/admin/ai-studio`);
     await expect(page.getByRole('heading', { name: 'AI Studio', exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.context().addCookies([{ name: 'overto-theme', value: 'dark', url: origin }]);
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await capture(page, 'ai-studio-cs-dark-mobile.png');
+    await page.locator('.workspace-mobile-nav summary').click();
+    await page.locator('.workspace-mobile-panel .workspace-switcher a[href="/dashboard"]').click();
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await capture(page, 'dashboard-cs-dark-mobile.png');
+    await page.locator('.workspace-mobile-nav summary').click();
+    await page.locator('.workspace-mobile-panel .workspace-switcher a[href="/admin/operations"]').click();
+    await expect(page).toHaveURL(/\/admin\/operations$/);
 
     // Verify multi-language switching
     await page.goto(`${origin}/`);
@@ -70,7 +95,7 @@ test('fresh self-hosted install supports verified account, metered rules and roo
     await expect(page.locator('body')).toContainText('Analyze');
   } finally {
     if (rootAssigned) {
-      execFileSync('docker', ['compose', '--env-file', '.env.selfhost', '-f', 'compose.saas.yaml', 'exec', '-T', 'postgres', 'psql', '-U', 'overto', '-d', 'overto', '-c', `DELETE FROM platform_admins WHERE user_id=(SELECT id FROM "user" WHERE email='${email}')`], { cwd: process.cwd(), stdio: 'pipe' });
+      execFileSync('docker', [...composeArgs, 'exec', '-T', 'postgres', 'psql', '-U', 'overto', '-d', 'overto', '-c', `DELETE FROM platform_admins WHERE user_id=(SELECT id FROM "user" WHERE email='${email}')`], { cwd: process.cwd(), stdio: 'pipe' });
     }
     await context.close();
   }

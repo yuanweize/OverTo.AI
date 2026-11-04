@@ -1,20 +1,12 @@
-# Next actions — official release checklist
+# Current maintenance status — 2026-11-04
 
-All development gates (A through H) have been implemented and verified in this worktree.
+Audit baseline `main` (2026-11-04): `f4f9f5430d8e6b76d38acf13ca1f23bcb59450ee`. Latest published release: `v7.0.3`. PR #14 is merged; the GitHub CI run for this commit succeeded. The public Render deployment record reports this SHA as successful, but the running application does not expose a build SHA, so direct runtime provenance remains unverified.
 
-## Verification Checklist
+The v7 release scope is the personal-workspace, rules-first SaaS described in [the acceptance matrix](ACCEPTANCE-MATRIX.md). Production model inference remains blocked by the adapter's deployment gate. Organization membership and OCR are unimplemented optional work, not completed release features. Stripe is Test Mode only; live payments are not launched.
 
-1. **Unit & Integration Suite**: 147 passed across 35 files against disposable PostgreSQL (`overto_test`).
-2. **Type Safety & Lint**: `tsc --noEmit` passed with 0 errors, `eslint` passed with 0 errors and 0 warnings.
-3. **Documentation**: `npm run docs:check` passed with 40 files, 153 local links, 0 failures.
-4. **Production Build**: `npm run build` compiled 54 routes successfully.
-5. **Self-Host Docker E2E**: `e2e/selfhost.e2e.ts` passed on live Docker Compose stack at `127.0.0.1:3006`.
-6. **Backup & Restore**: `scripts/test-backup-restore.ts` passed with table parity and synthetic record verification.
-7. **Prompt Lab Chain**: `src/server/ai/__tests__/prompt-activation-chain.integration.test.ts` passed (create, test, activate, execute, trace, rollback).
-8. **Git Safety & Clean Public History**:
-   - Inspect git status, diff, and secret scan.
-   - Commit cleanly to `release/overto-7`.
-   - Push `release/overto-7` to `origin`.
-   - Create Pull Request into `main`.
-   - Merge `main`.
-   - Publish release tag and GitHub release.
+Maintenance actions:
+
+1. Reproduce a specific defect against current `main` before changing a stable module.
+2. Use an isolated PostgreSQL database and synthetic accounts for integration and browser tests.
+3. Keep the main worktree and its private configuration/Compose volume; do not delete the older competition clone with uncommitted work.
+4. Publish a new tag only when a versioned release is requested and its CI, container, documentation and deployment evidence have been reviewed.

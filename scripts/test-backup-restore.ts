@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 
 async function main() {
   console.log('--- Step 1: Connecting to PostgreSQL container for backup verification ---');
-  const containerName = 'overto-saas-postgres-1';
+  const containerName = process.env.OVERTO_BACKUP_CONTAINER || 'overto-saas-postgres-1';
   const dumpFile = `/tmp/overto_backup_verify_${randomUUID().slice(0, 8)}.sql`;
   const restoreDb = `overto_restore_${Date.now()}`;
 
