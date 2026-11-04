@@ -42,6 +42,9 @@ describe('privacy-gated product analytics', () => {
     const filtered = config.before_send({ event: '$pageview', properties: { token: 'phc_test', $current_url: 'https://app/?secret=abc', text: 'private message', page: 'home', locale: 'cs' } });
     expect(JSON.stringify(filtered)).not.toContain('secret');
     expect(JSON.stringify(filtered)).not.toContain('private message');
+    expect(filtered.properties).toMatchObject({ $geoip_disable: true, $process_person_profile: false });
+    const exception = config.before_send({ event: '$exception', properties: { $current_url: 'https://app/?secret=abc' } });
+    expect(exception.properties).toMatchObject({ $geoip_disable: true, $process_person_profile: false });
     const previousId = filtered.properties.distinct_id;
     rotateAnalyticsIdentity();
     const rotated = config.before_send({ event: '$pageview', properties: { page: 'home', locale: 'cs' } });

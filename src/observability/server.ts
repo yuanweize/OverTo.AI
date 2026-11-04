@@ -23,7 +23,7 @@ export function captureServerEvent(request: Request, event: AnalyticsEvent | { e
     try {
       await fetch(`${config.host}/i/v0/e/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: config.token, distinct_id: id, event: event.event, properties: { ...properties, app: 'overto_ai', environment: analyticsEnvironment(), schema_version: 1, source: 'server', $process_person_profile: false } }),
+        body: JSON.stringify({ token: config.token, distinct_id: id, event: event.event, properties: { ...properties, app: 'overto_ai', environment: analyticsEnvironment(), schema_version: 1, source: 'server', $process_person_profile: false, $geoip_disable: true } }),
         signal: AbortSignal.timeout(1500), redirect: 'error',
       });
     } catch { /* Telemetry must never affect analysis or billing. */ }

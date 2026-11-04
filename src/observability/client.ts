@@ -81,6 +81,7 @@ export async function loadAnalytics(): Promise<PostHog | null> {
               $exception_list: [{ type: 'BrowserError', value: 'browser_runtime_failure', stacktrace: { frames: [] } }],
               $exception_fingerprint: 'browser_runtime_failure',
               $issue_name: 'Browser runtime failure',
+              $geoip_disable: true, $process_person_profile: false,
               app: 'overto_ai', environment, schema_version: 1, source: 'browser',
             } };
           }
@@ -90,6 +91,7 @@ export async function loadAnalytics(): Promise<PostHog | null> {
             token: config.token,
             distinct_id: currentId,
             ...event.properties,
+            $geoip_disable: true, $process_person_profile: false,
             app: 'overto_ai', environment, schema_version: 1, source: 'browser',
           } };
         },

@@ -24,7 +24,7 @@ describe('server telemetry isolation', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(scheduled[0]()).resolves.toBeUndefined();
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body).toMatchObject({ event: 'overto.ai_call_completed', distinct_id: id, properties: { app: 'overto_ai', environment: 'qa', schema_version: 1 } });
+    expect(body).toMatchObject({ event: 'overto.ai_call_completed', distinct_id: id, properties: { app: 'overto_ai', environment: 'qa', schema_version: 1, $geoip_disable: true, $process_person_profile: false } });
     expect(JSON.stringify(body)).not.toContain('private message');
     expect(JSON.stringify(body)).not.toContain('secret=private');
   });

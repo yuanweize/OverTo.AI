@@ -14,6 +14,7 @@ export async function PUT(request: Request) {
   let body: Record<string, unknown>;
   try { body = JSON.parse(new TextDecoder().decode(await readRequestBody(request, 3000))); }
   catch { return reply({ error: 'INVALID_PRICING' }, 400); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return reply({ error: 'INVALID_PRICING' }, 400);
   const model = body.model;
   const input = body.inputPerMillionUsd;
   const output = body.outputPerMillionUsd;

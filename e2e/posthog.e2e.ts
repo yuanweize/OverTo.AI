@@ -26,6 +26,8 @@ test('analytics is consent-gated and never sends URL queries', async ({ browser 
   expect(sent.join(' ')).toContain('overto_ai');
   expect(sent.join(' ')).toContain('qa');
   expect(sent.join(' ')).toContain('schema_version');
+  expect(sent.join(' ')).toContain('$geoip_disable');
+  expect(sent.join(' ')).toContain('$process_person_profile');
   expect(sent.join(' ')).toContain('$pageview');
   await page.screenshot({ path: '/tmp/overto-ai-mock/analytics-enabled.png', fullPage: true });
   const count = sent.length;

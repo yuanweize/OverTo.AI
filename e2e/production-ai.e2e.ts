@@ -36,6 +36,11 @@ test('production AI is budgeted, attributed, grounded and disabled for anonymous
     const config = { ...provider.rows[0].config, enabled: true, providerName: 'Synthetic Mock Gateway', baseUrl: 'https://host.docker.internal:4443/v1', model: 'mock/production', allowedModels: ['mock/production'], timeoutMs: 5000, maxCompletionTokens: 200 };
     const providerSave = await page.request.put(`${origin}/api/admin/ai-studio/providers`, { headers: { Origin: origin }, data: { version: provider.rows[0].version, config } });
     expect(providerSave.status(), await providerSave.text()).toBe(200);
+    for (const invalid of ['null', '[]']) {
+      const rejected = await page.request.put(`${origin}/api/admin/ai-studio/pricing`, { headers: { Origin: origin, 'Content-Type': 'application/json' }, data: invalid });
+      expect(rejected.status()).toBe(400);
+      expect((await rejected.json()).error).toBe('INVALID_PRICING');
+    }
     const pricing = await page.request.put(`${origin}/api/admin/ai-studio/pricing`, { headers: { Origin: origin }, data: { model: config.model, inputPerMillionUsd: 1, outputPerMillionUsd: 2, maxRequestCostUsd: 0.05, confirmCurrentProviderPricing: true } });
     expect(pricing.status(), await pricing.text()).toBe(200);
     const created = await page.request.post(`${origin}/api/admin/ai-studio/prompts`, { headers: { Origin: origin }, data: { operation: 'create', prompt: { name: 'Synthetic QA prompt', instructions: 'QA_SYSTEM_MARKER: Analyze suspicious messages and quote exact evidence from the text.' } } });
