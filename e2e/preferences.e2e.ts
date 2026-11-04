@@ -13,8 +13,10 @@ test('browser language, explicit overrides and real homepage example', async ({ 
   await page.reload();
   await expect(page.locator('header')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   const pref = page.waitForResponse(res => res.url().includes('/api/preferences') && res.status() === 200);
+  const reloaded = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.getByLabel('Language').selectOption('cs');
   await pref;
+  await reloaded;
   await expect(page.locator('html')).toHaveAttribute('lang', 'cs');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'cs');
