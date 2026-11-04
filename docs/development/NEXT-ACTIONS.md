@@ -8,5 +8,5 @@ Maintenance actions:
 
 1. Reproduce a specific defect against current `main` before changing a stable module.
 2. Use an isolated PostgreSQL database and synthetic accounts for integration and browser tests.
-3. Keep the main worktree and its private configuration/Compose volume; do not delete the older competition clone with uncommitted work.
+3. Preserve existing worktrees, private configuration and Compose volumes during local audits; use an isolated database for tests.
 4. Publish a new tag only when a versioned release is requested and its CI, container, documentation and deployment evidence have been reviewed.
