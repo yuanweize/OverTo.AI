@@ -266,6 +266,20 @@ describe.skipIf(!connectionString)('Stripe test webhook with PostgreSQL and a si
     provider.invoices.retrieve = vi.fn(async () => invoice);
   });
 
+  it('uses the stored grant when the configured monthly allowance changes', async () => {
+    const driftInvoiceId = 'in_allowance_drift';
+    await pool.query("INSERT INTO credit_grants(account_id,idempotency_key,category,amount) VALUES($1,$2,'SUBSCRIPTION',10)", [workspace, `stripe-test-invoice:${driftInvoiceId}`]);
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 20 };
+    const response = await POST(request('evt_allowance_drift', false, true, 'charge.refunded', {
+      object: { id: 'ch_allowance_drift', customer, invoice: driftInvoiceId, amount: 2000, amount_refunded: 2000 },
+    }));
+    expect(response.status).toBe(200);
+    expect(await effectiveCredits(driftInvoiceId)).toBe(0);
+    const tracking = await pool.query('SELECT cumulative_retracted_credits FROM local_stripe_refund_tracking WHERE invoice_id=$1', [driftInvoiceId]);
+    expect(tracking.rows[0].cumulative_retracted_credits).toBe(10);
+    state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
+  });
+
   it('ensures atomic rollback: no credits or events are committed if transaction fails midway', async () => {
     state.config = { stripe: provider, webhookSecret: secret, priceId: 'price_synthetic', credits: 10 };
     provider.subscriptions.retrieve = vi.fn(async () => ({ id: subscription, customer, livemode: false, status: 'active', cancel_at_period_end: false }));
