@@ -12,13 +12,14 @@ OvěřTo.AI supports optional, privacy-conscious model inference via any OpenAI-
 
 ## Production Security & Budget Controls
 
-- **Production Deployment Gate:** The current adapter blocks external inference in every production deployment with `deployment_gate`, even if `AI_ENABLED=true` and provider settings are configured. Public and self-hosted production instances run **Rules-only** analysis. Local development and tests can exercise bounded model calls.
+- **Explicit production enablement:** Production inference requires `AI_ENABLED=true`, `AI_PRODUCTION_ENABLED=true`, a server-side provider key, an allowed HTTPS endpoint, an enabled model, operator-confirmed current pricing and a successful atomic budget reservation. The public demo remains Rules-only by default. Anonymous paid AI requires a separate `AI_ANONYMOUS_ENABLED=true` choice; account requests retain their workspace and project attribution.
 - **PostgreSQL Atomic Budget Guard:** When AI inference is enabled, `AiBudgetGuard` (`src/server/ai/budgets.ts`, `migrations/016_ai_budget_reservations.sql`) uses PostgreSQL advisory and row-level locks to enforce atomic spending caps:
-  - Daily and monthly financial ceilings per workspace and platform.
+  - Daily and monthly platform financial ceilings; reservations record workspace and project attribution, but do not enforce separate per-workspace dollar caps.
   - Pre-allocation reservations prior to dispatching requests.
-  - Settlement with exact token accounting and cost recording.
+  - Settlement from provider-reported token usage against the price snapshot; missing usage or dispatched failures conservatively consume the reserved ceiling. Provider pricing and usage are estimates, not a provider invoice.
   - Fail-closed fallback to deterministic rules when ceilings are exceeded.
 - **Provider Registry & Whitelist:** Platform operators configure endpoints via `OPENAI_BASE_URL` or `AI_ALLOWED_BASE_URLS`. Root administrators can test endpoint health and manage active model configurations within the AI Studio.
+- **Operator price confirmation:** Historical seed prices are unverified and cannot authorize a paid request. ROOT must enter current input/output prices and maximum request cost in AI Studio → Models. Prompt Lab tests use the same budget gate. `AI_EMERGENCY_DISABLE=true` or disabling the provider stops new requests.
 
 ## Local Development Configuration
 
@@ -38,3 +39,5 @@ npm run dev -- -p 3005
 ```
 
 Run `npm run ai:check` to verify the provider connection and schema adherence with a single bounded test request.
+
+For production self-hosting, configure the endpoint, model, key and small positive `AI_MAX_REQUEST_BUDGET_USD`, `AI_DAILY_BUDGET_USD`, and `AI_MONTHLY_BUDGET_USD` in the private environment. Set `AI_PRODUCTION_ENABLED=true` only after confirming prices and testing the selected model's JSON schema and usage response. Restart the app after changing environment flags. The isolated HTTPS Mock journey is `OVERTO_PRODUCTION_AI_E2E=true npx playwright test e2e/production-ai.e2e.ts --workers=1`; it requires the dedicated `.env.ai-qa` Compose stack and never calls a paid model.

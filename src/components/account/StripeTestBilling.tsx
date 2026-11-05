@@ -1,6 +1,7 @@
 'use client';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
+import { trackEvent } from '@/observability/client';
 
 type Subscription = { status: string; cancelAtPeriodEnd: boolean } | null;
 export function StripeTestBilling({ enabled, credits, subscription }: { enabled: boolean; credits: number; subscription: Subscription }) {
@@ -20,6 +21,7 @@ export function StripeTestBilling({ enabled, credits, subscription }: { enabled:
       const data = await response.json(); if (!response.ok) { setError(data.error || t('billingError')); return; }
       const destination = new URL(data.url); const allowed = kind === 'checkout' ? 'checkout.stripe.com' : 'billing.stripe.com';
       if (destination.protocol !== 'https:' || destination.hostname !== allowed) throw new Error('INVALID_DESTINATION');
+      if (kind === 'checkout') trackEvent({ event: 'overto.checkout_started', properties: { mode: 'test' } });
       window.location.assign(destination.href);
     } catch { setError(t('testBillingError')); } finally { setBusy(false); }
   }

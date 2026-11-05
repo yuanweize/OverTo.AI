@@ -26,7 +26,7 @@ describe('review and verification flow', () => {
   it('does not transmit until reviewed and sends redacted URL with explicit AI consent', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: 'test' }) });
     vi.stubGlobal('fetch', fetchMock);
-    await act(async () => { root.render(<NextIntlClientProvider locale="cs" messages={messages}><AnalysisWorkspace /></NextIntlClientProvider>); });
+    await act(async () => { root.render(<NextIntlClientProvider locale="cs" messages={messages}><AnalysisWorkspace aiAvailable /></NextIntlClientProvider>); });
     const scenario = [...container.querySelectorAll('button')].find(b => b.textContent?.includes('Falešná SMS České pošty'));
     expect(scenario).toBeDefined();
     await act(async () => { scenario!.click(); });

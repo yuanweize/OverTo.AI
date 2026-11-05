@@ -98,6 +98,7 @@
     "loadVersion": "Load this version into the form"
   },
   "Analysis": {
+    "aiUnavailable": "AI analysis is unavailable in this deployment. Rules analysis remains available.",
     "reviewAgain": "More sensitive information was found in your edit. Review the updated text before sending.",
     "failed": "Analysis failed. Please try again.",
     "unexpected": "An unexpected error occurred. Please try again.",
@@ -664,6 +665,18 @@
     "datasetNote": "challenge-v1 contains {count} authored examples covering benign, ambiguous and malicious scenarios. The dataset is versioned in the repository; browser editing is not yet available."
   },
   "Models": {
+    "pricingTitle": "Verified model pricing",
+    "pricingModel": "Model to price",
+    "pricingNote": "Enter current prices from your provider in USD per million tokens. Historical example prices are not trusted. This confirmation permits budgeted requests for the selected model.",
+    "pricingVerified": "Pricing confirmed by an operator. Verify again whenever the provider changes prices.",
+    "pricingUnverified": "No confirmed price. Paid calls for this model are blocked.",
+    "inputPrice": "Input USD / 1M tokens",
+    "outputPrice": "Output USD / 1M tokens",
+    "requestCeiling": "Maximum USD / request",
+    "confirmPricing": "I checked these prices against the current provider terms and accept responsibility for their accuracy.",
+    "savePricing": "Confirm pricing",
+    "pricingSaved": "Pricing confirmed and audit recorded.",
+    "pricingError": "Pricing could not be confirmed.",
     "title": "Models in this workspace",
     "intro": "Choose which model IDs the configured endpoint may use. Select one default. Changes affect subsequent analyses and prompt tests; saving does not call or validate the model.",
     "registered": "Allowed model IDs",

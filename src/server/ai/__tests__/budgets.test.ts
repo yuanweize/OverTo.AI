@@ -43,6 +43,9 @@ describe('AI budget guard & atomic concurrency reservation', () => {
       await pool.query(migrationSql);
       const migration17Sql = await readFile('migrations/017_ai_budget_accounting.sql', 'utf8');
       await pool.query(migration17Sql);
+      await pool.query(await readFile('migrations/019_verified_ai_pricing.sql', 'utf8'));
+      await AiBudgetGuard.setModelPricing(pool, { model: 'gpt-4o', inputPerMillionUsd: 2.5, outputPerMillionUsd: 10, maxRequestCostUsd: 0.2 });
+      await AiBudgetGuard.setModelPricing(pool, { model: 'gpt-4o-mini', inputPerMillionUsd: 0.15, outputPerMillionUsd: 0.6, maxRequestCostUsd: 0.05 });
     });
 
     afterAll(async () => {
@@ -56,6 +59,11 @@ describe('AI budget guard & atomic concurrency reservation', () => {
     it('fails closed when model pricing is unknown (no name guessing)', async () => {
       const guard = new AiBudgetGuard(pool);
       const res = await guard.reserve({ provider: 'openai', model: 'unknown-experimental-model-9000' });
+      expect(res.allowed).toBe(false);
+      expect(res.reason).toBe('unknown_model_pricing');
+    });
+    it('rejects unconfirmed historical example prices', async () => {
+      const res = await new AiBudgetGuard(pool).reserve({ provider: 'test', model: 'gpt-6.1-sol' });
       expect(res.allowed).toBe(false);
       expect(res.reason).toBe('unknown_model_pricing');
     });
@@ -150,7 +158,7 @@ describe('AI budget guard & atomic concurrency reservation', () => {
         model: 'test-high-cost-model',
         maxInputTokens: 0,
         maxOutputTokens: 1000, // 1000 * $250 / 1M = $0.25 > $0.20 model ceiling
-        config: { dailyBudgetUsd: 0.20 },
+        config: { dailyBudgetUsd: 0.20, maxCostPerRequestUsd: 0.30 },
       });
       expect(overCeiling.allowed).toBe(false);
       expect(overCeiling.reason).toBe('max_request_budget_exceeded');
@@ -168,7 +176,7 @@ describe('AI budget guard & atomic concurrency reservation', () => {
         model: 'test-ceiling-model',
         maxInputTokens: 0,
         maxOutputTokens: 1000, // 1000 * $200 / 1M = $0.20 == ceiling
-        config: { dailyBudgetUsd: 0.20 },
+        config: { dailyBudgetUsd: 0.20, monthlyBudgetUsd: 1.00, maxCostPerRequestUsd: 0.20 },
       });
       expect(allowedRes.allowed).toBe(true);
       expect(allowedRes.reservedCost).toBe(0.20);
@@ -205,7 +213,7 @@ describe('AI budget guard & atomic concurrency reservation', () => {
         model: 'test-ceiling-model',
         maxInputTokens: 0,
         maxOutputTokens: 100,
-        config: { dailyBudgetUsd: 0.20 },
+        config: { dailyBudgetUsd: 0.20, monthlyBudgetUsd: 1.00 },
       });
       expect(nextRes.allowed).toBe(false);
       expect(nextRes.reason).toBe('daily_budget_exceeded');

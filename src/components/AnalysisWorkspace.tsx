@@ -12,8 +12,9 @@ import { Footer } from '@/components/Footer';
 import { sanitizeInput } from '@/lib/sanitizer';
 import { DemoScenario, AnalysisResult } from '@/types/analyzer';
 import { AlertCircle, ShieldCheck, Eye, Route } from 'lucide-react';
+import { trackEvent } from '@/observability/client';
 
-export function AnalysisWorkspace({ accountMode = false, projects = [], defaultProjectId = '' }: { accountMode?: boolean; projects?: { id: string; name: string }[]; defaultProjectId?: string }) {
+export function AnalysisWorkspace({ accountMode = false, aiAvailable = false, projects = [], defaultProjectId = '' }: { accountMode?: boolean; aiAvailable?: boolean; projects?: { id: string; name: string }[]; defaultProjectId?: string }) {
   const t = useTranslations('Analysis');
   const locale = useLocale();
   const inputVersion = useRef(0);
@@ -66,6 +67,7 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
     setIsLoading(true);
     setErrorMessage(null);
     setAnalysisResult(null);
+    trackEvent({ event: 'overto.analysis_started', properties: { engine: aiConsent ? 'ai' : 'rules', surface: accountMode ? 'account' : 'public' } });
 
     try {
       const response = await fetch(accountMode ? '/api/local/analyses' : '/api/analyze', {
@@ -89,12 +91,17 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
 
       const data = await response.json();
       if (version === inputVersion.current) {
-        setAnalysisResult(accountMode ? data.result : data);
+        const result: AnalysisResult = accountMode ? data.result : data;
+        setAnalysisResult(result);
+        trackEvent({ event: 'overto.analysis_completed', properties: { engine: aiConsent ? 'ai' : 'rules', status: aiConsent && result.metadata.aiStatus !== 'SUCCESS' ? 'fallback' : 'success', risk: result.riskLevel, surface: accountMode ? 'account' : 'public' } });
         if (accountMode) setCreditsCharged(data.creditsCharged);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : t('unexpected');
-      if (version === inputVersion.current) setErrorMessage(msg);
+      if (version === inputVersion.current) {
+        setErrorMessage(msg);
+        trackEvent({ event: 'overto.analysis_failed', properties: { engine: aiConsent ? 'ai' : 'rules', surface: accountMode ? 'account' : 'public', category: 'unknown' } });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -150,8 +157,7 @@ export function AnalysisWorkspace({ accountMode = false, projects = [], defaultP
                 <label htmlFor="preview-text" className="mt-4 block text-sm font-semibold text-slate-900">{t('previewLabel')}</label>
                 <textarea id="preview-text" aria-describedby="preview-help" rows={6} maxLength={10000} value={preview} onChange={e => { inputVersion.current++; setPreview(e.target.value); setReviewed(false); setAiConsent(false); setAnalysisResult(null); }} className="mt-2 w-full rounded-lg border border-slate-400 bg-white p-4 text-base text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700" />
                 <label className="mt-3 flex min-h-11 items-start gap-3 text-sm text-slate-800"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} className="mt-1 h-4 w-4 accent-teal-700" /><span>{t('reviewConsent')}</span></label>
-                <label className="mt-3 flex min-h-12 items-center gap-3 rounded-lg border border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/40 px-4 py-3 text-sm font-medium text-teal-950 dark:text-teal-200"><input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} aria-describedby="ai-privacy" className="h-4 w-4 accent-teal-700" /><span>{t('aiConsent')}</span></label>
-                <p id="ai-privacy" className="mt-3 text-sm leading-6 text-slate-700">{t('aiPrivacy')}</p>
+                {aiAvailable ? <><label className="mt-3 flex min-h-12 items-center gap-3 rounded-lg border border-teal-200 dark:border-teal-800/60 bg-teal-50 dark:bg-teal-950/40 px-4 py-3 text-sm font-medium text-teal-950 dark:text-teal-200"><input type="checkbox" checked={aiConsent} onChange={e => setAiConsent(e.target.checked)} aria-describedby="ai-privacy" className="h-4 w-4 accent-teal-700" /><span>{t('aiConsent')}</span></label><p id="ai-privacy" className="mt-3 text-sm leading-6 text-slate-700">{t('aiPrivacy')}</p></> : <p className="mt-3 text-sm text-slate-600" role="status">{t('aiUnavailable')}</p>}
                 {accountMode && <p className="mt-3 text-sm font-semibold text-slate-700">{t('creditsNote')}</p>}
                 <button type="button" onClick={handleAnalyze} disabled={!reviewed || !preview.trim() || isLoading} className="mt-5 min-h-12 w-full rounded-lg bg-teal-800 px-6 py-3 font-bold text-white hover:bg-teal-900 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 sm:w-auto">{isLoading ? t('busy') : aiConsent ? t('sendAi') : t('sendRules')}</button>
                 <p role="status" className="mt-2 text-sm text-slate-600">{isLoading ? t('wait') : ''}</p>

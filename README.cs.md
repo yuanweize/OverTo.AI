@@ -210,7 +210,8 @@ Ověřené požadavky používají Bearer token s denními limity. Podrobnosti n
 
 - **Žádná záruka bezpečnosti:** Deterministická pravidla ani volitelné AI modely nezaručují 100% spolehlivost detekce. Výsledek `INSUFFICIENT_EVIDENCE` neznamená potvrzení pravosti či bezpečnosti zprávy.
 - **Nezávislé ověření je nutné:** Jakýkoliv neočekávaný nebo urgentní požadavek týkající se financí či údajů je třeba ověřit přes spolehlivý oficiální kontakt.
-- **AI v produkci:** Aktuální produkční adaptér blokuje externí volání modelů (`deployment_gate`) i při nastaveném poskytovateli. Veřejné i vlastní produkční nasazení analyzuje pouze pravidly. Omezená volání modelu lze testovat jen v izolovaném místním vývojovém prostředí.
+- **AI v produkci:** Výchozí režim používá pouze pravidla. Správce vlastního serveru může výslovně povolit externí model po nastavení serverového klíče, ověřené ceny modelu a rozpočtů; veřejné demo zůstává ve výchozím stavu bez placené AI. Produkční cesta byla otestována s izolovaným HTTPS Mock poskytovatelem, nikoli s veřejným placeným modelem. Viz [AI Usage](AI_USAGE.md).
+- **Volitelná analytika:** PostHog EU se spouští pouze po samostatném souhlasu. Neodesílá text zpráv, e-mail, úplnou URL ani záznam obrazovky. Viz [návod](docs/observability/posthog.md).
 - **Klientská anonymizace:** Automatické odstraňování PII maskuje běžné formáty (telefon, e-mail, jména), nemůže však zajistit stoprocentní odstranění všech kontextových indicií.
 - Podrobný přehled technických hranic viz [LIMITATIONS.md](LIMITATIONS.md).
 

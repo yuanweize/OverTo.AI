@@ -41,5 +41,5 @@ flowchart LR
 
 - **Atomic Budget Guard:** The `AiBudgetGuard` (`src/server/ai/budgets.ts`, `migrations/016_ai_budget_reservations.sql`) uses PostgreSQL advisory and row-level locks to manage daily and monthly financial ceilings.
 - **Pre-Allocation & Settlement:** Token consumption and estimated costs are reserved prior to external invocation and settled or released post-execution. Requests fail closed upon budget exhaustion.
-- **Production Gating:** Production environments default to **Rules-only** mode via the `AI_LOCAL_ONLY` security gate, preventing unintended external provider costs or exposure.
+- **Production Gating:** Production defaults to Rules-only. Explicit `AI_PRODUCTION_ENABLED=true` and a verified budget reservation permit a call; anonymous paid AI has its own disabled-by-default switch. The public demo configuration keeps both switches off.
 - **Zero Content Persistence:** Raw message contents submitted for analysis are processed in memory and never stored in the database. Only operational telemetry (token counts, latency, estimated USD cost) is recorded in administrative trace logs.

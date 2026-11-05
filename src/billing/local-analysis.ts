@@ -5,6 +5,7 @@ import { POST as analyze } from '@/app/api/analyze/route';
 import type { AnalysisResult } from '@/types/analyzer';
 import { SharedRateLimiter } from '@/server/security/shared-rate-limit';
 import { readRequestBody } from '@/lib/read-request-body';
+import { markAccountAnalysis } from '@/server/ai/trusted-analysis';
 
 /** Local-only metered analysis; the caller must authorize this workspace and project. */
 export async function runLocalAnalysis(request: NextRequest, workspaceId: string, projectId: string, scopes?: string[]) {
@@ -38,8 +39,8 @@ export async function runLocalAnalysis(request: NextRequest, workspaceId: string
   const mode = body.enableLlm ? 'AI' : 'RULES';
   const started = Date.now();
   try {
-    const internal = new NextRequest(new URL('/api/analyze', request.url), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': request.headers.get('accept-language') || 'cs' }, body: raw });
-    const resultResponse = await analyze(internal);
+    const internal = new NextRequest(new URL('/api/analyze', request.url), { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Language': request.headers.get('accept-language') || 'cs', ...(request.headers.get('cookie') ? { Cookie: request.headers.get('cookie')! } : {}) }, body: raw });
+    const resultResponse = await analyze(markAccountAnalysis(internal, { workspaceId, projectId }));
     if (resultResponse.status === 429) {
       await ledger.settle(workspaceId, key, 0, { projectId, mode, providerStatus: 'FAILED', model: null, durationMs: Math.max(0, Date.now() - started) });
       return NextResponse.json({ error: 'Server je dočasně vytížen. Zkuste to prosím později.' }, { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': resultResponse.headers.get('retry-after') || '1' } });

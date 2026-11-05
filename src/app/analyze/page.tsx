@@ -1,2 +1,3 @@
 import { AnalysisWorkspace } from '@/components/AnalysisWorkspace';
-export default function AnalyzePage() { return <AnalysisWorkspace />; }
+import { aiAvailableFor } from '@/server/ai/availability';
+export default async function AnalyzePage() { return <AnalysisWorkspace aiAvailable={await aiAvailableFor(false)} />; }

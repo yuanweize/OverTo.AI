@@ -32,8 +32,20 @@ services:
       # Public Demo Safety Invariant: Rules-only, disable paid AI and real Stripe
       - key: AI_ENABLED
         value: 'false'
+      - key: AI_PRODUCTION_ENABLED
+        value: 'false'
+      - key: AI_ANONYMOUS_ENABLED
+        value: 'false'
+      - key: AI_EMERGENCY_DISABLE
+        value: 'false'
       - key: AI_LOCAL_ONLY
         value: 'false'
+      - key: POSTHOG_ENABLED
+        value: 'false'
+      - key: POSTHOG_HOST
+        value: https://eu.i.posthog.com
+      - key: POSTHOG_PROJECT_TOKEN
+        sync: false
       - key: STRIPE_SECRET_KEY
         value: ''
       # Production Database connection from managed PostgreSQL
