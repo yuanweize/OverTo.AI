@@ -1,4 +1,6 @@
-# Current maintenance status — 2026-11-04
+# Current maintenance status — 2026-11-05
+
+Current billing work: the administrator credit grant transaction defect has a fix on `fix/billing-admin-atomicity`; isolated PostgreSQL tests cover concurrent replay and audit-insert failure rollback. Formal subscription, top-up, Live payment architecture and the expanded billing/admin journeys remain unimplemented and must not be represented as released. The shared Git history and dirty legacy worktree have been backed up locally before consolidation; the old directories have not been removed.
 
 Prior audit baseline `main` (2026-11-04): `f4f9f5430d8e6b76d38acf13ca1f23bcb59450ee`. The published release at that audit was `v7.0.3`; check GitHub for newer commits and releases. The public Render deployment record reported this SHA as successful, but the running application did not expose a build SHA, so direct runtime provenance was unverified.
 
