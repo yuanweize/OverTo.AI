@@ -28,7 +28,7 @@ export function billingConfigStatus(env: Partial<NodeJS.ProcessEnv> = process.en
     if (mode === 'test' && url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname))) return { config: null, issue: 'INVALID_PUBLIC_URL' };
     publicOrigin = url.origin;
   } catch { return { config: null, issue: 'INVALID_PUBLIC_URL' }; }
-  return { config: { mode, webhookSecret, publicOrigin, stripe: new Stripe(key, { timeout: 10000, maxNetworkRetries: 0 }) }, issue: null };
+  return { config: { mode, webhookSecret, publicOrigin, checkoutEnabled: env.OVERTO_BILLING_CHECKOUT_ENABLED === 'true', stripe: new Stripe(key, { timeout: 10000, maxNetworkRetries: 0 }) }, issue: null };
 }
 
 export function billingConfig(env: Partial<NodeJS.ProcessEnv> = process.env) {

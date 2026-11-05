@@ -86,6 +86,8 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     await pool.query(await readFile('migrations/007_platform_settings.sql', 'utf8'));
     await pool.query(await readFile('migrations/009_shared_rate_limits.sql', 'utf8'));
     await pool.query(await readFile('migrations/014_key_permissions.sql', 'utf8'));
+    await pool.query(await readFile('migrations/021_billing_catalog.sql', 'utf8'));
+    await pool.query(await readFile('migrations/022_billing_commerce.sql', 'utf8'));
 
     // Insert user, password hash, and active session
     const hashedPassword = await hashPassword(correctPassword);
@@ -240,7 +242,26 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     expect(resSec.status).toBe(403);
   });
 
-  it('successfully deletes account upon correct re-authentication, revokes keys, and anonymizes financial customer records', async () => {
+  it('blocks deletion while a commercial subscription or checkout is active', async () => {
+    const plan = await pool.query<{ id: string }>(`INSERT INTO billing_plan_versions
+      (code,version,kind,name_cs,name_en,description_cs,description_en,currency,amount_minor,monthly_credits,is_visible,is_purchasable)
+      VALUES ('account-monthly',1,'MONTHLY','Měsíčně','Monthly','','','CZK',9900,100,false,false) RETURNING id`);
+    await pool.query('INSERT INTO billing_customers(mode,workspace_id,stripe_customer_id) VALUES($1,$2,$3)', ['test', workspaceId, 'cus_account_test']);
+    await pool.query(`INSERT INTO billing_subscriptions(mode,workspace_id,stripe_customer_id,stripe_subscription_id,plan_version_id,status)
+      VALUES($1,$2,$3,$4,$5,$6)`, ['test', workspaceId, 'cus_account_test', 'sub_account_test', plan.rows[0].id, 'active']);
+    const request = () => new NextRequest('http://127.0.0.1:3000/api/account/delete', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'http://127.0.0.1:3000' },
+      body: JSON.stringify({ confirmEmail: testEmail, password: correctPassword }),
+    });
+    expect((await deleteRoute(request())).status).toBe(409);
+    await pool.query("UPDATE billing_subscriptions SET status='canceled' WHERE mode='test' AND workspace_id=$1", [workspaceId]);
+    await pool.query(`INSERT INTO billing_orders(mode,workspace_id,plan_version_id,request_id,kind,amount_minor,currency,credits,expires_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8,now()+interval '1 hour')`, ['test', workspaceId, plan.rows[0].id, randomUUID(), 'MONTHLY', 9900, 'CZK', 100]);
+    expect((await deleteRoute(request())).status).toBe(409);
+    await pool.query("UPDATE billing_orders SET status='EXPIRED' WHERE workspace_id=$1", [workspaceId]);
+  });
+
+  it('deletes the personal account while retaining minimal commercial transaction references', async () => {
     const req = new NextRequest('http://127.0.0.1:3000/api/account/delete', {
       method: 'POST',
       headers: {
@@ -274,6 +295,9 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     // Verify all tenant and customer bindings are removed
     const stripeCheck = await pool.query('SELECT stripe_customer_id FROM local_stripe_customers WHERE workspace_id=$1', [workspaceId]);
     expect(stripeCheck.rowCount).toBe(0);
+
+    const commercialMapping = await pool.query('SELECT stripe_customer_id FROM billing_customers WHERE workspace_id=$1', [workspaceId]);
+    expect(commercialMapping.rows[0]?.stripe_customer_id).toBe('cus_account_test');
 
     const creditCheck = await pool.query('SELECT id FROM credit_accounts WHERE id=$1', [workspaceId]);
     expect(creditCheck.rowCount).toBe(0);
