@@ -13,13 +13,6 @@ export function Preferences() {
   }, []);
   async function update(value: { locale?: string; theme?: string }) {
     setBusy(true); setError('');
-    if (value.locale) {
-      if (value.locale === 'auto') {
-        document.cookie = 'overto-locale=; path=/; max-age=0; SameSite=Lax';
-      } else {
-        document.cookie = `overto-locale=${encodeURIComponent(value.locale)}; path=/; max-age=31536000; SameSite=Lax`;
-      }
-    }
     if (value.theme) {
       document.cookie = `overto-theme=${encodeURIComponent(value.theme)}; path=/; max-age=31536000; SameSite=Lax`;
       document.documentElement.dataset.themePreference = value.theme;
@@ -32,7 +25,15 @@ export function Preferences() {
     try {
       const response = await fetch('/api/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) });
       if (!response.ok) throw new Error();
-      if (value.locale) window.location.reload();
+      await response.json();
+      if (value.locale) {
+        // Commit the explicit choice after the response has completed, before navigation.
+        // This avoids a reload racing the response's Set-Cookie under a busy dev server.
+        document.cookie = value.locale === 'auto'
+          ? 'overto-locale=; path=/; max-age=0; SameSite=Lax'
+          : `overto-locale=${encodeURIComponent(value.locale)}; path=/; max-age=31536000; SameSite=Lax`;
+        window.location.reload();
+      }
     } catch { setError(t('saveError')); } finally { setBusy(false); }
   }
   return <div ref={containerRef} className="preferences"><label><Languages size={16} aria-hidden="true"/><span className="sr-only">{t('language')}</span><select aria-label={t('language')} value={locale} disabled={busy} onChange={e => update({ locale: e.target.value })}><option value="cs">Čeština</option><option value="en">English</option><option value="auto">{t('automatic')}</option></select></label><label><SunMoon size={16} aria-hidden="true"/><span className="sr-only">{t('appearance')}</span><select aria-label={t('appearance')} value={theme} disabled={busy} onChange={e => update({ theme: e.target.value })}><option value="system">{t('system')}</option><option value="light">{t('light')}</option><option value="dark">{t('dark')}</option></select></label>{error && <span role="alert">{error}</span>}</div>;
