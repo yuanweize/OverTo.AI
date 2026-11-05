@@ -42,7 +42,8 @@ describe('Production & Render Deployment Configuration Integrity', () => {
       // 7. Safety in public demo: Paid AI and Stripe billing disabled
       expect(yamlContent).toMatch(/key:\s*AI_ENABLED\s*\n\s*value:\s*'false'/);
       expect(yamlContent).toMatch(/key:\s*AI_LOCAL_ONLY\s*\n\s*value:\s*'false'/);
-      expect(yamlContent).toMatch(/key:\s*STRIPE_SECRET_KEY\s*\n\s*value:\s*''/);
+      expect(yamlContent).toMatch(/key:\s*OVERTO_BILLING_MODE\s*\n\s*value:\s*disabled/);
+      expect(yamlContent).toMatch(/key:\s*OVERTO_LIVE_BILLING_ACTIVATED\s*\n\s*value:\s*'false'/);
 
       // 8. Generated secrets for session security and client identity
       expect(yamlContent).toMatch(/key:\s*OVERTO_AUTH_SECRET\s*\n\s*generateValue:\s*true/);
