@@ -2,6 +2,11 @@
 
 All notable changes to OvěřTo.AI are documented in this file.
 
+## Unreleased
+
+- Administrator credit grants and audit records now commit in one PostgreSQL transaction. A stable request identifier makes retries idempotent, including after an uncertain network response. The ROOT role is checked again in the transaction.
+- The credit grant dialog now uses Czech and English labels and exposes a dialog name and status message to assistive technology.
+
 ## [7.0.3] - 2026-10-31
 
 ### Security & Hardening

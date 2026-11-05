@@ -1,9 +1,8 @@
 import { pool } from '@/auth/server';
 import { getPlatformAdmin } from '@/server/config/admin';
-import { CreditLedger } from '@/billing/credit-ledger';
+import { grantAdminCredits } from '@/server/admin/credit-adjustment';
 import { readRequestBody } from '@/lib/read-request-body';
 import { isAllowedOrigin } from '@/server/security/origin';
-import { randomUUID } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -24,38 +23,18 @@ export async function POST(request: NextRequest) {
   }
 
   const { userId, amount, reason } = body;
-  if (!userId || typeof userId !== 'string' || !Number.isSafeInteger(amount) || !amount || amount < 1 || amount > 10000 || typeof reason !== 'string' || !reason.trim()) {
+  const requestId = request.headers.get('idempotency-key') ?? '';
+  if (!userId || typeof userId !== 'string' || !Number.isSafeInteger(amount) || !amount || amount < 1 || amount > 10000 || typeof reason !== 'string' || !reason.trim() || reason.trim().length > 100 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
     return Response.json({ error: 'INVALID_INPUT' }, { status: 400 });
   }
 
-  const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    const userRes = await client.query('SELECT u.id, u.email, w.id AS workspace_id FROM "user" u LEFT JOIN local_workspaces w ON w.user_id = u.id WHERE u.id = $1', [userId]);
-    if (!userRes.rowCount || !userRes.rows[0].workspace_id) {
-      await client.query('ROLLBACK');
-      return Response.json({ error: 'USER_WORKSPACE_NOT_FOUND' }, { status: 404 });
-    }
-
-    const workspaceId = userRes.rows[0].workspace_id;
-    const ledger = new CreditLedger(pool);
-    const idempotencyKey = `admin-grant:${randomUUID()}`;
-    await ledger.grant(workspaceId, idempotencyKey, amount, 'PROMOTIONAL');
-
-    await client.query(
-      `INSERT INTO ai_operations_audit (actor_id, action, target_id, details)
-       VALUES ($1, 'ADMIN_CREDIT_ADJUSTMENT', $2, $3)`,
-      [admin.id, userId, JSON.stringify({ amount, reason: reason.trim(), workspaceId })]
-    );
-
-    const balance = await ledger.balance(workspaceId);
-    await client.query('COMMIT');
-
-    return Response.json({ success: true, granted: amount, balance }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch {
-    await client.query('ROLLBACK');
+    const result = await grantAdminCredits(pool, { actorId: admin.id, userId, amount, reason, requestId });
+    return Response.json({ success: true, ...result }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'USER_WORKSPACE_NOT_FOUND') return Response.json({ error: error.message }, { status: 404 });
+    if (error instanceof Error && error.message === 'FORBIDDEN') return Response.json({ error: error.message }, { status: 403 });
+    if (error instanceof Error && error.message === 'IDEMPOTENCY_CONFLICT') return Response.json({ error: error.message }, { status: 409 });
     return Response.json({ error: 'CREDIT_ADJUSTMENT_FAILED' }, { status: 500 });
-  } finally {
-    client.release();
   }
 }

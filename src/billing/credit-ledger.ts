@@ -55,7 +55,7 @@ export class CreditLedger {
     return this.locked(accountId, async client => this.balanceInTransaction(client, accountId));
   }
 
-  private async balanceInTransaction(client: PoolClient, accountId: string) {
+  async balanceInTransaction(client: PoolClient, accountId: string) {
     const result = await client.query(`SELECT
       COALESCE((SELECT SUM(amount) FROM credit_grants WHERE account_id = $1), 0)::int AS granted,
       COALESCE((SELECT SUM(amount) FROM credit_transactions WHERE account_id = $1), 0)::int AS consumed,
