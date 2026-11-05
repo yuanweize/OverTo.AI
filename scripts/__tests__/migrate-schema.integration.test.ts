@@ -13,7 +13,7 @@ describe.skipIf(!connectionString)('schema migration idempotency', () => {
 
   beforeAll(async () => {
     await control.query(`CREATE SCHEMA ${schema}`);
-    pool = new Pool({ connectionString, options: `-c search_path=${schema}` });
+    pool = new Pool({ connectionString, options: `-c search_path=${schema}`, max: 2 });
   });
 
   afterAll(async () => {
@@ -33,8 +33,11 @@ describe.skipIf(!connectionString)('schema migration idempotency', () => {
     );
     expect(tablesFirst.rows.length).toBeGreaterThan(5);
 
-    // Second run (should be completely idempotent and succeed)
-    await expect(migrateSchema(pool, secret, true)).resolves.not.toThrow();
+    // Concurrent deploy and boot processes use separate pools and must serialize.
+    const bootPool = new Pool({ connectionString, options: `-c search_path=${schema}`, max: 2 });
+    try {
+      await expect(Promise.all([migrateSchema(pool, secret, true), migrateSchema(bootPool, secret, true)])).resolves.toHaveLength(2);
+    } finally { await bootPool.end(); }
 
     const tablesSecond = await pool.query<{ tablename: string }>(
       "SELECT tablename FROM pg_tables WHERE schemaname = $1 ORDER BY tablename",

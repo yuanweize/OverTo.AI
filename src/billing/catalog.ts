@@ -80,8 +80,9 @@ export class BillingCatalog {
         return priorRequest.rows[0];
       }
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`billing-plan:${input.code}`]);
-      const prior = await client.query<{ version: number; kind: PlanKind }>('SELECT version,kind FROM billing_plan_versions WHERE code=$1 ORDER BY version DESC LIMIT 1', [input.code]);
+      const prior = await client.query<{ version: number; kind: PlanKind; effective_at: Date }>('SELECT version,kind,effective_at FROM billing_plan_versions WHERE code=$1 ORDER BY version DESC LIMIT 1', [input.code]);
       if (prior.rowCount && prior.rows[0].kind !== input.kind) throw new Error('PLAN_KIND_CONFLICT');
+      if (prior.rowCount && new Date(input.effectiveAt) < prior.rows[0].effective_at) throw new Error('PLAN_EFFECTIVE_ORDER');
       const version = (prior.rows[0]?.version ?? 0) + 1;
       const result = await client.query<PlanVersion>(`INSERT INTO billing_plan_versions
         (code,version,kind,name_cs,name_en,description_cs,description_en,currency,amount_minor,monthly_credits,pack_credits,

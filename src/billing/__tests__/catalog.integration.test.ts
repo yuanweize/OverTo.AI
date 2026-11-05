@@ -55,6 +55,7 @@ describe.skipIf(!connectionString)('versioned billing catalog on isolated Postgr
     await expect(catalog.publish(root, { ...input, amountMinor: 12900 }, requestId)).rejects.toThrow('IDEMPOTENCY_CONFLICT');
     const second = await catalog.publish(root, { ...input, amountMinor: 12900, stripeTestPriceId: 'price_synthetic_v2', reason: 'Price revision' }, randomUUID());
     expect(second.version).toBe(2);
+    await expect(catalog.publish(root, { ...input, effectiveAt: new Date(Date.now() - 3_600_000).toISOString(), reason: 'Backdated revision' }, randomUUID())).rejects.toThrow('PLAN_EFFECTIVE_ORDER');
     expect((await catalog.current()).find(plan => plan.code === input.code)?.amount_minor).toBe('12900');
     expect((await catalog.history(input.code)).map(plan => plan.amount_minor)).toEqual(['12900', '9900']);
     expect((await pool.query("SELECT count(*)::int AS n FROM ai_operations_audit WHERE action='BILLING_PLAN_PUBLISHED'")).rows[0].n).toBe(2);

@@ -1,6 +1,6 @@
 import { pool } from '@/auth/server';
 import { BillingCatalog } from '@/billing/catalog';
-import { billingConfig, configuredBillingMode } from '@/billing/config';
+import { billingConfig } from '@/billing/config';
 
 export async function GET() {
   if (!pool) return Response.json({ error: 'UNAVAILABLE' }, { status: 503 });
@@ -13,6 +13,6 @@ export async function GET() {
       monthlyCredits: plan.monthly_credits, packCredits: plan.pack_credits,
       paymentConfigurationPresent: !!config && plan.is_purchasable && !!(config.mode === 'test' ? plan.stripe_test_price_id : plan.stripe_live_price_id),
     }));
-    return Response.json({ mode: config?.mode ?? 'disabled', requestedMode: configuredBillingMode(process.env), plans }, { headers: { 'Cache-Control': 'no-store' } });
+    return Response.json({ mode: config?.mode ?? 'disabled', plans }, { headers: { 'Cache-Control': 'no-store' } });
   } catch { return Response.json({ error: 'UNAVAILABLE' }, { status: 503 }); }
 }

@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
-import { billingConfig, configuredBillingMode } from '@/billing/config';
+import { billingConfig, billingConfigStatus, configuredBillingMode } from '@/billing/config';
 
 describe('billing mode is explicit and fails closed', () => {
   it('stays disabled by default and refuses malformed credentials', () => {
     expect(configuredBillingMode({})).toBe('disabled');
     expect(billingConfig({})).toBeNull();
     expect(billingConfig({ OVERTO_BILLING_MODE: 'test', STRIPE_TEST_SECRET_KEY: 'sk_test_synthetic', STRIPE_TEST_WEBHOOK_SECRET: 'whsec_synthetic', BETTER_AUTH_URL: 'https://example.test/path' })).toBeNull();
+    expect(billingConfigStatus({ OVERTO_BILLING_MODE: 'live', OVERTO_LIVE_BILLING_ACTIVATED: 'false', STRIPE_LIVE_WEBHOOK_SECRET: 'whsec_synthetic', BETTER_AUTH_URL: 'https://example.test' }).issue).toBe('LIVE_NOT_ACTIVATED');
   });
   it('accepts isolated test credentials but never treats them as live', () => {
     const config = billingConfig({ OVERTO_BILLING_MODE: 'test', STRIPE_TEST_SECRET_KEY: 'sk_test_synthetic', STRIPE_TEST_WEBHOOK_SECRET: 'whsec_synthetic', BETTER_AUTH_URL: 'http://127.0.0.1:3005' });

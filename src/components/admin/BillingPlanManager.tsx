@@ -33,7 +33,7 @@ function parseMinor(value: string): number | null {
   return Number(major) * 100 + Number(fraction.padEnd(2, '0'));
 }
 
-export function BillingPlanManager({ plans, mode }: { plans: CatalogPlanRow[]; mode: 'disabled' | 'test' | 'live' }) {
+export function BillingPlanManager({ plans, mode, configurationIssue }: { plans: CatalogPlanRow[]; mode: 'disabled' | 'test' | 'live'; configurationIssue: string | null }) {
   const t = useTranslations('BillingCatalog');
   const locale = useLocale();
   const router = useRouter();
@@ -72,7 +72,7 @@ export function BillingPlanManager({ plans, mode }: { plans: CatalogPlanRow[]; m
     try {
       const response = await fetch('/api/admin/billing/plans', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': pending.current.id }, body: payload });
       const result = await response.json();
-      if (!response.ok) { setError(result.error || t('saveFailed')); return; }
+      if (!response.ok) { setError(result.error === 'PLAN_EFFECTIVE_ORDER' ? t('effectiveOrder') : result.error || t('saveFailed')); return; }
       pending.current = null; setSuccess(t('saved', { version: result.plan.version })); router.refresh();
     } catch { setError(t('networkError')); } finally { setBusy(false); }
   }
@@ -80,7 +80,8 @@ export function BillingPlanManager({ plans, mode }: { plans: CatalogPlanRow[]; m
     <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 id="billing-plans-heading">{t('title')}</h2><p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{t('intro')}</p></div>
       <button type="button" className="button button-primary" onClick={() => { setDraft({ ...emptyDraft(), effectiveAt: dateInput(new Date().toISOString()) }); setOpen(true); setError(''); setSuccess(''); pending.current = null; }}>{t('newPlan')}</button></div>
     <p className="admin-footnote mt-3">{t('mode', { mode })}</p>
-    {plans.length ? <div className="admin-table-wrap mt-4" role="region" aria-label={t('title')} tabIndex={0}><table className="admin-table"><thead><tr><th>{t('plan')}</th><th>{t('kind')}</th><th>{t('price')}</th><th>{t('credits')}</th><th>{t('state')}</th><th>{t('effective')}</th><th>{t('actions')}</th></tr></thead><tbody>{plans.map(plan => <tr key={plan.id}><td><strong>{locale === 'cs' ? plan.nameCs : plan.nameEn}</strong><small>{plan.code} · v{plan.version}</small></td><td>{t(plan.kind)}</td><td>{new Intl.NumberFormat(locale === 'cs' ? 'cs-CZ' : 'en-GB', { style: 'currency', currency: plan.currency }).format(Number(plan.amountMinor) / 100)}</td><td>{plan.kind === 'MONTHLY' ? plan.monthlyCredits : plan.packCredits}</td><td>{plan.isVisible ? t('visible') : t('hidden')} · {plan.isPurchasable ? t('purchasable') : t('notPurchasable')}</td><td>{new Date(plan.effectiveAt).toLocaleString(locale === 'cs' ? 'cs-CZ' : 'en-GB')}</td><td><button type="button" className="min-h-11 text-sm font-semibold text-teal-700 underline dark:text-teal-300" onClick={() => edit(plan)}>{t('newVersion')}</button></td></tr>)}</tbody></table></div> : <p className="admin-empty">{t('empty')}</p>}
+    {configurationIssue && <p role="status" className="mt-2 text-sm text-amber-700 dark:text-amber-300">{t('configurationIssue', { issue: configurationIssue })}</p>}
+    {plans.length ? <div className="admin-table-wrap mt-4" role="region" aria-label={t('title')} tabIndex={0}><table className="admin-table"><thead><tr><th>{t('plan')}</th><th>{t('kind')}</th><th>{t('price')}</th><th>{t('credits')}</th><th>{t('state')}</th><th>{t('effective')}</th><th>{t('actions')}</th></tr></thead><tbody>{plans.map(plan => <tr key={plan.id}><td><strong>{locale === 'cs' ? plan.nameCs : plan.nameEn}</strong><small>{plan.code} · v{plan.version}</small></td><td>{t(plan.kind)}</td><td>{new Intl.NumberFormat(locale === 'cs' ? 'cs-CZ' : 'en-GB', { style: 'currency', currency: plan.currency }).format(Number(plan.amountMinor) / 100)}</td><td>{plan.kind === 'MONTHLY' ? plan.monthlyCredits : plan.packCredits}</td><td>{plan.isVisible ? t('visible') : t('hidden')} · {plan.isPurchasable ? t('purchasable') : t('notPurchasable')}</td><td>{new Date(plan.effectiveAt).toLocaleString(locale === 'cs' ? 'cs-CZ' : 'en-GB', { timeZone: 'Europe/Prague' })}</td><td><button type="button" className="min-h-11 text-sm font-semibold text-teal-700 underline dark:text-teal-300" onClick={() => edit(plan)}>{t('newVersion')}</button></td></tr>)}</tbody></table></div> : <p className="admin-empty">{t('empty')}</p>}
     {open && <form onSubmit={save} className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900" aria-label={t('editor')}>
       <h3 className="text-lg font-semibold">{t('editor')}</h3><p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{t('immutable')}</p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
