@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLocale } from 'next-intl';
+import { SlidersHorizontal } from 'lucide-react';
 import { analyticsConsent, loadAnalytics, setAnalyticsConsent, trackBrowserError, trackEvent } from '@/observability/client';
 import { pageName } from '@/observability/events';
 
@@ -40,6 +41,7 @@ export function AnalyticsConsent() {
     if (!enabled) lastPage.current = '';
   };
   const show = choice === null || editing;
+  const settingsLabel = locale === 'cs' ? 'Nastavení analytiky' : 'Analytics settings';
   return <div className="fixed bottom-4 right-4 z-50 max-w-sm px-3 sm:px-0">
     {show ? <section aria-label={locale === 'cs' ? 'Nastavení analytiky' : 'Analytics preferences'} className="rounded-xl border border-slate-300 bg-white p-4 text-slate-900 shadow-lg dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
       <h2 className="text-sm font-semibold">{locale === 'cs' ? 'Volitelná analytika' : 'Optional analytics'}</h2>
@@ -50,6 +52,6 @@ export function AnalyticsConsent() {
         <button type="button" onClick={() => select(false)} className="min-h-11 rounded-lg border border-slate-400 px-4 text-sm font-semibold dark:border-slate-600">{locale === 'cs' ? 'Odmítnout' : 'Decline'}</button>
         <button type="button" onClick={() => select(true)} className="min-h-11 rounded-lg bg-teal-800 px-4 text-sm font-semibold text-white">{locale === 'cs' ? 'Povolit analytiku' : 'Allow analytics'}</button>
       </div>
-    </section> : <button type="button" onClick={() => setEditing(true)} className="min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">{locale === 'cs' ? 'Nastavení analytiky' : 'Analytics settings'}</button>}
+    </section> : <button type="button" onClick={() => setEditing(true)} aria-label={settingsLabel} title={settingsLabel} className="flex size-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"><SlidersHorizontal size={18} aria-hidden="true" /></button>}
   </div>;
 }
