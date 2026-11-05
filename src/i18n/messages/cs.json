@@ -767,6 +767,7 @@
   },
   "CommercialBilling": {
     "title": "Fakturace a kredity",
+    "dashboardDescriptionLive": "Správa předplatného, objednávek a faktur.",
     "testNote": "Testovací platby Stripe. Nevzniká skutečné stržení peněz. Kredity se připíší až po potvrzené události Stripe.",
     "liveNote": "Platby a kredity. Kredity se připíší až po potvrzené platbě.",
     "refresh": "Obnovit stav",
