@@ -4,6 +4,7 @@ All notable changes to OvěřTo.AI are documented in this file.
 
 ## Unreleased
 
+- Added a versioned Free/monthly/credit-pack catalog with immutable PostgreSQL versions, ROOT-only publication, audit and idempotent retries. A public catalog endpoint and pricing display use only visible, effective versions. Commercial checkout remains unavailable and disabled by default.
 - Test Mode refunds now preserve the original credit grant and append reversal entries. Balances subtract reversals, and refunded invoices cannot regain credits through a later or repeated paid event. Account export includes reversal history.
 - Administrator credit grants and audit records now commit in one PostgreSQL transaction. A stable request identifier makes retries idempotent, including after an uncertain network response. The ROOT role is checked again in the transaction.
 - The credit grant dialog now uses Czech and English labels and exposes a dialog name and status message to assistive technology.

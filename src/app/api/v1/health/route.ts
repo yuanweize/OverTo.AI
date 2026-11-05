@@ -39,7 +39,7 @@ export async function GET() {
     }
     try {
       const result = await pool.query(
-        "SELECT to_regclass('public.user') IS NOT NULL AND to_regclass('public.credit_accounts') IS NOT NULL AND to_regclass('public.credit_reversals') IS NOT NULL AND to_regclass('public.platform_admins') IS NOT NULL AS ready"
+        "SELECT to_regclass('public.user') IS NOT NULL AND to_regclass('public.credit_accounts') IS NOT NULL AND to_regclass('public.credit_reversals') IS NOT NULL AND to_regclass('public.billing_plan_versions') IS NOT NULL AND to_regclass('public.platform_admins') IS NOT NULL AS ready"
       );
       if (!result.rows[0]?.ready) {
         return NextResponse.json(
