@@ -5,8 +5,24 @@ import { stripeTestConfig } from '@/billing/stripe-test';
 import { CreditLedger } from '@/billing/credit-ledger';
 import { verifyTestEvent } from '@/billing/stripe-signature';
 import { readRequestBody } from '@/lib/read-request-body';
+import type { PoolClient } from 'pg';
 
 const id = (value: string | { id: string } | null | undefined) => typeof value === 'string' ? value : value?.id;
+
+async function applyRefundReversal(client: PoolClient, ledger: CreditLedger, workspaceId: string, invoiceId: string) {
+  const grantKey = `stripe-test-invoice:${invoiceId}`;
+  const grant = await client.query<{ id: string; amount: number }>('SELECT id,amount FROM credit_grants WHERE account_id=$1 AND idempotency_key=$2', [workspaceId, grantKey]);
+  if (!grant.rowCount) return;
+  const tracking = await client.query<{ total_amount: number; cumulative_amount_refunded: number }>(
+    'SELECT total_amount,cumulative_amount_refunded FROM local_stripe_refund_tracking WHERE workspace_id=$1 AND invoice_id=$2', [workspaceId, invoiceId]);
+  if (!tracking.rowCount || tracking.rows[0].total_amount <= 0) return;
+  // The persisted grant is authoritative even if the configured allowance changed later.
+  const targetCredits = Math.min(grant.rows[0].amount, Math.round(grant.rows[0].amount * tracking.rows[0].cumulative_amount_refunded / tracking.rows[0].total_amount));
+  const applied = await client.query<{ amount: number }>('SELECT COALESCE(SUM(amount),0)::int AS amount FROM credit_reversals WHERE grant_id=$1', [grant.rows[0].id]);
+  const delta = targetCredits - applied.rows[0].amount;
+  if (delta > 0) await ledger.reverseInTransaction(client, workspaceId, `stripe-test-refund:${invoiceId}:${targetCredits}`, grantKey, delta, 'STRIPE_REFUND');
+  await client.query('UPDATE local_stripe_refund_tracking SET cumulative_retracted_credits=$1,updated_at=now() WHERE workspace_id=$2 AND invoice_id=$3', [targetCredits, workspaceId, invoiceId]);
+}
 
 interface StripeInvoiceRecord {
   id: string;
@@ -123,91 +139,29 @@ export async function POST(request: NextRequest) {
 
         const ledger = new CreditLedger(pool);
         if (shouldGrantCredits && invoice) {
-          await ledger.grantInTransaction(client, workspaceId, `stripe-test-invoice:${invoice.id}`, config.credits, 'SUBSCRIPTION');
+          const invoiceKey = `stripe-test-invoice:${invoice.id}`;
+          await ledger.grantInTransaction(client, workspaceId, invoiceKey, config.credits, 'SUBSCRIPTION');
+          // A refund can arrive before invoice.paid. Reconcile its recorded target now.
+          await applyRefundReversal(client, ledger, workspaceId, invoice.id);
         } else if (event.type === 'charge.refunded' && refundInvoiceId) {
           const charge = event.data.object as Stripe.Charge;
-          const invoiceKey = `stripe-test-invoice:${refundInvoiceId}`;
-          const isPartial = typeof charge.amount === 'number' && typeof charge.amount_refunded === 'number' && charge.amount_refunded < charge.amount && charge.amount_refunded > 0;
-
-          if (isPartial) {
-            const totalAmount = charge.amount;
-            const cumulativeRefunded = charge.amount_refunded;
-
-            // Ensure tracking row exists and acquire exclusive row lock
-            await client.query(
-              `INSERT INTO local_stripe_refund_tracking (workspace_id, invoice_id, charge_id, total_amount, cumulative_amount_refunded, cumulative_retracted_credits)
-               VALUES ($1, $2, $3, $4, 0, 0)
-               ON CONFLICT (workspace_id, invoice_id) DO UPDATE SET total_amount = EXCLUDED.total_amount`,
-              [workspaceId, refundInvoiceId, charge.id, totalAmount]
-            );
-
-            const trackingRes = await client.query<{
-              cumulative_amount_refunded: number;
-              cumulative_retracted_credits: number;
-            }>(
-              'SELECT cumulative_amount_refunded, cumulative_retracted_credits FROM local_stripe_refund_tracking WHERE workspace_id = $1 AND invoice_id = $2 FOR UPDATE',
-              [workspaceId, refundInvoiceId]
-            );
-
-            const prevRefunded = trackingRes.rows[0]?.cumulative_amount_refunded ?? 0;
-            const prevRetracted = trackingRes.rows[0]?.cumulative_retracted_credits ?? 0;
-
-            // Only process if cumulativeRefunded is strictly greater than previously accounted amount.
-            // Guarantees idempotency across duplicate deliveries and protects against out-of-order events.
-            if (cumulativeRefunded > prevRefunded) {
-              const originalCredits = config.credits;
-              const targetRetractedCredits = Math.min(originalCredits, Math.round(originalCredits * (cumulativeRefunded / totalAmount)));
-              const deltaRetract = Math.max(0, targetRetractedCredits - prevRetracted);
-
-              if (deltaRetract > 0) {
-                if (targetRetractedCredits >= originalCredits) {
-                  await ledger.revokeInTransaction(client, workspaceId, invoiceKey);
-                } else {
-                  const currentGrant = await client.query<{ amount: number }>(
-                    'SELECT amount FROM credit_grants WHERE account_id = $1 AND idempotency_key = $2 FOR UPDATE',
-                    [workspaceId, invoiceKey]
-                  );
-                  if (currentGrant.rowCount) {
-                    const currentAmount = currentGrant.rows[0].amount;
-                    if (currentAmount <= deltaRetract) {
-                      await ledger.revokeInTransaction(client, workspaceId, invoiceKey);
-                    } else {
-                      await client.query(
-                        'UPDATE credit_grants SET amount = amount - $1 WHERE account_id = $2 AND idempotency_key = $3',
-                        [deltaRetract, workspaceId, invoiceKey]
-                      );
-                    }
-                  }
-                }
-
-                await client.query(
-                  `UPDATE local_stripe_refund_tracking
-                   SET cumulative_amount_refunded = $1,
-                       cumulative_retracted_credits = $2,
-                       last_event_id = $3,
-                       updated_at = now()
-                   WHERE workspace_id = $4 AND invoice_id = $5`,
-                  [cumulativeRefunded, targetRetractedCredits, event.id, workspaceId, refundInvoiceId]
-                );
-              }
-            }
-          } else {
-            // Full refund: completely revoke remaining grant
-            await ledger.revokeInTransaction(client, workspaceId, invoiceKey);
-
-            // Also record full refund state in tracking table
-            const total = typeof charge.amount === 'number' ? charge.amount : 1;
-            await client.query(
-              `INSERT INTO local_stripe_refund_tracking (workspace_id, invoice_id, charge_id, total_amount, cumulative_amount_refunded, cumulative_retracted_credits, last_event_id)
-               VALUES ($1, $2, $3, $4, $4, $5, $6)
-               ON CONFLICT (workspace_id, invoice_id) DO UPDATE
-               SET cumulative_amount_refunded = EXCLUDED.cumulative_amount_refunded,
-                   cumulative_retracted_credits = EXCLUDED.cumulative_retracted_credits,
-                   last_event_id = EXCLUDED.last_event_id,
-                   updated_at = now()`,
-              [workspaceId, refundInvoiceId, charge.id, total, config.credits, event.id]
-            );
-          }
+          if (!Number.isSafeInteger(charge.amount) || charge.amount <= 0 ||
+              !Number.isSafeInteger(charge.amount_refunded) || charge.amount_refunded < 0 ||
+              charge.amount_refunded > charge.amount) throw new Error('INVALID_REFUND_AMOUNT');
+          const tracking = await client.query(
+            `INSERT INTO local_stripe_refund_tracking
+               (workspace_id, invoice_id, charge_id, total_amount, cumulative_amount_refunded, cumulative_retracted_credits, last_event_id)
+             VALUES ($1,$2,$3,$4,$5,0,$6)
+             ON CONFLICT (workspace_id, invoice_id) DO UPDATE SET
+               cumulative_amount_refunded=GREATEST(local_stripe_refund_tracking.cumulative_amount_refunded,EXCLUDED.cumulative_amount_refunded),
+               last_event_id=CASE WHEN EXCLUDED.cumulative_amount_refunded>local_stripe_refund_tracking.cumulative_amount_refunded THEN EXCLUDED.last_event_id ELSE local_stripe_refund_tracking.last_event_id END,
+               updated_at=now()
+             WHERE local_stripe_refund_tracking.charge_id=EXCLUDED.charge_id AND local_stripe_refund_tracking.total_amount=EXCLUDED.total_amount
+             RETURNING invoice_id`,
+            [workspaceId, refundInvoiceId, charge.id, charge.amount, charge.amount_refunded, event.id],
+          );
+          if (!tracking.rowCount) throw new Error('REFUND_CHARGE_CONFLICT');
+          await applyRefundReversal(client, ledger, workspaceId, refundInvoiceId);
         }
 
         await client.query('INSERT INTO local_stripe_events (event_id,event_type) VALUES ($1,$2)', [event.id, event.type]);

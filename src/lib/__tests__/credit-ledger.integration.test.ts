@@ -17,6 +17,7 @@ describe.skipIf(!connectionString)('PostgreSQL credit ledger', () => {
     if (!['127.0.0.1', 'localhost'].includes(url.hostname) || url.pathname !== '/overto_test') throw new Error('Requires a disposable local overto_test database');
     await control.query(`CREATE SCHEMA ${schema}`);
     await pool.query(await readFile('migrations/001_credit_ledger.sql', 'utf8'));
+    await pool.query(await readFile('migrations/020_credit_reversals.sql', 'utf8'));
     await pool.query('INSERT INTO credit_accounts (id) VALUES ($1)', [account]);
   });
   afterAll(async () => {
@@ -29,6 +30,28 @@ describe.skipIf(!connectionString)('PostgreSQL credit ledger', () => {
     await Promise.all(Array.from({ length: 5 }, () => ledger.grant(account, 'trial', 10, 'PROMOTIONAL')));
     await expect(ledger.grant(account, 'trial', 11, 'PROMOTIONAL')).rejects.toThrow('IDEMPOTENCY_CONFLICT');
     expect((await ledger.balance(account)).available).toBe(10);
+  });
+  it('records immutable compensating reversals and rejects excess or altered replays', async () => {
+    const reversalAccount = randomUUID();
+    await pool.query('INSERT INTO credit_accounts(id) VALUES($1)', [reversalAccount]);
+    await ledger.grant(reversalAccount, 'refund-test-grant', 10, 'PURCHASED');
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      expect(await ledger.reverseInTransaction(client, reversalAccount, 'refund-1', 'refund-test-grant', 3, 'TEST_REFUND')).toBe(true);
+      expect(await ledger.reverseInTransaction(client, reversalAccount, 'refund-1', 'refund-test-grant', 3, 'TEST_REFUND')).toBe(false);
+      await expect(ledger.reverseInTransaction(client, reversalAccount, 'refund-2', 'refund-test-grant', 8, 'TEST_REFUND')).rejects.toThrow('REVERSAL_EXCEEDS_GRANT');
+      await client.query('ROLLBACK');
+    } finally { client.release(); }
+    expect((await ledger.balance(reversalAccount)).reversed).toBe(0);
+    const second = await pool.connect();
+    try {
+      await second.query('BEGIN');
+      await ledger.reverseInTransaction(second, reversalAccount, 'refund-1', 'refund-test-grant', 3, 'TEST_REFUND');
+      await second.query('COMMIT');
+    } finally { second.release(); }
+    expect(await ledger.balance(reversalAccount)).toMatchObject({ granted: 10, reversed: 3, available: 7 });
+    expect((await pool.query("SELECT amount FROM credit_grants WHERE account_id=$1 AND idempotency_key='refund-test-grant'", [reversalAccount])).rows[0].amount).toBe(10);
   });
   it('serializes concurrent reservations and does not overspend', async () => {
     const attempts = await Promise.allSettled(Array.from({ length: 20 }, (_, i) => ledger.reserve(account, `request-${i}`, 1, 60)));

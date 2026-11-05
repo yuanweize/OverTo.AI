@@ -43,15 +43,25 @@ export class CreditLedger {
     await client.query('INSERT INTO credit_grants (account_id, idempotency_key, amount, category) VALUES ($1,$2,$3,$4)', [accountId, key, amount, category]);
   }
 
-  async revokeInTransaction(client: PoolClient, accountId: string, key: string): Promise<boolean> {
-    requireKey(key);
+  async reverseInTransaction(client: PoolClient, accountId: string, key: string, grantKey: string, amount: number, reason: string): Promise<boolean> {
+    requireKey(key); requireKey(grantKey); requireAmount(amount);
+    if (!reason.trim() || reason.length > 200) throw new Error('INVALID_REASON');
     const account = await client.query('SELECT id FROM credit_accounts WHERE id = $1 FOR UPDATE', [accountId]);
     if (!account.rowCount) throw new Error('ACCOUNT_NOT_FOUND');
-    const deleted = await client.query('DELETE FROM credit_grants WHERE account_id = $1 AND idempotency_key = $2', [accountId, key]);
-    return (deleted.rowCount ?? 0) > 0;
+    const grant = await client.query<{ id: string; amount: number }>('SELECT id,amount FROM credit_grants WHERE account_id=$1 AND idempotency_key=$2', [accountId, grantKey]);
+    if (!grant.rowCount) throw new Error('GRANT_NOT_FOUND');
+    const previous = await client.query<{ grant_id: string; amount: number; reason: string }>('SELECT grant_id,amount,reason FROM credit_reversals WHERE account_id=$1 AND idempotency_key=$2', [accountId, key]);
+    if (previous.rowCount) {
+      if (previous.rows[0].grant_id !== grant.rows[0].id || previous.rows[0].amount !== amount || previous.rows[0].reason !== reason) throw new Error('IDEMPOTENCY_CONFLICT');
+      return false;
+    }
+    const total = await client.query<{ amount: number }>('SELECT COALESCE(SUM(amount),0)::int AS amount FROM credit_reversals WHERE grant_id=$1', [grant.rows[0].id]);
+    if (total.rows[0].amount + amount > grant.rows[0].amount) throw new Error('REVERSAL_EXCEEDS_GRANT');
+    await client.query('INSERT INTO credit_reversals(account_id,grant_id,idempotency_key,amount,reason) VALUES($1,$2,$3,$4,$5)', [accountId, grant.rows[0].id, key, amount, reason]);
+    return true;
   }
 
-  async balance(accountId: string): Promise<{ granted: number; consumed: number; reserved: number; available: number }> {
+  async balance(accountId: string): Promise<{ granted: number; consumed: number; reserved: number; reversed: number; available: number }> {
     return this.locked(accountId, async client => this.balanceInTransaction(client, accountId));
   }
 
@@ -59,9 +69,10 @@ export class CreditLedger {
     const result = await client.query(`SELECT
       COALESCE((SELECT SUM(amount) FROM credit_grants WHERE account_id = $1), 0)::int AS granted,
       COALESCE((SELECT SUM(amount) FROM credit_transactions WHERE account_id = $1), 0)::int AS consumed,
-      COALESCE((SELECT SUM(amount) FROM credit_reservations WHERE account_id = $1 AND status = 'RESERVED'), 0)::int AS reserved`, [accountId]);
-    const { granted, consumed, reserved } = result.rows[0];
-    return { granted, consumed, reserved, available: granted - consumed - reserved };
+      COALESCE((SELECT SUM(amount) FROM credit_reservations WHERE account_id = $1 AND status = 'RESERVED'), 0)::int AS reserved,
+      COALESCE((SELECT SUM(amount) FROM credit_reversals WHERE account_id = $1), 0)::int AS reversed`, [accountId]);
+    const { granted, consumed, reserved, reversed } = result.rows[0];
+    return { granted, consumed, reserved, reversed, available: granted - consumed - reserved - reversed };
   }
 
   async reserve(accountId: string, key: string, amount: number, ttlSeconds: number): Promise<Reservation & { created: boolean }> {

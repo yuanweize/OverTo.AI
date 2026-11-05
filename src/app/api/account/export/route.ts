@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
   try {
     const { workspaceId } = await personalWorkspace(userId);
     // Complete data retrieval: never arbitrarily truncate or silently omit historical records
-    const [workspaceRes, projectsRes, keysRes, usageRes, usageEventsRes, transactionsRes, grantsRes] = await Promise.all([
+    const [workspaceRes, projectsRes, keysRes, usageRes, usageEventsRes, transactionsRes, grantsRes, reversalsRes] = await Promise.all([
       pool.query('SELECT id, name, created_at FROM local_workspaces WHERE id=$1 AND user_id=$2', [workspaceId, userId]),
       pool.query('SELECT id, name, created_at, archived_at FROM local_projects WHERE workspace_id=$1 ORDER BY created_at ASC', [workspaceId]),
       pool.query('SELECT id, name, key_prefix, scopes, daily_request_limit, created_at, expires_at, revoked_at FROM local_api_keys WHERE workspace_id=$1', [workspaceId]),
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       pool.query('SELECT mode, provider_status, credits, created_at, project_id FROM local_usage_events WHERE account_id=$1 ORDER BY created_at DESC', [workspaceId]),
       pool.query('SELECT id, reservation_id, amount, created_at FROM credit_transactions WHERE account_id=$1 ORDER BY created_at DESC', [workspaceId]),
       pool.query('SELECT id, idempotency_key, category, amount, created_at FROM credit_grants WHERE account_id=$1 ORDER BY created_at DESC', [workspaceId]),
+      pool.query('SELECT id, grant_id, idempotency_key, amount, reason, created_at FROM credit_reversals WHERE account_id=$1 ORDER BY created_at DESC', [workspaceId]),
     ]);
 
     const balance = await new CreditLedger(pool).balance(workspaceId);
@@ -67,6 +68,7 @@ export async function GET(request: NextRequest) {
       apiKeys: keysRes.rows,
       credits: balance,
       creditGrants: grantsRes.rows,
+      creditReversals: reversalsRes.rows,
       creditTransactions: transactionsRes.rows,
       usageSummary: usageRes.rows[0],
       usageEvents: usageEventsRes.rows,
