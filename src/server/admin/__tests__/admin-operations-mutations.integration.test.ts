@@ -23,6 +23,7 @@ describe.skipIf(!connectionString)('admin credit adjustment and audit logging', 
 
     await pool.query('CREATE TABLE "user" (id text PRIMARY KEY, name text, email text, "emailVerified" boolean, "createdAt" timestamptz DEFAULT now(), "updatedAt" timestamptz DEFAULT now())');
     await pool.query(await readFile('migrations/001_credit_ledger.sql', 'utf8'));
+    await pool.query(await readFile('migrations/020_credit_reversals.sql', 'utf8'));
     await pool.query(await readFile('migrations/002_local_workspace.sql', 'utf8'));
     await pool.query(await readFile('migrations/007_platform_settings.sql', 'utf8'));
     await pool.query(await readFile('migrations/010_ai_prompts.sql', 'utf8'));

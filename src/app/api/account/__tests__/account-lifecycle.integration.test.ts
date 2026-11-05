@@ -77,6 +77,7 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     `);
 
     await pool.query(await readFile('migrations/001_credit_ledger.sql', 'utf8'));
+    await pool.query(await readFile('migrations/020_credit_reversals.sql', 'utf8'));
     await pool.query(await readFile('migrations/002_local_workspace.sql', 'utf8'));
     await pool.query(await readFile('migrations/003_local_usage.sql', 'utf8'));
     await pool.query(await readFile('migrations/004_local_api_keys.sql', 'utf8'));
@@ -108,7 +109,8 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
       [workspaceId, testUserId, 'Test Personal Workspace']
     );
     await pool.query('INSERT INTO credit_accounts (id) VALUES ($1) ON CONFLICT DO NOTHING', [workspaceId]);
-    await pool.query('INSERT INTO credit_grants (account_id, idempotency_key, amount, category) VALUES ($1, $2, 50, \'PROMOTIONAL\')', [workspaceId, randomUUID()]);
+    const grant = await pool.query<{ id: string }>('INSERT INTO credit_grants (account_id, idempotency_key, amount, category) VALUES ($1, $2, 50, \'PROMOTIONAL\') RETURNING id', [workspaceId, randomUUID()]);
+    await pool.query('INSERT INTO credit_reversals(account_id,grant_id,idempotency_key,amount,reason) VALUES($1,$2,$3,5,$4)', [workspaceId, grant.rows[0].id, randomUUID(), 'TEST_CORRECTION']);
 
     const projectId = randomUUID();
     await pool.query('INSERT INTO local_projects (id, workspace_id, name) VALUES ($1, $2, $3)', [projectId, workspaceId, 'Project Alpha']);
@@ -217,7 +219,8 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     expect(exportJson.projects.length).toBeGreaterThanOrEqual(1);
     expect(exportJson.apiKeys).toHaveLength(1);
     expect(exportJson.usageEvents).toHaveLength(1);
-    expect(exportJson.credits.available).toBeGreaterThanOrEqual(50);
+    expect(exportJson.credits.available).toBe(55); // 50 fixture credits + 10 workspace credits - 5 reversed
+    expect(exportJson.creditReversals).toHaveLength(1);
     expect(exportJson.dataRetentionNotice.scope).toContain('Complete export');
   });
 

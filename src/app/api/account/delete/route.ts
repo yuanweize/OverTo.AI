@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
     // 6. Delete credit ledger records in strict foreign key order
     await client.query('DELETE FROM credit_transactions WHERE account_id=$1', [workspaceId]);
     await client.query('DELETE FROM credit_reservations WHERE account_id=$1', [workspaceId]);
+    await client.query('DELETE FROM credit_reversals WHERE account_id=$1', [workspaceId]);
     await client.query('DELETE FROM credit_grants WHERE account_id=$1', [workspaceId]);
     await client.query('DELETE FROM credit_accounts WHERE id=$1', [workspaceId]);
 
