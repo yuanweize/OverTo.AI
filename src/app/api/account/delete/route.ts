@@ -69,6 +69,23 @@ export async function POST(request: NextRequest) {
     }
 
     const { workspaceId } = await personalWorkspace(userId);
+    // Serialize with both Test and Live checkout/webhook transactions. A
+    // checkout started after deletion must fail its workspace existence check.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`billing:test:${workspaceId}`]);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`billing:live:${workspaceId}`]);
+
+    // Financial history is retained, but a Stripe subscription must be canceled
+    // through the billing portal before its local customer mapping can be erased.
+    const commercialBilling = await client.query("SELECT 1 FROM billing_subscriptions WHERE workspace_id=$1 AND status IN ('active','trialing','past_due','unpaid','incomplete') LIMIT 1", [workspaceId]);
+    if (commercialBilling.rowCount) {
+      await client.query('ROLLBACK');
+      return Response.json({ error: 'Nejprve ukončete aktivní předplatné v platebním portálu.' }, { status: 409 });
+    }
+    const pendingPayment = await client.query("SELECT 1 FROM billing_orders WHERE workspace_id=$1 AND (status='PROCESSING' OR (status='PENDING' AND (expires_at>now() OR stripe_checkout_session_id IS NOT NULL))) LIMIT 1", [workspaceId]);
+    if (pendingPayment.rowCount) {
+      await client.query('ROLLBACK');
+      return Response.json({ error: 'Nejprve dokončete nebo nechte vypršet rozpracovanou platbu.' }, { status: 409 });
+    }
 
     // 3. Revoke & delete API keys and active sessions immediately
     await client.query('DELETE FROM local_api_keys WHERE workspace_id=$1', [workspaceId]);
@@ -78,7 +95,9 @@ export async function POST(request: NextRequest) {
     await client.query('DELETE FROM local_usage_events WHERE account_id=$1', [workspaceId]);
     await client.query('DELETE FROM local_projects WHERE workspace_id=$1', [workspaceId]);
 
-    // 5. Clean up Stripe workspace bindings (statutory webhook logs remain in local_stripe_events)
+    // 5. Keep commercial Stripe customer mapping and financial history so later
+    // refunds can be reconciled after account deletion. Personal workspace data
+    // below is erased; only the opaque transaction reference remains.
     await client.query('DELETE FROM local_stripe_checkout_attempts WHERE workspace_id=$1', [workspaceId]);
     await client.query('DELETE FROM local_stripe_subscriptions WHERE workspace_id=$1', [workspaceId]);
     await client.query('DELETE FROM local_stripe_customers WHERE workspace_id=$1', [workspaceId]);

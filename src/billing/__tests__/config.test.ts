@@ -13,6 +13,8 @@ describe('billing mode is explicit and fails closed', () => {
     const config = billingConfig({ OVERTO_BILLING_MODE: 'test', STRIPE_TEST_SECRET_KEY: 'sk_test_synthetic', STRIPE_TEST_WEBHOOK_SECRET: 'whsec_synthetic', BETTER_AUTH_URL: 'http://127.0.0.1:3005' });
     expect(config?.mode).toBe('test');
     expect(config?.publicOrigin).toBe('http://127.0.0.1:3005');
+    expect(config?.checkoutEnabled).toBe(false);
+    expect(billingConfig({ OVERTO_BILLING_MODE: 'test', STRIPE_TEST_SECRET_KEY: 'sk_test_synthetic', STRIPE_TEST_WEBHOOK_SECRET: 'whsec_synthetic', BETTER_AUTH_URL: 'http://127.0.0.1:3005', OVERTO_BILLING_CHECKOUT_ENABLED: 'true' })?.checkoutEnabled).toBe(true);
     expect(billingConfig({ OVERTO_BILLING_MODE: 'live', STRIPE_LIVE_SECRET_KEY: 'sk_test_synthetic', STRIPE_LIVE_WEBHOOK_SECRET: 'whsec_synthetic', OVERTO_LIVE_BILLING_ACTIVATED: 'true', NODE_ENV: 'production', BETTER_AUTH_URL: 'https://example.test' })).toBeNull();
   });
   it('requires an HTTPS origin, production mode and explicit activation for live', () => {

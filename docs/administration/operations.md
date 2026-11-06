@@ -5,7 +5,7 @@ A verified ROOT account can access `/admin`. The server verifies the session and
 | Page | Current operations | Boundary |
 | --- | --- | --- |
 | `/admin/users` | Search and page users; grant promotional credits with a reason and idempotent audit | User suspension, session revocation and adjustment reversal are not yet available |
-| `/admin/billing` | Inspect local Stripe Test Mode subscription/webhook summaries; publish versioned Free, monthly and credit-pack catalog entries | No commercial checkout, invoice operations, refund initiation or Live revenue dashboard |
+| `/admin/billing` | Inspect local Stripe Test Mode summaries, publish versioned plan entries, and inspect commercial orders and webhook records by mode | Commercial checkout is gated off by default; no operator refund initiation, invoice correction, or Live revenue reconciliation UI |
 | `/admin/audit` | Inspect recent site, AI Studio and credit adjustment metadata | No full message text, passwords or secret values |
 | `/admin/system` | Check database and basic configuration presence | Does not prove email delivery, provider quality, backups or payment readiness |
 | `/admin/ai-studio` | Manage configured AI providers, models, prompt versions and evaluations | Paid inference remains behind explicit budget and deployment gates |
