@@ -23,7 +23,7 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     },
     subscriptions: {
       list: vi.fn(async () => ({ data: [], has_more: false })),
-      retrieve: vi.fn(async () => ({ id: 'sub_synthetic', livemode: false, customer: 'cus_synthetic', metadata: {}, status: 'active', cancel_at_period_end: false, items: { data: [] } })),
+      retrieve: vi.fn(async (_subscriptionId: string) => ({ id: 'sub_synthetic', livemode: false, customer: 'cus_synthetic', metadata: {}, status: 'active', cancel_at_period_end: false, items: { data: [] } })),
     },
     invoices: { retrieve: vi.fn(async () => ({ id: 'in_synthetic', livemode: false, customer: 'cus_synthetic' })) },
     invoicePayments: { list: vi.fn(async () => ({ data: [{ status: 'paid', payment: { type: 'payment_intent', payment_intent: 'pi_synthetic' } }], has_more: false })) },
@@ -80,6 +80,7 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     const checkout = new BillingCheckout(pool, stripe as unknown as Stripe, 'test', 'http://127.0.0.1:3005', false);
     await expect(checkout.create(workspaceId, planId, randomUUID())).rejects.toThrow('PRICE_MISMATCH');
     expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+    await expect(checkout.create('personal:deleted-user', planId, randomUUID())).rejects.toThrow('WORKSPACE_NOT_FOUND');
   });
 
   it('grants only after a paid event, tolerates replay, and reverses partial then full refunds', async () => {
@@ -106,6 +107,9 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     await events.process(event('evt_refund_2', 'charge.refunded', { id: 'ch_synthetic' }));
     expect((await pool.query('SELECT COALESCE(SUM(amount),0)::int AS credits FROM credit_reversals WHERE account_id=$1', [workspaceId])).rows[0].credits).toBe(100);
     expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [created.orderId])).rows[0].status).toBe('REFUNDED');
+    await events.process(event('evt_dispute_1', 'charge.dispute.created', { charge: 'ch_synthetic' }));
+    await events.process(event('evt_refund_late', 'charge.refunded', { id: 'ch_synthetic' }));
+    expect((await pool.query('SELECT status,amount_refunded_minor FROM billing_orders WHERE id=$1', [created.orderId])).rows[0]).toMatchObject({ status: 'DISPUTED', amount_refunded_minor: '9900' });
   });
 
   it('grants a monthly allowance once when invoice arrives before checkout completion', async () => {
@@ -138,6 +142,30 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     expect((await pool.query('SELECT COUNT(*)::int AS count FROM credit_grants WHERE account_id=$1 AND idempotency_key LIKE $2', [workspaceId, 'stripe-test-invoice:%'])).rows[0].count).toBe(2);
   });
 
+  it('replaces a canceled subscription and ignores delayed events from the old one', async () => {
+    const oldOrder = await pool.query<{ id: string }>("SELECT id FROM billing_orders WHERE mode='test' AND stripe_subscription_id='sub_synthetic' LIMIT 1");
+    expect(oldOrder.rowCount).toBe(1);
+    await pool.query("UPDATE billing_subscriptions SET status='canceled' WHERE mode='test' AND workspace_id=$1", [workspaceId]);
+    await pool.query("UPDATE billing_orders SET created_at=created_at-interval '1 minute' WHERE id=$1", [oldOrder.rows[0].id]);
+    stripe.prices.retrieve.mockResolvedValueOnce({ livemode: false, active: true, currency: 'czk', unit_amount: 9900, product: 'prod_synthetic', type: 'recurring', recurring: { interval: 'month', interval_count: 1 } } as never);
+    stripe.checkout.sessions.create.mockResolvedValueOnce({ id: 'cs_test_resubscribe', livemode: false, url: 'https://checkout.stripe.com/c/resubscribe', status: 'open' });
+    const checkout = new BillingCheckout(pool, stripe as unknown as Stripe, 'test', 'http://127.0.0.1:3005', false);
+    const created = await checkout.create(workspaceId, monthlyPlanId, randomUUID());
+    const oldSubscription = { id: 'sub_synthetic', livemode: false, customer: 'cus_synthetic', metadata: { orderId: oldOrder.rows[0].id }, status: 'canceled', cancel_at_period_end: false, items: { data: [{ price: { id: 'price_monthly' } }] } };
+    const newSubscription = { ...oldSubscription, id: 'sub_resubscribed', metadata: { orderId: created.orderId }, status: 'active' };
+    stripe.subscriptions.retrieve.mockImplementation(async (subscriptionId: string) => (subscriptionId === newSubscription.id ? newSubscription : oldSubscription) as never);
+    const events = new BillingEvents(pool, stripe as unknown as Stripe, 'test');
+    const event = (id: string, type: string, object: object) => ({ id, type, livemode: false, data: { object } }) as Stripe.Event;
+    await events.process(event('evt_resubscription', 'customer.subscription.created', { id: newSubscription.id }));
+    expect((await pool.query('SELECT stripe_subscription_id,status FROM billing_subscriptions WHERE mode=$1 AND workspace_id=$2', ['test', workspaceId])).rows[0]).toMatchObject({ stripe_subscription_id: newSubscription.id, status: 'active' });
+    await events.process(event('evt_old_subscription_deleted', 'customer.subscription.deleted', { id: oldSubscription.id }));
+    expect((await pool.query('SELECT stripe_subscription_id,status FROM billing_subscriptions WHERE mode=$1 AND workspace_id=$2', ['test', workspaceId])).rows[0]).toMatchObject({ stripe_subscription_id: newSubscription.id, status: 'active' });
+    const lateInvoice = { id: 'in_old_failed_late', livemode: false, customer: 'cus_synthetic', parent: { subscription_details: { subscription: oldSubscription.id } }, currency: 'czk', lines: { has_more: false, data: [] }, status: 'open', billing_reason: 'subscription_cycle', amount_due: 9900, amount_paid: 0, total_taxes: [], hosted_invoice_url: null, invoice_pdf: null };
+    stripe.invoices.retrieve.mockResolvedValueOnce(lateInvoice as never);
+    await events.process(event('evt_old_invoice_failed_late', 'invoice.payment_failed', { id: lateInvoice.id }));
+    expect((await pool.query('SELECT stripe_subscription_id,status FROM billing_subscriptions WHERE mode=$1 AND workspace_id=$2', ['test', workspaceId])).rows[0]).toMatchObject({ stripe_subscription_id: newSubscription.id, status: 'active' });
+  });
+
   it('does not grant credits for an underpaid invoice or a live-mode event', async () => {
     const order = await pool.query<{ id: string }>("SELECT id FROM billing_orders WHERE mode='test' AND kind='MONTHLY' LIMIT 1");
     const invoice = { id: 'in_underpaid', livemode: false, customer: 'cus_synthetic', parent: { subscription_details: { subscription: 'sub_synthetic' } }, currency: 'czk', lines: { has_more: false, data: [{ pricing: { price_details: { price: 'price_monthly' } }, quantity: 1, parent: { subscription_item_details: { proration: false } } }] }, status: 'paid', billing_reason: 'subscription_cycle', amount_due: 9900, amount_paid: 100, total_taxes: [], hosted_invoice_url: null, invoice_pdf: null };
@@ -166,5 +194,15 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     const reversed = await pool.query<{ amount: number }>('SELECT amount FROM credit_reversals WHERE account_id=$1 AND idempotency_key LIKE $2', [workspaceId, 'stripe-test-refund:ch_refunded_early:%']);
     expect(granted.rows[0].amount).toBe(100);
     expect(reversed.rows[0].amount).toBe(100);
+  });
+
+  it('refuses to expose a checkout session if the workspace was deleted while Stripe responded', async () => {
+    stripe.checkout.sessions.create.mockImplementationOnce(async () => {
+      await pool.query('DELETE FROM local_workspaces WHERE id=$1', [workspaceId]);
+      return { id: 'cs_test_after_delete', livemode: false, url: 'https://checkout.stripe.com/c/after-delete', status: 'open' } as never;
+    });
+    const checkout = new BillingCheckout(pool, stripe as unknown as Stripe, 'test', 'http://127.0.0.1:3005', false);
+    await expect(checkout.create(workspaceId, planId, randomUUID())).rejects.toThrow('WORKSPACE_NOT_FOUND');
+    expect((await pool.query("SELECT COUNT(*)::int AS count FROM billing_orders WHERE stripe_checkout_session_id='cs_test_after_delete'")).rows[0].count).toBe(0);
   });
 });

@@ -69,6 +69,10 @@ export async function POST(request: NextRequest) {
     }
 
     const { workspaceId } = await personalWorkspace(userId);
+    // Serialize with both Test and Live checkout/webhook transactions. A
+    // checkout started after deletion must fail its workspace existence check.
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`billing:test:${workspaceId}`]);
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`billing:live:${workspaceId}`]);
 
     // Financial history is retained, but a Stripe subscription must be canceled
     // through the billing portal before its local customer mapping can be erased.
@@ -77,7 +81,7 @@ export async function POST(request: NextRequest) {
       await client.query('ROLLBACK');
       return Response.json({ error: 'Nejprve ukončete aktivní předplatné v platebním portálu.' }, { status: 409 });
     }
-    const pendingPayment = await client.query("SELECT 1 FROM billing_orders WHERE workspace_id=$1 AND status IN ('PENDING','PROCESSING') AND expires_at>now() LIMIT 1", [workspaceId]);
+    const pendingPayment = await client.query("SELECT 1 FROM billing_orders WHERE workspace_id=$1 AND (status='PROCESSING' OR (status='PENDING' AND (expires_at>now() OR stripe_checkout_session_id IS NOT NULL))) LIMIT 1", [workspaceId]);
     if (pendingPayment.rowCount) {
       await client.query('ROLLBACK');
       return Response.json({ error: 'Nejprve dokončete nebo nechte vypršet rozpracovanou platbu.' }, { status: 409 });

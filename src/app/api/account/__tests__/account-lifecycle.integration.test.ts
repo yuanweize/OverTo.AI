@@ -258,6 +258,8 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     await pool.query(`INSERT INTO billing_orders(mode,workspace_id,plan_version_id,request_id,kind,amount_minor,currency,credits,expires_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,now()+interval '1 hour')`, ['test', workspaceId, plan.rows[0].id, randomUUID(), 'MONTHLY', 9900, 'CZK', 100]);
     expect((await deleteRoute(request())).status).toBe(409);
+    await pool.query("UPDATE billing_orders SET status='PROCESSING',expires_at=now()-interval '1 minute' WHERE workspace_id=$1", [workspaceId]);
+    expect((await deleteRoute(request())).status).toBe(409);
     await pool.query("UPDATE billing_orders SET status='EXPIRED' WHERE workspace_id=$1", [workspaceId]);
   });
 

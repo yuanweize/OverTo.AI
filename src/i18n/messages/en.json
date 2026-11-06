@@ -613,13 +613,13 @@
     "ledgerSchema": "Credit ledger tables",
     "aiConfigured": "AI credentials configured",
     "available": "Available",
-    "testMode": "Test payment",
-    "pricingIntroTest": "Try message analysis without an account. Test plans use Stripe Sandbox only; no real charge is made.",
-    "pricingIntroLive": "Try message analysis without an account. Available plans can be managed in your account.",
     "unavailable": "Unavailable",
     "systemBoundary": "These checks confirm basic configuration and database access. They do not test email delivery, provider quality, backups or public security."
   },
   "BillingCatalog": {
+    "testMode": "Test payment",
+    "pricingIntroTest": "Try message analysis without an account. Test plans use Stripe Sandbox only; no real charge is made.",
+    "pricingIntroLive": "Try message analysis without an account. Available plans can be managed in your account.",
     "title": "Plan catalog",
     "available": "Available",
     "choosePlan": "Choose plan",

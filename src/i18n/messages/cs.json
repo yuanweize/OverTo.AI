@@ -614,13 +614,13 @@
     "ledgerSchema": "Tabulky kreditů",
     "aiConfigured": "Nastavené přihlašovací údaje AI",
     "available": "Dostupné",
-    "testMode": "Testovací platba",
-    "pricingIntroTest": "Analýzu zprávy můžete vyzkoušet bez registrace. Testovací tarify používají pouze Stripe Sandbox; skutečná platba nevzniká.",
-    "pricingIntroLive": "Analýzu zprávy můžete vyzkoušet bez registrace. Dostupné tarify lze spravovat ve vašem účtu.",
     "unavailable": "Nedostupné",
     "systemBoundary": "Kontroly potvrzují základní konfiguraci a spojení s databází. Neověřují doručení e-mailů, kvalitu modelu, zálohy ani veřejnou bezpečnost."
   },
   "BillingCatalog": {
+    "testMode": "Testovací platba",
+    "pricingIntroTest": "Analýzu zprávy můžete vyzkoušet bez registrace. Testovací tarify používají pouze Stripe Sandbox; skutečná platba nevzniká.",
+    "pricingIntroLive": "Analýzu zprávy můžete vyzkoušet bez registrace. Dostupné tarify lze spravovat ve vašem účtu.",
     "title": "Katalog tarifů",
     "available": "Dostupné",
     "choosePlan": "Vybrat tarif",

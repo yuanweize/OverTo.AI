@@ -29,6 +29,8 @@ export class BillingCheckout {
     try {
       await client.query('BEGIN');
       await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`billing:${this.mode}:${workspaceId}`]);
+      const workspace = await client.query('SELECT 1 FROM local_workspaces WHERE id=$1', [workspaceId]);
+      if (!workspace.rowCount) throw new Error('WORKSPACE_NOT_FOUND');
       const prior = await client.query<Order>('SELECT id,workspace_id,plan_version_id,status,stripe_checkout_session_id,expires_at FROM billing_orders WHERE mode=$1 AND workspace_id=$2 AND request_id=$3', [this.mode, workspaceId, requestId]);
       if (prior.rowCount) {
         order = prior.rows[0];
@@ -96,10 +98,19 @@ export class BillingCheckout {
       cancel_url: `${this.publicOrigin}/dashboard/billing?checkout=canceled`,
     }, { idempotencyKey: `overto-${this.mode}-checkout-${order.id}` });
     if (session.livemode !== (this.mode === 'live') || !this.validCheckoutUrl(session.url)) throw new Error('INVALID_CHECKOUT');
-    const linked = await this.pool.query(`UPDATE billing_orders SET stripe_customer_id=$1,stripe_checkout_session_id=$2,updated_at=now()
-      WHERE id=$3 AND mode=$4 AND status='PENDING' AND (stripe_checkout_session_id IS NULL OR stripe_checkout_session_id=$2)`,
-    [customerId, session.id, order.id, this.mode]);
-    if (linked.rowCount !== 1) throw new Error('ORDER_CHANGED');
+    const linkClient = await this.pool.connect();
+    try {
+      await linkClient.query('BEGIN');
+      await linkClient.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`billing:${this.mode}:${workspaceId}`]);
+      const workspace = await linkClient.query('SELECT 1 FROM local_workspaces WHERE id=$1', [workspaceId]);
+      if (!workspace.rowCount) throw new Error('WORKSPACE_NOT_FOUND');
+      const linked = await linkClient.query(`UPDATE billing_orders SET stripe_customer_id=$1,stripe_checkout_session_id=$2,updated_at=now()
+        WHERE id=$3 AND mode=$4 AND status='PENDING' AND (stripe_checkout_session_id IS NULL OR stripe_checkout_session_id=$2)`,
+      [customerId, session.id, order.id, this.mode]);
+      if (linked.rowCount !== 1) throw new Error('ORDER_CHANGED');
+      await linkClient.query('COMMIT');
+    } catch (error) { await linkClient.query('ROLLBACK').catch(() => {}); throw error; }
+    finally { linkClient.release(); }
     return { url: session.url!, orderId: order.id };
   }
 

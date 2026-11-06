@@ -7,7 +7,7 @@ type Order = {
   id: string; workspace_id: string; kind: 'MONTHLY' | 'CREDIT_PACK';
   amount_minor: string; currency: string; credits: number; status: string;
   plan_version_id: string; stripe_customer_id: string | null;
-  stripe_checkout_session_id: string | null; stripe_subscription_id: string | null;
+  stripe_checkout_session_id: string | null; stripe_subscription_id: string | null; created_at: Date;
 };
 const id = (value: string | { id: string } | null | undefined) => typeof value === 'string' ? value : value?.id;
 const integer = (value: number) => Number.isSafeInteger(value) && value >= 0;
@@ -137,7 +137,8 @@ export class BillingEvents {
         WHERE id=$4 AND mode=$5 AND status IN ('PENDING','PAID') AND (stripe_checkout_session_id IS NULL OR stripe_checkout_session_id=$1) AND (stripe_payment_intent_id IS NULL OR stripe_payment_intent_id=$2)`,
       [session.id, intent!.id, session.total_details?.amount_tax ?? null, order.id, this.mode]);
       if (updated.rowCount !== 1) throw new Error('ORDER_STATE_MISMATCH');
-      await new CreditLedger(this.pool).grantInTransaction(client, order.workspace_id, `stripe-${this.mode}-checkout:${session.id}`, order.credits, 'PURCHASED');
+      const account = await client.query('SELECT 1 FROM credit_accounts WHERE id=$1', [order.workspace_id]);
+      if (account.rowCount) await new CreditLedger(this.pool).grantInTransaction(client, order.workspace_id, `stripe-${this.mode}-checkout:${session.id}`, order.credits, 'PURCHASED');
     } else {
       const subscriptionId = id(session.subscription)!;
       const updated = await client.query(`UPDATE billing_orders SET status=CASE WHEN status='PAID' THEN status ELSE 'PROCESSING' END,stripe_checkout_session_id=$1,stripe_subscription_id=$2,updated_at=now()
@@ -151,17 +152,33 @@ export class BillingEvents {
     const updated = await client.query(`UPDATE billing_orders SET stripe_subscription_id=$1,updated_at=now()
       WHERE id=$2 AND mode=$3 AND kind='MONTHLY' AND (stripe_subscription_id IS NULL OR stripe_subscription_id=$1)`, [subscription.id, order.id, this.mode]);
     if (updated.rowCount !== 1) throw new Error('SUBSCRIPTION_ORDER_MISMATCH');
-    const saved = await client.query(`INSERT INTO billing_subscriptions(mode,workspace_id,stripe_customer_id,stripe_subscription_id,plan_version_id,status,cancel_at_period_end)
-      VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(mode,workspace_id) DO UPDATE SET
-      stripe_subscription_id=excluded.stripe_subscription_id,status=excluded.status,cancel_at_period_end=excluded.cancel_at_period_end,updated_at=now()
-      WHERE billing_subscriptions.stripe_subscription_id=excluded.stripe_subscription_id`,
-    [this.mode, order.workspace_id, order.stripe_customer_id, subscription.id, order.plan_version_id, subscription.status, subscription.cancel_at_period_end]);
-    if (saved.rowCount !== 1) throw new Error('SUBSCRIPTION_CONFLICT');
+    const current = await client.query<{ stripe_subscription_id: string; status: string; order_created_at: Date | null }>(`SELECT s.stripe_subscription_id,s.status,o.created_at AS order_created_at
+      FROM billing_subscriptions s LEFT JOIN LATERAL (
+        SELECT created_at FROM billing_orders WHERE mode=s.mode AND stripe_subscription_id=s.stripe_subscription_id
+        ORDER BY created_at DESC LIMIT 1
+      ) o ON true WHERE s.mode=$1 AND s.workspace_id=$2 FOR UPDATE OF s`, [this.mode, order.workspace_id]);
+    const existing = current.rows[0];
+    if (existing && existing.stripe_subscription_id !== subscription.id) {
+      if (!existing.order_created_at || !order.created_at) throw new Error('SUBSCRIPTION_ORDER_UNKNOWN');
+      // A delayed event from the previous subscription may still create its
+      // own invoice/credit, but must never replace a newer subscription.
+      if (order.created_at <= existing.order_created_at) return;
+      if (!['canceled', 'incomplete_expired'].includes(existing.status)) throw new Error('SUBSCRIPTION_CONFLICT');
+    }
+    if (existing) {
+      await client.query(`UPDATE billing_subscriptions SET stripe_customer_id=$1,stripe_subscription_id=$2,
+        plan_version_id=$3,status=$4,cancel_at_period_end=$5,updated_at=now() WHERE mode=$6 AND workspace_id=$7`,
+      [order.stripe_customer_id, subscription.id, order.plan_version_id, subscription.status, subscription.cancel_at_period_end, this.mode, order.workspace_id]);
+    } else {
+      await client.query(`INSERT INTO billing_subscriptions(mode,workspace_id,stripe_customer_id,stripe_subscription_id,plan_version_id,status,cancel_at_period_end)
+        VALUES($1,$2,$3,$4,$5,$6,$7)`,
+      [this.mode, order.workspace_id, order.stripe_customer_id, subscription.id, order.plan_version_id, subscription.status, subscription.cancel_at_period_end]);
+    }
   }
 
   private async applyInvoice(client: PoolClient, invoice: Stripe.Invoice, subscription: Stripe.Subscription, order: Order, paid: boolean, intentId?: string) {
     await this.applySubscription(client, subscription, order);
-    if (!paid) await client.query("UPDATE billing_subscriptions SET status='past_due',updated_at=now() WHERE mode=$1 AND workspace_id=$2 AND status NOT IN ('canceled','unpaid')", [this.mode, order.workspace_id]);
+    if (!paid) await client.query("UPDATE billing_subscriptions SET status='past_due',updated_at=now() WHERE mode=$1 AND workspace_id=$2 AND stripe_subscription_id=$3 AND status NOT IN ('canceled','unpaid')", [this.mode, order.workspace_id, subscription.id]);
     const status = paid ? 'paid' : 'payment_failed';
     await client.query(`INSERT INTO billing_invoices(mode,stripe_invoice_id,workspace_id,stripe_subscription_id,stripe_payment_intent_id,plan_version_id,status,currency,amount_due_minor,amount_paid_minor,tax_amount_minor,hosted_invoice_url,invoice_pdf_url,paid_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
@@ -201,7 +218,11 @@ export class BillingEvents {
         `stripe-${this.mode}-refund:${charge.id}:${target}`, grantKey, delta, dispute ? 'STRIPE_DISPUTE' : 'STRIPE_REFUND');
     }
     await client.query('UPDATE billing_refund_tracking SET credits_reversed=$1 WHERE mode=$2 AND stripe_charge_id=$3', [target, this.mode, charge.id]);
-    if (!invoice?.rows[0]) await client.query('UPDATE billing_orders SET amount_refunded_minor=$1,status=$2,updated_at=now() WHERE id=$3 AND mode=$4',
-      [refunded, dispute ? 'DISPUTED' : refunded === charge.amount ? 'REFUNDED' : 'PARTIAL_REFUND', order.id, this.mode]);
+    if (!invoice?.rows[0]) {
+      const cumulativeRefunded = Number(tracked.rows[0].cumulative_refunded_minor);
+      await client.query(`UPDATE billing_orders SET amount_refunded_minor=GREATEST(amount_refunded_minor,$1),
+        status=CASE WHEN status='DISPUTED' THEN status ELSE $2 END,updated_at=now() WHERE id=$3 AND mode=$4`,
+      [cumulativeRefunded, dispute ? 'DISPUTED' : cumulativeRefunded === charge.amount ? 'REFUNDED' : 'PARTIAL_REFUND', order.id, this.mode]);
+    }
   }
 }
