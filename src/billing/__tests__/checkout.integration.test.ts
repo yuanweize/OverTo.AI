@@ -23,7 +23,7 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     },
     subscriptions: {
       list: vi.fn(async () => ({ data: [], has_more: false })),
-      retrieve: vi.fn(async (_subscriptionId: string) => ({ id: 'sub_synthetic', livemode: false, customer: 'cus_synthetic', metadata: {}, status: 'active', cancel_at_period_end: false, items: { data: [] } })),
+      retrieve: vi.fn(async (subscriptionId: string) => ({ id: subscriptionId, livemode: false, customer: 'cus_synthetic', metadata: {}, status: 'active', cancel_at_period_end: false, items: { data: [] } })),
     },
     invoices: { retrieve: vi.fn(async () => ({ id: 'in_synthetic', livemode: false, customer: 'cus_synthetic' })) },
     invoicePayments: { list: vi.fn(async () => ({ data: [{ status: 'paid', payment: { type: 'payment_intent', payment_intent: 'pi_synthetic' } }], has_more: false })) },

@@ -15,6 +15,8 @@ const testUserId = randomUUID();
 const testEmail = `user-${randomUUID()}@example.com`;
 const correctPassword = 'StrongPassword123!';
 let mockPool: Pool;
+const stripeSessions = vi.hoisted(() => ({ retrieve: vi.fn(), expire: vi.fn() }));
+vi.mock('@/billing/config', () => ({ billingReconciliationStripe: () => ({ checkout: { sessions: stripeSessions } }) }));
 const mockSessionUser: { id: string; email: string; emailVerified: boolean } = { id: testUserId, email: testEmail, emailVerified: true };
 
 vi.mock('@/auth/server', () => ({
@@ -34,6 +36,8 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
   let exportRoute: (req: NextRequest) => Promise<Response>;
 
   let workspaceId: string;
+  let expiredLinkedOrderId: string;
+  let commercialPlanId: string;
 
   beforeAll(async () => {
     control = new Pool({ connectionString: testDbUrl });
@@ -246,6 +250,7 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     const plan = await pool.query<{ id: string }>(`INSERT INTO billing_plan_versions
       (code,version,kind,name_cs,name_en,description_cs,description_en,currency,amount_minor,monthly_credits,is_visible,is_purchasable)
       VALUES ('account-monthly',1,'MONTHLY','Měsíčně','Monthly','','','CZK',9900,100,false,false) RETURNING id`);
+    commercialPlanId = plan.rows[0].id;
     await pool.query('INSERT INTO billing_customers(mode,workspace_id,stripe_customer_id) VALUES($1,$2,$3)', ['test', workspaceId, 'cus_account_test']);
     await pool.query(`INSERT INTO billing_subscriptions(mode,workspace_id,stripe_customer_id,stripe_subscription_id,plan_version_id,status)
       VALUES($1,$2,$3,$4,$5,$6)`, ['test', workspaceId, 'cus_account_test', 'sub_account_test', plan.rows[0].id, 'active']);
@@ -261,9 +266,24 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     await pool.query("UPDATE billing_orders SET status='PROCESSING',expires_at=now()-interval '1 minute' WHERE workspace_id=$1", [workspaceId]);
     expect((await deleteRoute(request())).status).toBe(409);
     await pool.query("UPDATE billing_orders SET status='EXPIRED' WHERE workspace_id=$1", [workspaceId]);
+    const linked = await pool.query<{ id: string }>(`INSERT INTO billing_orders
+      (mode,workspace_id,plan_version_id,request_id,kind,amount_minor,currency,credits,expires_at,stripe_customer_id,stripe_checkout_session_id)
+      VALUES($1,$2,$3,$4,'MONTHLY',9900,'CZK',100,now()-interval '1 minute',$5,$6) RETURNING id`,
+      ['test', workspaceId, commercialPlanId, randomUUID(), 'cus_account_test', 'cs_test_expired_account']);
+    expiredLinkedOrderId = linked.rows[0].id;
+    stripeSessions.retrieve.mockResolvedValueOnce({ id: 'cs_test_expired_account', livemode: false, client_reference_id: expiredLinkedOrderId,
+      metadata: { orderId: expiredLinkedOrderId, workspaceId, planVersionId: commercialPlanId, billingMode: 'test' },
+      customer: 'cus_account_test', currency: 'czk', amount_subtotal: 9900, status: 'complete', payment_status: 'paid' });
+    expect((await deleteRoute(request())).status).toBe(409);
+    expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [expiredLinkedOrderId])).rows[0].status).toBe('PENDING');
   });
 
   it('deletes the personal account while retaining minimal commercial transaction references', async () => {
+    const checkout = { id: 'cs_test_expired_account', livemode: false, client_reference_id: expiredLinkedOrderId,
+      metadata: { orderId: expiredLinkedOrderId, workspaceId, planVersionId: commercialPlanId, billingMode: 'test' },
+      customer: 'cus_account_test', currency: 'czk', amount_subtotal: 9900, status: 'open', payment_status: 'unpaid' };
+    stripeSessions.retrieve.mockResolvedValueOnce(checkout);
+    stripeSessions.expire.mockResolvedValueOnce({ ...checkout, status: 'expired' });
     const req = new NextRequest('http://127.0.0.1:3000/api/account/delete', {
       method: 'POST',
       headers: {
@@ -280,6 +300,8 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.deleted).toBe(true);
+    expect(stripeSessions.expire).toHaveBeenCalledWith('cs_test_expired_account');
+    expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [expiredLinkedOrderId])).rows[0].status).toBe('EXPIRED');
 
     // Verify cascading deletions
     const userCheck = await pool.query('SELECT id FROM "user" WHERE id=$1', [testUserId]);

@@ -2,6 +2,7 @@ import { auth, pool } from '@/auth/server';
 import { personalWorkspace } from '@/auth/workspace';
 import { readRequestBody } from '@/lib/read-request-body';
 import { isAllowedOrigin } from '@/server/security/origin';
+import { billingReconciliationStripe } from '@/billing/config';
 import { verifyPassword } from 'better-auth/crypto';
 import type { NextRequest } from 'next/server';
 
@@ -81,9 +82,40 @@ export async function POST(request: NextRequest) {
       await client.query('ROLLBACK');
       return Response.json({ error: 'Nejprve ukončete aktivní předplatné v platebním portálu.' }, { status: 409 });
     }
+    const expiredLinked = await client.query<{ id: string; mode: 'test' | 'live'; stripe_checkout_session_id: string; stripe_customer_id: string; plan_version_id: string; currency: string; amount_minor: string }>(
+      `SELECT id,mode,stripe_checkout_session_id,stripe_customer_id,plan_version_id,currency,amount_minor
+       FROM billing_orders WHERE workspace_id=$1 AND status='PENDING' AND expires_at<=now()
+         AND stripe_checkout_session_id IS NOT NULL ORDER BY created_at LIMIT 10 FOR UPDATE`, [workspaceId]);
+    for (const order of expiredLinked.rows) {
+      const stripe = billingReconciliationStripe(order.mode);
+      if (!stripe) {
+        await client.query('ROLLBACK');
+        return Response.json({ error: 'Platbu nyní nelze ověřit. Kontaktujte správce.' }, { status: 503 });
+      }
+      try {
+        let checkout = await stripe.checkout.sessions.retrieve(order.stripe_checkout_session_id);
+        const matches = () => checkout.livemode === (order.mode === 'live') && checkout.id === order.stripe_checkout_session_id &&
+          checkout.client_reference_id === order.id && checkout.metadata?.orderId === order.id &&
+          checkout.metadata?.workspaceId === workspaceId && checkout.metadata?.planVersionId === order.plan_version_id &&
+          checkout.metadata?.billingMode === order.mode && checkout.customer === order.stripe_customer_id &&
+          checkout.currency?.toUpperCase() === order.currency && checkout.amount_subtotal === Number(order.amount_minor);
+        if (!matches()) throw new Error('CHECKOUT_RECONCILIATION_MISMATCH');
+        if (checkout.status === 'open') checkout = await stripe.checkout.sessions.expire(order.stripe_checkout_session_id);
+        if (!matches() || checkout.status !== 'expired' || checkout.payment_status !== 'unpaid') {
+          await client.query('ROLLBACK');
+          return Response.json({ error: 'Platba ještě není bezpečně uzavřená.' }, { status: 409 });
+        }
+        await client.query("UPDATE billing_orders SET status='EXPIRED',updated_at=now() WHERE id=$1 AND status='PENDING'", [order.id]);
+      } catch (error) {
+        console.error('CHECKOUT_RECONCILIATION_ERROR:', error);
+        await client.query('ROLLBACK');
+        return Response.json({ error: 'Platbu nyní nelze ověřit. Zkuste to později.' }, { status: 503 });
+      }
+    }
     const pendingPayment = await client.query("SELECT 1 FROM billing_orders WHERE workspace_id=$1 AND (status='PROCESSING' OR (status='PENDING' AND (expires_at>now() OR stripe_checkout_session_id IS NOT NULL))) LIMIT 1", [workspaceId]);
     if (pendingPayment.rowCount) {
-      await client.query('ROLLBACK');
+      // Keep any successfully reconciled batch so repeated attempts progress.
+      await client.query('COMMIT');
       return Response.json({ error: 'Nejprve dokončete nebo nechte vypršet rozpracovanou platbu.' }, { status: 409 });
     }
 

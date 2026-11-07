@@ -34,3 +34,10 @@ export function billingConfigStatus(env: Partial<NodeJS.ProcessEnv> = process.en
 export function billingConfig(env: Partial<NodeJS.ProcessEnv> = process.env) {
   return billingConfigStatus(env).config;
 }
+
+/** Reconcile historical orders even if checkout is now disabled or its mode changed. */
+export function billingReconciliationStripe(mode: 'test' | 'live', env: Partial<NodeJS.ProcessEnv> = process.env): Stripe | null {
+  const key = (mode === 'test' ? env.STRIPE_TEST_SECRET_KEY : env.STRIPE_LIVE_SECRET_KEY)?.trim() ?? '';
+  if (!(mode === 'test' ? /^sk_test_[A-Za-z0-9_]+$/ : /^sk_live_[A-Za-z0-9_]+$/).test(key)) return null;
+  return new Stripe(key, { timeout: 10000, maxNetworkRetries: 0 });
+}
