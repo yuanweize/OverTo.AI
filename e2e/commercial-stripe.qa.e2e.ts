@@ -9,8 +9,13 @@ const inbox = 'http://127.0.0.1:8025';
 
 function qaEnv() {
   return Object.fromEntries(readFileSync('.env.ai-qa', 'utf8').split(/\r?\n/)
+    .map(line => line.trim().replace(/^export\s+/, ''))
     .filter(line => line.includes('=') && !line.startsWith('#'))
-    .map(line => { const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1).trim()]; }));
+    .map(line => {
+      const index = line.indexOf('=');
+      const value = line.slice(index + 1).trim();
+      return [line.slice(0, index).trim(), /^(['"]).*\1$/.test(value) ? value.slice(1, -1) : value];
+    }));
 }
 
 async function verificationLink(email: string) {

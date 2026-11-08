@@ -15,8 +15,8 @@ const testUserId = randomUUID();
 const testEmail = `user-${randomUUID()}@example.com`;
 const correctPassword = 'StrongPassword123!';
 let mockPool: Pool;
-const stripeSessions = vi.hoisted(() => ({ retrieve: vi.fn(), expire: vi.fn() }));
-vi.mock('@/billing/config', () => ({ billingReconciliationStripe: () => ({ checkout: { sessions: stripeSessions } }) }));
+const stripeSessions = vi.hoisted(() => ({ retrieve: vi.fn(), expire: vi.fn(), configured: true }));
+vi.mock('@/billing/config', () => ({ billingReconciliationStripe: () => stripeSessions.configured ? { checkout: { sessions: stripeSessions } } : null }));
 const mockSessionUser: { id: string; email: string; emailVerified: boolean } = { id: testUserId, email: testEmail, emailVerified: true };
 
 vi.mock('@/auth/server', () => ({
@@ -276,13 +276,49 @@ describe.skipIf(!testDbUrl)('account lifecycle: re-authentication, GDPR export, 
       customer: 'cus_account_test', currency: 'czk', amount_subtotal: 9900, status: 'complete', payment_status: 'paid' });
     expect((await deleteRoute(request())).status).toBe(409);
     expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [expiredLinkedOrderId])).rows[0].status).toBe('PENDING');
+    stripeSessions.configured = false;
+    expect((await deleteRoute(request())).status).toBe(503);
+    stripeSessions.configured = true;
+    stripeSessions.retrieve.mockRejectedValueOnce(new Error('Stripe unavailable'));
+    expect((await deleteRoute(request())).status).toBe(503);
+    stripeSessions.retrieve.mockResolvedValueOnce({ id: 'cs_test_expired_account', livemode: false, client_reference_id: expiredLinkedOrderId,
+      metadata: { orderId: expiredLinkedOrderId, workspaceId, planVersionId: commercialPlanId, billingMode: 'test' },
+      customer: 'wrong_customer', currency: 'czk', amount_subtotal: 9900, status: 'expired', payment_status: 'unpaid' });
+    expect((await deleteRoute(request())).status).toBe(503);
+    expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [expiredLinkedOrderId])).rows[0].status).toBe('PENDING');
+  });
+
+  it('rechecks the order after Stripe returns before deleting an account', async () => {
+    const checkout = { id: 'cs_test_expired_account', livemode: false, client_reference_id: expiredLinkedOrderId,
+      metadata: { orderId: expiredLinkedOrderId, workspaceId, planVersionId: commercialPlanId, billingMode: 'test' },
+      customer: 'cus_account_test', currency: 'czk', amount_subtotal: 9900, status: 'expired', payment_status: 'unpaid' };
+    stripeSessions.retrieve.mockImplementationOnce(async () => {
+      await pool.query("UPDATE billing_orders SET status='PROCESSING' WHERE id=$1", [expiredLinkedOrderId]);
+      return checkout;
+    });
+    const request = new NextRequest('http://127.0.0.1:3000/api/account/delete', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'http://127.0.0.1:3000' },
+      body: JSON.stringify({ confirmEmail: testEmail, password: correctPassword }),
+    });
+    expect((await deleteRoute(request)).status).toBe(409);
+    expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [expiredLinkedOrderId])).rows[0].status).toBe('PROCESSING');
+    await pool.query("UPDATE billing_orders SET status='PENDING' WHERE id=$1", [expiredLinkedOrderId]);
   });
 
   it('deletes the personal account while retaining minimal commercial transaction references', async () => {
     const checkout = { id: 'cs_test_expired_account', livemode: false, client_reference_id: expiredLinkedOrderId,
       metadata: { orderId: expiredLinkedOrderId, workspaceId, planVersionId: commercialPlanId, billingMode: 'test' },
       customer: 'cus_account_test', currency: 'czk', amount_subtotal: 9900, status: 'open', payment_status: 'unpaid' };
-    stripeSessions.retrieve.mockResolvedValueOnce(checkout);
+    stripeSessions.retrieve.mockImplementationOnce(async () => {
+      const probe = await pool.connect();
+      try {
+        await probe.query('BEGIN');
+        const lock = await probe.query<{ available: boolean }>('SELECT pg_try_advisory_xact_lock(hashtext($1)) AS available', [`billing:test:${workspaceId}`]);
+        expect(lock.rows[0].available).toBe(true);
+        await probe.query('SELECT 1 FROM "account" WHERE "userId"=$1 FOR UPDATE NOWAIT', [testUserId]);
+        return checkout;
+      } finally { await probe.query('ROLLBACK'); probe.release(); }
+    });
     stripeSessions.expire.mockResolvedValueOnce({ ...checkout, status: 'expired' });
     const req = new NextRequest('http://127.0.0.1:3000/api/account/delete', {
       method: 'POST',

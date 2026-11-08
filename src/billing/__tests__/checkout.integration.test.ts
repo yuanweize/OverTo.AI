@@ -147,17 +147,32 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     expect(oldOrder.rowCount).toBe(1);
     await pool.query("UPDATE billing_subscriptions SET status='canceled' WHERE mode='test' AND workspace_id=$1", [workspaceId]);
     await pool.query("UPDATE billing_orders SET created_at=created_at-interval '1 minute' WHERE id=$1", [oldOrder.rows[0].id]);
+    const nextPlan = await pool.query<{ id: string }>(`INSERT INTO billing_plan_versions
+      (code,version,kind,name_cs,name_en,description_cs,description_en,currency,amount_minor,monthly_credits,is_visible,is_purchasable,stripe_test_product_id,stripe_test_price_id)
+      VALUES ('test-monthly',2,'MONTHLY','Měsíčně II','Monthly II','','','CZK',9900,200,true,true,'prod_synthetic','price_monthly_v2') RETURNING id`);
     stripe.prices.retrieve.mockResolvedValueOnce({ livemode: false, active: true, currency: 'czk', unit_amount: 9900, product: 'prod_synthetic', type: 'recurring', recurring: { interval: 'month', interval_count: 1 } } as never);
     stripe.checkout.sessions.create.mockResolvedValueOnce({ id: 'cs_test_resubscribe', livemode: false, url: 'https://checkout.stripe.com/c/resubscribe', status: 'open' });
     const checkout = new BillingCheckout(pool, stripe as unknown as Stripe, 'test', 'http://127.0.0.1:3005', false);
-    const created = await checkout.create(workspaceId, monthlyPlanId, randomUUID());
+    const created = await checkout.create(workspaceId, nextPlan.rows[0].id, randomUUID());
     const oldSubscription = { id: 'sub_synthetic', livemode: false, customer: 'cus_synthetic', metadata: { orderId: oldOrder.rows[0].id }, status: 'canceled', cancel_at_period_end: false, items: { data: [{ price: { id: 'price_monthly' } }] } };
-    const newSubscription = { ...oldSubscription, id: 'sub_resubscribed', metadata: { orderId: created.orderId }, status: 'active' };
+    const newSubscription = { ...oldSubscription, id: 'sub_resubscribed', metadata: { orderId: created.orderId }, status: 'active', items: { data: [{ price: { id: 'price_monthly_v2' } }] } };
     stripe.subscriptions.retrieve.mockImplementation(async (subscriptionId: string) => (subscriptionId === newSubscription.id ? newSubscription : oldSubscription) as never);
     const events = new BillingEvents(pool, stripe as unknown as Stripe, 'test');
     const event = (id: string, type: string, object: object) => ({ id, type, livemode: false, data: { object } }) as Stripe.Event;
     await events.process(event('evt_resubscription', 'customer.subscription.created', { id: newSubscription.id }));
     expect((await pool.query('SELECT stripe_subscription_id,status FROM billing_subscriptions WHERE mode=$1 AND workspace_id=$2', ['test', workspaceId])).rows[0]).toMatchObject({ stripe_subscription_id: newSubscription.id, status: 'active' });
+    const newInvoice = { id: 'in_resubscribed', livemode: false, customer: 'cus_synthetic', parent: { subscription_details: { subscription: newSubscription.id } }, currency: 'czk',
+      lines: { has_more: false, data: [{ pricing: { price_details: { price: 'price_monthly_v2' } }, quantity: 1, parent: { subscription_item_details: { proration: false } } }] },
+      status: 'paid', billing_reason: 'subscription_create', amount_due: 9900, amount_paid: 9900, total_taxes: [], hosted_invoice_url: null, invoice_pdf: null };
+    stripe.invoices.retrieve.mockResolvedValueOnce(newInvoice as never).mockResolvedValueOnce(newInvoice as never);
+    stripe.invoicePayments.list.mockResolvedValueOnce({ data: [{ status: 'paid', payment: { type: 'payment_intent', payment_intent: 'pi_resubscribed' } }], has_more: false } as never)
+      .mockResolvedValueOnce({ data: [{ status: 'paid', payment: { type: 'payment_intent', payment_intent: 'pi_resubscribed' } }], has_more: false } as never);
+    stripe.paymentIntents.retrieve.mockResolvedValueOnce({ id: 'pi_resubscribed', livemode: false, status: 'succeeded', amount_received: 9900, currency: 'czk', customer: 'cus_synthetic' } as never)
+      .mockResolvedValueOnce({ id: 'pi_resubscribed', livemode: false, status: 'succeeded', amount_received: 9900, currency: 'czk', customer: 'cus_synthetic' } as never);
+    await events.process(event('evt_resub_invoice', 'invoice.paid', { id: newInvoice.id }));
+    await events.process(event('evt_resub_invoice_retry', 'invoice.paid', { id: newInvoice.id }));
+    expect((await pool.query('SELECT amount FROM credit_grants WHERE account_id=$1 AND idempotency_key=$2', [workspaceId, 'stripe-test-invoice:in_resubscribed'])).rows).toEqual([expect.objectContaining({ amount: 200 })]);
+    expect((await pool.query('SELECT plan_version_id,status FROM billing_invoices WHERE stripe_invoice_id=$1', [newInvoice.id])).rows[0]).toMatchObject({ plan_version_id: nextPlan.rows[0].id, status: 'paid' });
     await events.process(event('evt_old_subscription_deleted', 'customer.subscription.deleted', { id: oldSubscription.id }));
     expect((await pool.query('SELECT stripe_subscription_id,status FROM billing_subscriptions WHERE mode=$1 AND workspace_id=$2', ['test', workspaceId])).rows[0]).toMatchObject({ stripe_subscription_id: newSubscription.id, status: 'active' });
     const lateInvoice = { id: 'in_old_failed_late', livemode: false, customer: 'cus_synthetic', parent: { subscription_details: { subscription: oldSubscription.id } }, currency: 'czk', lines: { has_more: false, data: [] }, status: 'open', billing_reason: 'subscription_cycle', amount_due: 9900, amount_paid: 0, total_taxes: [], hosted_invoice_url: null, invoice_pdf: null };
