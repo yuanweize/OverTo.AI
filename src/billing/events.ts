@@ -6,7 +6,7 @@ type Mode = 'test' | 'live';
 type Order = {
   id: string; workspace_id: string; kind: 'MONTHLY' | 'CREDIT_PACK';
   amount_minor: string; currency: string; credits: number; status: string;
-  plan_version_id: string; stripe_customer_id: string | null;
+  plan_version_id: string; stripe_customer_id: string | null; stripe_payment_intent_id: string | null;
   stripe_checkout_session_id: string | null; stripe_subscription_id: string | null; created_at: Date;
 };
 const id = (value: string | { id: string } | null | undefined) => typeof value === 'string' ? value : value?.id;
@@ -182,12 +182,18 @@ export class BillingEvents {
     const status = paid ? 'paid' : 'payment_failed';
     await client.query(`INSERT INTO billing_invoices(mode,stripe_invoice_id,workspace_id,stripe_subscription_id,stripe_payment_intent_id,plan_version_id,status,currency,amount_due_minor,amount_paid_minor,tax_amount_minor,hosted_invoice_url,invoice_pdf_url,paid_at)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-      ON CONFLICT(mode,stripe_invoice_id) DO UPDATE SET status=excluded.status,stripe_payment_intent_id=COALESCE(excluded.stripe_payment_intent_id,billing_invoices.stripe_payment_intent_id),
+      ON CONFLICT(mode,stripe_invoice_id) DO UPDATE SET status=CASE WHEN billing_invoices.status IN ('refunded','partial_refund','disputed') THEN billing_invoices.status ELSE excluded.status END,
+      stripe_payment_intent_id=COALESCE(excluded.stripe_payment_intent_id,billing_invoices.stripe_payment_intent_id),
       amount_paid_minor=excluded.amount_paid_minor,paid_at=excluded.paid_at,updated_at=now()`,
     [this.mode, invoice.id, order.workspace_id, subscription.id, intentId ?? null, order.plan_version_id, status,
       invoice.currency.toUpperCase(), invoice.amount_due, invoice.amount_paid, invoice.total_taxes?.reduce((sum, tax) => sum + tax.amount, 0) ?? null,
       invoice.hosted_invoice_url, invoice.invoice_pdf, paid ? new Date() : null]);
     if (paid) {
+      if (invoice.billing_reason === 'subscription_create' && intentId) {
+        const linked = await client.query('UPDATE billing_orders SET stripe_payment_intent_id=$1 WHERE id=$2 AND mode=$3 AND (stripe_payment_intent_id IS NULL OR stripe_payment_intent_id=$1)', [intentId, order.id, this.mode]);
+        if (linked.rowCount !== 1) throw new Error('INITIAL_INVOICE_MISMATCH');
+        order.stripe_payment_intent_id = intentId;
+      }
       // A deleted personal workspace has no credit account. Keep the immutable
       // payment record for reconciliation without resurrecting deleted data.
       const account = await client.query('SELECT 1 FROM credit_accounts WHERE id=$1', [order.workspace_id]);
@@ -218,11 +224,16 @@ export class BillingEvents {
         `stripe-${this.mode}-refund:${charge.id}:${target}`, grantKey, delta, dispute ? 'STRIPE_DISPUTE' : 'STRIPE_REFUND');
     }
     await client.query('UPDATE billing_refund_tracking SET credits_reversed=$1 WHERE mode=$2 AND stripe_charge_id=$3', [target, this.mode, charge.id]);
-    if (!invoice?.rows[0]) {
-      const cumulativeRefunded = Number(tracked.rows[0].cumulative_refunded_minor);
+    const cumulativeRefunded = Number(tracked.rows[0].cumulative_refunded_minor);
+    const refundStatus = dispute ? 'DISPUTED' : cumulativeRefunded === charge.amount ? 'REFUNDED' : 'PARTIAL_REFUND';
+    if (invoice?.rows[0]) {
+      await client.query(`UPDATE billing_invoices SET status=CASE WHEN status='disputed' THEN status ELSE $1 END,updated_at=now()
+        WHERE mode=$2 AND stripe_invoice_id=$3`, [refundStatus.toLowerCase(), this.mode, invoice.rows[0].stripe_invoice_id]);
+    }
+    if (!invoice?.rows[0] || order.stripe_payment_intent_id === paymentIntentId) {
       await client.query(`UPDATE billing_orders SET amount_refunded_minor=GREATEST(amount_refunded_minor,$1),
         status=CASE WHEN status='DISPUTED' THEN status ELSE $2 END,updated_at=now() WHERE id=$3 AND mode=$4`,
-      [cumulativeRefunded, dispute ? 'DISPUTED' : cumulativeRefunded === charge.amount ? 'REFUNDED' : 'PARTIAL_REFUND', order.id, this.mode]);
+      [cumulativeRefunded, refundStatus, order.id, this.mode]);
     }
   }
 }

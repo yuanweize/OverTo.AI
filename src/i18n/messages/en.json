@@ -767,6 +767,7 @@
   },
   "CommercialBilling": {
     "title": "Billing and credits",
+    "dashboardDescriptionTest": "Manage Stripe Sandbox subscriptions, orders and invoices.",
     "dashboardDescriptionLive": "Manage subscriptions, orders and invoices.",
     "testNote": "Stripe test payments. No real charge is made. Credits appear only after a confirmed Stripe event.",
     "liveNote": "Payments and credits. Credits appear only after confirmed payment.",

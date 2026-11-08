@@ -48,18 +48,21 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = session.user.id;
+  let workspaceId: string;
+  let passwordHash: string;
+  const verified = new Map<string, ExpiredOrder>();
+  try {
   // Password hashing and Stripe network calls run before any database transaction.
   const credential = await pool.query<{ password: string }>(
     'SELECT password FROM "account" WHERE "userId"=$1 AND "providerId"=$2', [userId, 'credential']);
-  const passwordHash = credential.rows[0]?.password;
+  passwordHash = credential.rows[0]?.password;
   if (!passwordHash) return Response.json({ error: 'Účet nemá nastaveno heslo.' }, { status: 400 });
   if (!await verifyPassword({ hash: passwordHash, password: body.password }))
     return Response.json({ error: 'Zadané heslo pro potvrzení smazání účtu není správné.' }, { status: 403 });
   const root = await pool.query('SELECT 1 FROM platform_admins WHERE user_id=$1', [userId]);
   if (root.rowCount) return Response.json({ error: 'Hlavní administrátorský účet (ROOT) nelze smazat.' }, { status: 400 });
-  const { workspaceId } = await personalWorkspace(userId);
+  ({ workspaceId } = await personalWorkspace(userId));
   const expired = await pool.query<ExpiredOrder>(expiredOrderQuery, [workspaceId]);
-  const verified = new Map<string, ExpiredOrder>();
   for (const order of expired.rows) {
     const stripe = billingReconciliationStripe(order.mode);
     if (!stripe) return Response.json({ error: 'Platbu nyní nelze ověřit. Kontaktujte správce.' }, { status: 503 });
@@ -79,6 +82,10 @@ export async function POST(request: NextRequest) {
       console.error('CHECKOUT_RECONCILIATION_ERROR:', error);
       return Response.json({ error: 'Platbu nyní nelze ověřit. Zkuste to později.' }, { status: 503 });
     }
+  }
+  } catch (error) {
+    console.error('DELETE_ERROR:', error);
+    return Response.json({ error: 'Smazání účtu selhalo.' }, { status: 500 });
   }
 
   const client = await pool.connect();

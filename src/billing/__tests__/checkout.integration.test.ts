@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import type Stripe from 'stripe';
 import { BillingCheckout } from '@/billing/checkout';
 import { BillingEvents } from '@/billing/events';
+import { submitBillingRefund } from '@/billing/admin-refund';
 
 const connectionString = process.env.SITE_CONFIG_TEST_DATABASE_URL;
 describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL', () => {
@@ -29,6 +30,7 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     invoicePayments: { list: vi.fn(async () => ({ data: [{ status: 'paid', payment: { type: 'payment_intent', payment_intent: 'pi_synthetic' } }], has_more: false })) },
     paymentIntents: { retrieve: vi.fn(async () => ({ id: 'pi_synthetic', livemode: false, status: 'succeeded', amount_received: 9900, currency: 'czk', customer: 'cus_synthetic' })) },
     charges: { retrieve: vi.fn(async () => ({ id: 'ch_synthetic', livemode: false, amount: 9900, amount_refunded: 4950, payment_intent: 'pi_synthetic', customer: 'cus_synthetic' })) },
+    refunds: { create: vi.fn(async () => ({ id: 're_synthetic', status: 'succeeded', amount: 9900 })) },
     checkout: { sessions: {
       create: vi.fn(async () => ({ id: `cs_test_${randomUUID().replaceAll('-', '')}`, livemode: false, url: 'https://checkout.stripe.com/c/test', status: 'open' })),
       retrieve: vi.fn(async () => ({ id: 'cs_test_synthetic', livemode: false, url: 'https://checkout.stripe.com/c/test', status: 'open' })),
@@ -40,12 +42,15 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     await control.query(`CREATE SCHEMA ${schema}`);
     pool = new Pool({ connectionString, options: `-c search_path=${schema}` });
     await pool.query('CREATE TABLE "user"(id text PRIMARY KEY)');
+    await pool.query("CREATE TABLE platform_admins(user_id text PRIMARY KEY REFERENCES \"user\"(id),role text NOT NULL)");
+    await pool.query("CREATE TABLE ai_operations_audit(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,actor_id text NOT NULL REFERENCES \"user\"(id),action text NOT NULL,target_id text,details jsonb NOT NULL DEFAULT '{}')");
     await pool.query(await readFile('migrations/001_credit_ledger.sql', 'utf8'));
     await pool.query(await readFile('migrations/020_credit_reversals.sql', 'utf8'));
     await pool.query(await readFile('migrations/002_local_workspace.sql', 'utf8'));
     await pool.query(await readFile('migrations/021_billing_catalog.sql', 'utf8'));
     await pool.query(await readFile('migrations/022_billing_commerce.sql', 'utf8'));
     await pool.query('INSERT INTO "user"(id) VALUES($1)', ['owner']);
+    await pool.query("INSERT INTO platform_admins(user_id,role) VALUES('owner','ROOT')");
     await pool.query('INSERT INTO local_workspaces(id,user_id,name) VALUES($1,$2,$3)', [workspaceId, 'owner', 'Test']);
     await pool.query('INSERT INTO credit_accounts(id) VALUES($1)', [workspaceId]);
     const result = await pool.query<{ id: string }>(`INSERT INTO billing_plan_versions
@@ -113,6 +118,8 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
   });
 
   it('grants a monthly allowance once when invoice arrives before checkout completion', async () => {
+    stripe.invoicePayments.list.mockResolvedValue({ data: [{ status: 'paid', payment: { type: 'payment_intent', payment_intent: 'pi_monthly' } }], has_more: false } as never);
+    stripe.paymentIntents.retrieve.mockResolvedValue({ id: 'pi_monthly', livemode: false, status: 'succeeded', amount_received: 9900, currency: 'czk', customer: 'cus_synthetic' } as never);
     stripe.prices.retrieve.mockResolvedValueOnce({ livemode: false, active: true, currency: 'czk', unit_amount: 9900, product: 'prod_synthetic', type: 'recurring', recurring: { interval: 'month', interval_count: 1 } } as never);
     stripe.checkout.sessions.create.mockResolvedValueOnce({ id: 'cs_test_monthly', livemode: false, url: 'https://checkout.stripe.com/c/monthly', status: 'open' });
     const checkout = new BillingCheckout(pool, stripe as unknown as Stripe, 'test', 'http://127.0.0.1:3005', false);
@@ -136,6 +143,16 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     stripe.paymentIntents.retrieve.mockResolvedValueOnce({ id: 'pi_cycle', livemode: false, status: 'succeeded', amount_received: 9900, currency: 'czk', customer: 'cus_synthetic' } as never);
     await events.process(event('evt_invoice_cycle', 'invoice.paid', { id: 'in_cycle' }));
     expect((await pool.query('SELECT COUNT(*)::int AS count FROM credit_grants WHERE account_id=$1 AND idempotency_key LIKE $2', [workspaceId, 'stripe-test-invoice:%'])).rows[0].count).toBe(2);
+    stripe.charges.retrieve.mockResolvedValueOnce({ id: 'ch_cycle', livemode: false, amount: 9900, amount_refunded: 9900, payment_intent: 'pi_cycle', customer: 'cus_synthetic' } as never);
+    await events.process(event('evt_cycle_refund', 'charge.refunded', { id: 'ch_cycle' }));
+    expect((await pool.query('SELECT status FROM billing_invoices WHERE stripe_invoice_id=$1', ['in_cycle'])).rows[0].status).toBe('refunded');
+    expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [created.orderId])).rows[0].status).toBe('PAID');
+    stripe.charges.retrieve.mockResolvedValueOnce({ id: 'ch_initial', livemode: false, amount: 9900, amount_refunded: 9900, payment_intent: 'pi_monthly', customer: 'cus_synthetic' } as never);
+    await events.process(event('evt_initial_refund', 'charge.refunded', { id: 'ch_initial' }));
+    expect((await pool.query('SELECT status FROM billing_invoices WHERE stripe_invoice_id=$1', [invoice.id])).rows[0].status).toBe('refunded');
+    expect((await pool.query('SELECT status,amount_refunded_minor FROM billing_orders WHERE id=$1', [created.orderId])).rows[0]).toMatchObject({ status: 'REFUNDED', amount_refunded_minor: '9900' });
+    await events.process(event('evt_invoice_after_refund', 'invoice.paid', { id: invoice.id }));
+    expect((await pool.query('SELECT status FROM billing_invoices WHERE stripe_invoice_id=$1', [invoice.id])).rows[0].status).toBe('refunded');
     stripe.invoices.retrieve.mockResolvedValueOnce({ ...invoice, id: 'in_failed', status: 'open', amount_paid: 0, billing_reason: 'subscription_cycle' } as never);
     await events.process(event('evt_invoice_failed', 'invoice.payment_failed', { id: 'in_failed' }));
     expect((await pool.query('SELECT status FROM billing_subscriptions WHERE mode=$1 AND workspace_id=$2', ['test', workspaceId])).rows[0].status).toBe('past_due');
@@ -209,6 +226,40 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
     const reversed = await pool.query<{ amount: number }>('SELECT amount FROM credit_reversals WHERE account_id=$1 AND idempotency_key LIKE $2', [workspaceId, 'stripe-test-refund:ch_refunded_early:%']);
     expect(granted.rows[0].amount).toBe(100);
     expect(reversed.rows[0].amount).toBe(100);
+  });
+
+  it('allows only ROOT to submit a verified full refund and records the operation', async () => {
+    const created = await new BillingCheckout(pool, stripe as unknown as Stripe, 'test', 'http://127.0.0.1:3005', false).create(workspaceId, planId, randomUUID());
+    await pool.query("UPDATE billing_orders SET status='PAID',stripe_customer_id='cus_synthetic',stripe_payment_intent_id='pi_admin_refund' WHERE id=$1", [created.orderId]);
+    const input = { actorId: 'owner', targetId: created.orderId, targetKind: 'order' as const, reason: 'Customer requested a full refund', mode: 'test' as const };
+    stripe.paymentIntents.retrieve.mockResolvedValue({ id: 'pi_admin_refund', livemode: false, status: 'succeeded', latest_charge: 'ch_admin_refund', amount_received: 9900, currency: 'czk', customer: 'cus_synthetic' } as never);
+    stripe.charges.retrieve.mockResolvedValue({ id: 'ch_admin_refund', livemode: false, amount: 9900, amount_refunded: 0, payment_intent: 'pi_admin_refund', customer: 'cus_synthetic', currency: 'czk' } as never);
+    const calls = stripe.refunds.create.mock.calls.length;
+    await expect(submitBillingRefund(pool, stripe as unknown as Stripe, { ...input, actorId: 'not-root' })).rejects.toThrow('FORBIDDEN');
+    expect(stripe.refunds.create).toHaveBeenCalledTimes(calls);
+    await expect(submitBillingRefund(pool, stripe as unknown as Stripe, { ...input, mode: 'live' })).rejects.toThrow('ORDER_NOT_REFUNDABLE');
+    expect(stripe.refunds.create).toHaveBeenCalledTimes(calls);
+    const result = await submitBillingRefund(pool, stripe as unknown as Stripe, input);
+    expect(result).toMatchObject({ status: 'succeeded', amount: 9900, currency: 'CZK' });
+    expect(stripe.refunds.create).toHaveBeenCalledWith(expect.objectContaining({ charge: 'ch_admin_refund', amount: 9900 }),
+      { idempotencyKey: `overto-test-order-${created.orderId}-full-refund` });
+    expect((await pool.query("SELECT action FROM ai_operations_audit WHERE target_id=$1 ORDER BY id", [created.orderId])).rows.map(row => row.action)).toEqual(['BILLING_REFUND_REQUESTED', 'BILLING_REFUND_SUBMITTED']);
+    expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [created.orderId])).rows[0].status).toBe('PAID');
+    stripe.charges.retrieve.mockResolvedValueOnce({ id: 'ch_admin_refund', livemode: false, amount: 9900, amount_refunded: 9900, payment_intent: 'pi_admin_refund', customer: 'cus_synthetic', currency: 'czk' } as never);
+    await expect(submitBillingRefund(pool, stripe as unknown as Stripe, input)).rejects.toThrow('ALREADY_REFUNDED');
+    expect(stripe.refunds.create).toHaveBeenCalledTimes(calls + 1);
+  });
+
+  it('can refund a paid renewal invoice without touching a different order', async () => {
+    await pool.query(`INSERT INTO billing_invoices(mode,stripe_invoice_id,workspace_id,stripe_subscription_id,stripe_payment_intent_id,
+      plan_version_id,status,currency,amount_due_minor,amount_paid_minor)
+      VALUES('test','in_adminrenewal',$1,'sub_admin_renewal','pi_admin_renewal',$2,'paid','CZK',9900,9900)`, [workspaceId, monthlyPlanId]);
+    stripe.paymentIntents.retrieve.mockResolvedValueOnce({ id: 'pi_admin_renewal', livemode: false, status: 'succeeded', latest_charge: 'ch_admin_renewal', amount_received: 9900, currency: 'czk', customer: 'cus_synthetic' } as never);
+    stripe.charges.retrieve.mockResolvedValueOnce({ id: 'ch_admin_renewal', livemode: false, amount: 9900, amount_refunded: 0, payment_intent: 'pi_admin_renewal', customer: 'cus_synthetic', currency: 'czk' } as never);
+    const result = await submitBillingRefund(pool, stripe as unknown as Stripe, { actorId: 'owner', targetId: 'in_adminrenewal', targetKind: 'invoice', reason: 'Customer requested renewal refund', mode: 'test' });
+    expect(result.status).toBe('succeeded');
+    expect(stripe.refunds.create).toHaveBeenCalledWith(expect.objectContaining({ charge: 'ch_admin_renewal' }), { idempotencyKey: 'overto-test-invoice-in_adminrenewal-full-refund' });
+    expect((await pool.query('SELECT status FROM billing_invoices WHERE stripe_invoice_id=$1', ['in_adminrenewal'])).rows[0].status).toBe('paid');
   });
 
   it('refuses to expose a checkout session if the workspace was deleted while Stripe responded', async () => {
