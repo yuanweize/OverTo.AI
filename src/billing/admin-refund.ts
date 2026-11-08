@@ -12,7 +12,7 @@ export async function submitBillingRefund(pool: Pool, stripe: Stripe, input: {
 }) {
   const reason = input.reason.trim();
   if (reason.length < 5 || reason.length > 300 ||
-      !(input.targetKind === 'order' ? /^[0-9a-f-]{36}$/i.test(input.targetId) : /^in_[A-Za-z0-9]+$/.test(input.targetId))) throw new Error('INVALID_INPUT');
+      !(input.targetKind === 'order' ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.targetId) : /^in_[A-Za-z0-9]+$/.test(input.targetId))) throw new Error('INVALID_INPUT');
   const target = (await pool.query<RefundTarget>(input.targetKind === 'order'
     ? 'SELECT id,mode,workspace_id,status,stripe_customer_id,stripe_payment_intent_id,currency FROM billing_orders WHERE id=$1 AND mode=$2'
     : `SELECT i.stripe_invoice_id AS id,i.mode,i.workspace_id,i.status,c.stripe_customer_id,i.stripe_payment_intent_id,i.currency
@@ -46,11 +46,19 @@ export async function submitBillingRefund(pool: Pool, stripe: Stripe, input: {
   [input.actorId, input.targetId, JSON.stringify({ mode: input.mode, targetKind: input.targetKind, workspaceId: target.workspace_id, reason, chargeId })]);
   if (!audit.rowCount) throw new Error('FORBIDDEN');
 
-  const refund = await stripe.refunds.create({ charge: charge.id, amount: charge.amount - charge.amount_refunded,
-    reason: 'requested_by_customer', metadata: { targetId: target.id, targetKind: input.targetKind, operator: input.actorId } },
-  { idempotencyKey: `overto-${input.mode}-${input.targetKind}-${target.id}-full-refund` });
+  let refund: Stripe.Refund;
+  try {
+    refund = await stripe.refunds.create({ charge: charge.id, amount: charge.amount - charge.amount_refunded,
+      reason: 'requested_by_customer', metadata: { targetId: target.id, targetKind: input.targetKind, operator: input.actorId } },
+    { idempotencyKey: `overto-${input.mode}-${input.targetKind}-${target.id}-full-refund` });
+  } catch (error) {
+    await pool.query(`INSERT INTO ai_operations_audit(actor_id,action,target_id,details)
+      VALUES($1,'BILLING_REFUND_FAILED',$2,$3)`,
+    [input.actorId, input.targetId, JSON.stringify({ mode: input.mode, targetKind: input.targetKind, reason: error instanceof Error ? error.name : 'UNKNOWN' })]).catch(auditError => console.error('REFUND_AUDIT_ERROR', auditError));
+    throw error;
+  }
   await pool.query(`INSERT INTO ai_operations_audit(actor_id,action,target_id,details)
     VALUES($1,'BILLING_REFUND_SUBMITTED',$2,$3)`,
-  [input.actorId, input.targetId, JSON.stringify({ mode: input.mode, targetKind: input.targetKind, refundId: refund.id, status: refund.status, amount: refund.amount })]);
+  [input.actorId, input.targetId, JSON.stringify({ mode: input.mode, targetKind: input.targetKind, refundId: refund.id, status: refund.status, amount: refund.amount })]).catch(error => console.error('REFUND_AUDIT_ERROR', error));
   return { status: refund.status, amount: refund.amount, currency: target.currency };
 }

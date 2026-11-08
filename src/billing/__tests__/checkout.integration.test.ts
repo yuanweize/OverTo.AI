@@ -245,9 +245,12 @@ describe.skipIf(!connectionString)('commercial checkout on isolated PostgreSQL',
       { idempotencyKey: `overto-test-order-${created.orderId}-full-refund` });
     expect((await pool.query("SELECT action FROM ai_operations_audit WHERE target_id=$1 ORDER BY id", [created.orderId])).rows.map(row => row.action)).toEqual(['BILLING_REFUND_REQUESTED', 'BILLING_REFUND_SUBMITTED']);
     expect((await pool.query('SELECT status FROM billing_orders WHERE id=$1', [created.orderId])).rows[0].status).toBe('PAID');
+    stripe.refunds.create.mockRejectedValueOnce(new Error('STRIPE_TEMPORARILY_UNAVAILABLE'));
+    await expect(submitBillingRefund(pool, stripe as unknown as Stripe, input)).rejects.toThrow('STRIPE_TEMPORARILY_UNAVAILABLE');
+    expect((await pool.query("SELECT action FROM ai_operations_audit WHERE target_id=$1 ORDER BY id DESC LIMIT 1", [created.orderId])).rows[0].action).toBe('BILLING_REFUND_FAILED');
     stripe.charges.retrieve.mockResolvedValueOnce({ id: 'ch_admin_refund', livemode: false, amount: 9900, amount_refunded: 9900, payment_intent: 'pi_admin_refund', customer: 'cus_synthetic', currency: 'czk' } as never);
     await expect(submitBillingRefund(pool, stripe as unknown as Stripe, input)).rejects.toThrow('ALREADY_REFUNDED');
-    expect(stripe.refunds.create).toHaveBeenCalledTimes(calls + 1);
+    expect(stripe.refunds.create).toHaveBeenCalledTimes(calls + 2);
   });
 
   it('can refund a paid renewal invoice without touching a different order', async () => {
