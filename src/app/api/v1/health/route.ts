@@ -4,6 +4,7 @@ import { pool } from '@/auth/server';
 
 export async function GET() {
   const headers = { 'Cache-Control': 'no-store' };
+  const commit = /^[0-9a-f]{40}$/i.test(process.env.RENDER_GIT_COMMIT ?? '') ? process.env.RENDER_GIT_COMMIT : undefined;
 
   // Detect configuration typos (OVERTO_SELF_HOST vs OVERTO_SELF_HOSTED)
   if (process.env.OVERTO_SELF_HOST === 'true' && process.env.OVERTO_SELF_HOSTED !== 'true') {
@@ -56,7 +57,7 @@ export async function GET() {
   }
 
   return NextResponse.json(
-    { status: 'ok', service: 'overto', schemaVersion: '1.0', auth: deployment?.mode ?? 'disabled' },
+    { status: 'ok', service: 'overto', schemaVersion: '1.0', auth: deployment?.mode ?? 'disabled', ...(commit ? { commit } : {}) },
     { headers }
   );
 }

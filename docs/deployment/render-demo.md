@@ -2,6 +2,8 @@
 
 This guide documents the setup for running an OvěřTo.AI public demo instance on [Render](https://render.com) backed by managed PostgreSQL, with Cloudflare custom subdomain routing and automated continuous deployment from the GitHub `main` branch.
 
+After a deploy, `/api/v1/health` reports the running `commit` when Render supplies `RENDER_GIT_COMMIT`. Compare it with the merged `main` SHA before claiming that production is current. A healthy response alone does not prove the latest code was deployed.
+
 ---
 
 ## 1. Safety & Demo Invariants
