@@ -559,7 +559,7 @@
     "requestsToday": "Dnešní analýzy",
     "testSubscriptions": "Testovací předplatná",
     "billing": "Platební události",
-    "billingIntro": "Stav předplatného Stripe Test Mode a typy zpracovaných webhooků. Nejde o finanční účetnictví ani faktury.",
+    "billingIntro": "Správa tarifů, objednávek, faktur a vrácení plateb. Kredity se aktualizují po ověřených událostech Stripe.",
     "audit": "Auditní záznamy",
     "auditIntro": "Poslední změny nastavení webu a AI Studia s administrátorem a časem.",
     "system": "Stav systému",

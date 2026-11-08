@@ -558,7 +558,7 @@
     "requestsToday": "Analyses today",
     "testSubscriptions": "Test subscriptions",
     "billing": "Billing activity",
-    "billingIntro": "Stripe Test Mode subscription state and processed webhook event types. This is not a financial ledger or invoice view.",
+    "billingIntro": "Manage plans, orders, invoices and refunds. Signed Stripe webhooks update credits after confirmed payments.",
     "audit": "Audit log",
     "auditIntro": "Recent site-setting and AI Studio changes with the acting administrator and timestamp.",
     "system": "System status",
