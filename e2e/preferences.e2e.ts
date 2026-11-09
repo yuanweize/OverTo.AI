@@ -12,15 +12,10 @@ test('browser language, explicit overrides and real homepage example', async ({ 
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.reload();
   await expect(page.locator('header')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  const pref = page.waitForResponse(res => res.url().includes('/api/preferences') && res.status() === 200);
   const reloaded = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.getByLabel('Language').selectOption('cs');
-  await pref;
   await reloaded;
   await expect.poll(async () => (await context.cookies()).find(cookie => cookie.name === 'overto-locale')?.value).toBe('cs');
-  // A dev-server HMR navigation can satisfy waitForNavigation before the
-  // preference reload. Request a fresh document with the persisted cookie.
-  await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('lang', 'cs');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'cs');
