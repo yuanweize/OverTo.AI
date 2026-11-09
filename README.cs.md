@@ -38,7 +38,7 @@ Asistent založený na důkazech pro české a vícejazyčné zprávy. Pomáhá 
 - **Vývojářské API a OpenAPI 3.1**  
   Verzovaný REST koncový bod (`/api/v1/analyses`), projektové API klíče s denními limity spotřeby a interaktivní testovací prostředí (API Playground).
 - **Provoz ve vlastní infrastruktuře (Self-Hosting) a AI Studio**  
-  Nasazení v Docker Compose s PostgreSQL 17, Better Auth s ověřováním e-mailů, transakční kreditní knihou, testovací fakturací Stripe a administrátorským AI Studiem chráněným atomickými finančními rozpočty.
+  Nasazení v Docker Compose s PostgreSQL 17, Better Auth s ověřováním e-mailů, transakční kreditní knihou, konfigurovatelnými platbami Stripe Sandbox a Live a administrátorským AI Studiem chráněným atomickými finančními rozpočty. Živé platby nejsou ve veřejném demu zapnuté.
 
 ---
 

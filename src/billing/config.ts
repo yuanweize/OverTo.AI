@@ -28,9 +28,16 @@ export function billingConfigStatus(env: Partial<NodeJS.ProcessEnv> = process.en
     if (mode === 'test' && url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname))) return { config: null, issue: 'INVALID_PUBLIC_URL' };
     publicOrigin = url.origin;
   } catch { return { config: null, issue: 'INVALID_PUBLIC_URL' }; }
-  return { config: { mode, webhookSecret, publicOrigin, stripe: new Stripe(key, { timeout: 10000, maxNetworkRetries: 0 }) }, issue: null };
+  return { config: { mode, webhookSecret, publicOrigin, checkoutEnabled: env.OVERTO_BILLING_CHECKOUT_ENABLED === 'true', stripe: new Stripe(key, { timeout: 10000, maxNetworkRetries: 0 }) }, issue: null };
 }
 
 export function billingConfig(env: Partial<NodeJS.ProcessEnv> = process.env) {
   return billingConfigStatus(env).config;
+}
+
+/** Reconcile historical orders even if checkout is now disabled or its mode changed. */
+export function billingReconciliationStripe(mode: 'test' | 'live', env: Partial<NodeJS.ProcessEnv> = process.env): Stripe | null {
+  const key = (mode === 'test' ? env.STRIPE_TEST_SECRET_KEY : env.STRIPE_LIVE_SECRET_KEY)?.trim() ?? '';
+  if (!(mode === 'test' ? /^sk_test_[A-Za-z0-9_]+$/ : /^sk_live_[A-Za-z0-9_]+$/).test(key)) return null;
+  return new Stripe(key, { timeout: 10000, maxNetworkRetries: 0 });
 }

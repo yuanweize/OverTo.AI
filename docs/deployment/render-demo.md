@@ -2,14 +2,16 @@
 
 This guide documents the setup for running an OvěřTo.AI public demo instance on [Render](https://render.com) backed by managed PostgreSQL, with Cloudflare custom subdomain routing and automated continuous deployment from the GitHub `main` branch.
 
+After a deploy, `/api/v1/health` reports the running `commit` when Render supplies `RENDER_GIT_COMMIT`. Compare it with the merged `main` SHA before claiming that production is current. A healthy response alone does not prove the latest code was deployed.
+
 ---
 
 ## 1. Safety & Demo Invariants
 
-The public demo configuration (`render.yaml`) enforces the following security boundaries:
+The current public demo keeps these security boundaries through its Render environment. A new Blueprint is safe when the optional AI and Billing values are left unset; operators must configure them explicitly in the Render Dashboard:
 
 - **Rules-Only Deterministic Analysis**: Paid LLM calls are disabled (`AI_ENABLED=false`, `AI_LOCAL_ONLY=false`). Public analysis uses deterministic scam pattern matching and offline URL verification with zero third-party provider costs.
-- **Zero Real Billing**: Real Stripe checkout is disabled (`STRIPE_SECRET_KEY=""`), preventing unintended customer payments.
+- **Zero Real Billing by default**: `OVERTO_BILLING_MODE` defaults to `disabled`; new checkout also requires `OVERTO_BILLING_CHECKOUT_ENABLED=true` and mode-specific valid credentials.
 - **Client Identity & Anti-Abuse**: `OVERTO_TRUST_PROXY=true` preserves client IP hashing behind Cloudflare and Render proxies, preventing rate-limit circumvention while protecting user privacy.
 - **High-Entropy Generated Secrets**: Critical secrets (`OVERTO_AUTH_SECRET`, `OVERTO_CLIENT_IDENTITY_SALT`) are generated dynamically by Render on initialization and never committed to version control.
 - **EU Data Residency & Privacy Posture**: Deployed in the Frankfurt region (`frankfurt`) for low network latency and alignment with European data residency preferences. Note: Hosting within the European Union supports data residency goals but does not automatically constitute full GDPR compliance, which also requires appropriate operational Data Processing Agreements (DPAs), privacy disclosures, and administrative data management procedures.
@@ -50,8 +52,14 @@ Fill in the uncommitted environment variables (`sync: false`) in the Render Web 
 | `SMTP_USER` | SMTP username provided by your email provider |
 | `SMTP_PASSWORD` | SMTP password / API token |
 | `SMTP_FROM` | Verified sender address (e.g. `OvěřTo.AI <noreply@overto.ai>`) |
+| `AI_ENABLED`, `AI_PRODUCTION_ENABLED` | Leave `false` for the public Rules-only demo. Set both to `true` only after configuring provider, pricing, consent, and budget guards in AI Studio. |
+| `OVERTO_BILLING_MODE`, `OVERTO_BILLING_CHECKOUT_ENABLED` | Leave `disabled` and `false` for the demo. A controlled Live rollout requires `live` and a separate explicit checkout flag. |
+| `OVERTO_LIVE_BILLING_ACTIVATED` | Leave `false` until Stripe Live merchant, webhook, catalog prices, tax and refund policies pass acceptance. |
+| `STRIPE_LIVE_SECRET_KEY`, `STRIPE_LIVE_WEBHOOK_SECRET` | Set only in Render, from the same Stripe Live account. Never use Test credentials for Live mode. |
 
 *(Never commit real SMTP passwords or API tokens to the GitHub repository).*
+
+Render ignores `sync: false` entries when updating an existing Blueprint, so existing service values are preserved; any newly needed secret must be added in the Dashboard. The repository does not contain Live credentials or assert that the current public demo accepts payments. See the [billing boundary](../saas/ledger.md) before changing the mode.
 
 ### Step 3: Configure Cloudflare Custom Subdomain
 

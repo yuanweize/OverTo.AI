@@ -29,11 +29,12 @@ services:
         generateValue: true
       - key: OVERTO_TRUST_PROXY
         value: 'true'
-      # Public Demo Safety Invariant: Rules-only, disable paid AI and real Stripe
+      # Existing demo stays Rules-only. Operators can explicitly enable guarded
+      # production AI in Render without a later Blueprint sync resetting it.
       - key: AI_ENABLED
-        value: 'false'
+        sync: false
       - key: AI_PRODUCTION_ENABLED
-        value: 'false'
+        sync: false
       - key: AI_ANONYMOUS_ENABLED
         value: 'false'
       - key: AI_EMERGENCY_DISABLE
@@ -47,9 +48,15 @@ services:
       - key: POSTHOG_PROJECT_TOKEN
         sync: false
       - key: OVERTO_BILLING_MODE
-        value: disabled
+        sync: false
+      - key: OVERTO_BILLING_CHECKOUT_ENABLED
+        sync: false
       - key: OVERTO_LIVE_BILLING_ACTIVATED
-        value: 'false'
+        sync: false
+      - key: STRIPE_LIVE_SECRET_KEY
+        sync: false
+      - key: STRIPE_LIVE_WEBHOOK_SECRET
+        sync: false
       # Production Database connection from managed PostgreSQL
       - key: DATABASE_URL
         fromDatabase:

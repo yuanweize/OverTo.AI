@@ -2,9 +2,10 @@
 
 All notable changes to OvěřTo.AI are documented in this file.
 
-## Unreleased
+## [7.1.0] - 2026-11-08
 
-- Added a versioned Free/monthly/credit-pack catalog with immutable PostgreSQL versions, ROOT-only publication, audit and idempotent retries. A public catalog endpoint and pricing display use only visible, effective versions. Commercial checkout remains unavailable and disabled by default.
+- Added a versioned Free/monthly/credit-pack catalog with immutable PostgreSQL versions, ROOT-only publication, audit and idempotent retries. A public catalog endpoint and pricing display use only visible, effective versions. Commercial Checkout and customer portal are configurable; new payments remain disabled by default.
+- Added mode-separated Stripe Sandbox/Live orders, signed webhook processing, subscriptions, invoices, customer billing pages, and ROOT refund actions for paid orders and renewal invoices. Refunds are audited and use Stripe idempotency keys; only signed webhooks reverse credits. Hosted Sandbox Checkout, refund reversal, cancellation and account deletion were verified on an isolated QA stack. Live merchant activation and public deployment remain separate operational steps.
 - Test Mode refunds now preserve the original credit grant and append reversal entries. Balances subtract reversals, and refunded invoices cannot regain credits through a later or repeated paid event. Account export includes reversal history.
 - Administrator credit grants and audit records now commit in one PostgreSQL transaction. A stable request identifier makes retries idempotent, including after an uncertain network response. The ROOT role is checked again in the transaction.
 - The credit grant dialog now uses Czech and English labels and exposes a dialog name and status message to assistive technology.

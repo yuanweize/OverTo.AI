@@ -39,11 +39,13 @@ describe('Production & Render Deployment Configuration Integrity', () => {
       expect(yamlContent).toMatch(/key:\s*SMTP_FROM/);
       expect(yamlContent).not.toMatch(/key:\s*OVERTO_SMTP_/);
 
-      // 7. Safety in public demo: Paid AI and Stripe billing disabled
-      expect(yamlContent).toMatch(/key:\s*AI_ENABLED\s*\n\s*value:\s*'false'/);
+      // 7. Sensitive switches are operator-managed. Existing public demo values
+      // remain disabled when the Blueprint is synced.
+      expect(yamlContent).toMatch(/key:\s*AI_ENABLED\s*\n\s*sync:\s*false/);
+      expect(yamlContent).toMatch(/key:\s*AI_PRODUCTION_ENABLED\s*\n\s*sync:\s*false/);
       expect(yamlContent).toMatch(/key:\s*AI_LOCAL_ONLY\s*\n\s*value:\s*'false'/);
-      expect(yamlContent).toMatch(/key:\s*OVERTO_BILLING_MODE\s*\n\s*value:\s*disabled/);
-      expect(yamlContent).toMatch(/key:\s*OVERTO_LIVE_BILLING_ACTIVATED\s*\n\s*value:\s*'false'/);
+      expect(yamlContent).toMatch(/key:\s*OVERTO_BILLING_MODE\s*\n\s*sync:\s*false/);
+      expect(yamlContent).toMatch(/key:\s*OVERTO_LIVE_BILLING_ACTIVATED\s*\n\s*sync:\s*false/);
 
       // 8. Generated secrets for session security and client identity
       expect(yamlContent).toMatch(/key:\s*OVERTO_AUTH_SECRET\s*\n\s*generateValue:\s*true/);

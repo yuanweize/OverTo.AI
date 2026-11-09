@@ -38,7 +38,7 @@ An evidence-led assistant for Czech and multilingual messages, helping people ex
 - **Developer API & OpenAPI 3.1**  
   Versioned REST endpoint (`/api/v1/analyses`), scoped tenant API keys with daily rate limits, and an interactive browser-based API playground.
 - **Self-Hosted Architecture & AI Studio**  
-  Self-hosted Docker Compose deployment powered by PostgreSQL 17, Better Auth with email verification, transactional credit ledger, Stripe test billing, and an administrative AI Studio protected by atomic concurrency budgets.
+  Self-hosted Docker Compose deployment powered by PostgreSQL 17, Better Auth with email verification, a transactional credit ledger, configurable Stripe Sandbox and Live billing, and an administrative AI Studio protected by atomic concurrency budgets. Live billing is not activated on the public demo.
 
 ---
 
